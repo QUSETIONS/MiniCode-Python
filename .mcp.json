@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@zengwenliang/mcp-server-sequential-thinking"],
+      "env": {},
+      "enabled": true,
+      "protocol": "auto"
+    }
+  }
+}
