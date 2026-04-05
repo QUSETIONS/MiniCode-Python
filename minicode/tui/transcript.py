@@ -85,6 +85,30 @@ def get_transcript_window_size(window_size: int | None = None) -> int:
     return max(8, rows - 15)
 
 
+_entry_cache: dict[int, tuple[tuple, list[str]]] = {}
+
+def _get_entry_lines(entry: TranscriptEntry) -> list[str]:
+    state = (
+        entry.kind,
+        entry.body,
+        entry.status,
+        entry.collapsed,
+        entry.collapsePhase,
+        entry.collapsedSummary,
+        entry.toolName
+    )
+    
+    entry_id = id(entry)
+    cached = _entry_cache.get(entry_id)
+    if cached is not None and cached[0] == state:
+        return cached[1]
+        
+    lines = _render_transcript_entry(entry).split("\n")
+    # Clean up old entries occasionally if needed, but since we just append, 
+    # the cache will grow linearly with session length which is fine for TUI.
+    _entry_cache[entry_id] = (state, lines)
+    return lines
+
 def _render_transcript_lines(entries: list[TranscriptEntry]) -> list[str]:
     """Render all entries into a list of lines with decorative separators."""
     all_lines: list[str] = []
@@ -97,8 +121,7 @@ def _render_transcript_lines(entries: list[TranscriptEntry]) -> list[str]:
             all_lines.append(separator)
             all_lines.append("")
 
-        entry_text = _render_transcript_entry(entry)
-        all_lines.extend(entry_text.split("\n"))
+        all_lines.extend(_get_entry_lines(entry))
 
     return all_lines
 
