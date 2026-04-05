@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import os
+import random
 import sys
 import threading
 import time
@@ -310,7 +312,6 @@ def _get_contextual_help(state: ScreenState, args: TtyAppArgs) -> str | None:
             "💡 Tip: Type /help for all commands",
             "💡 Tip: Use Ctrl+R to search history",
         ]
-        import random
         return random.choice(tips)
     
     # 工具运行中 - 显示相关提示
@@ -1299,7 +1300,7 @@ def run_tty_app(
                     if not msvcrt.kbhit():
                         # Flush any deferred renders during idle
                         throttled.flush()
-                        time.sleep(0.02)
+                        time.sleep(0.05)  # 从 0.02 增加到 0.05 降低 CPU 使用率
                         continue
                     # Use _win_read_one_key to translate special keys
                     chunk = ""
@@ -1345,9 +1346,9 @@ def run_tty_app(
                     except SystemExit:
                         should_exit = True
                         break
-                    except Exception:
-                        # Silently ignore rendering errors
-                        pass
+                    except Exception as e:
+                        # 记录事件处理错误，但不中断主循环
+                        logging.debug("Event handling error: %s", e, exc_info=True)
 
                 # Ensure the final state after processing all events is visible
                 throttled.flush()

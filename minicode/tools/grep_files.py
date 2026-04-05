@@ -22,7 +22,12 @@ def _run(input_data: dict, context) -> ToolResult:
     regex = re.compile(input_data["pattern"])
     results: list[str] = []
     skipped = 0
+    file_count = 0
     
+    # 跳过常见大目录
+    SKIP_DIRS = {'.git', 'node_modules', '__pycache__', '.venv', 'venv', '.tox', 'dist', 'build'}
+    MAX_FILES = 5000
+
     try:
         all_files = sorted(root.rglob("*"))
     except PermissionError:
@@ -31,6 +36,19 @@ def _run(input_data: dict, context) -> ToolResult:
         return ToolResult(ok=False, output=f"Cannot read directory: {e}")
 
     for file_path in all_files:
+        # 跳过大目录
+        if any(part in SKIP_DIRS for part in file_path.parts):
+            skipped += 1
+            continue
+            
+        # 限制文件数量
+        if file_count >= MAX_FILES:
+            output = "\n".join(results) if results else "No matches found."
+            output += f"\n\n⚠️ Results truncated at {MAX_FILES} files. Try a more specific path."
+            return ToolResult(ok=True, output=output)
+        
+        file_count += 1
+        
         if not file_path.is_file():
             continue
         try:

@@ -3,6 +3,41 @@ from __future__ import annotations
 from minicode.tooling import ToolContext, ToolRegistry
 from minicode.types import ChatMessage, ModelAdapter
 
+# 常量：避免重复的提示文本
+NUDGE_CONTINUE = (
+    "Continue immediately from your <progress> update with concrete tool calls, "
+    "code changes, or an explicit <final> answer only if the task is complete."
+)
+
+NUDGE_AFTER_TOOL_RESULT = (
+    "Continue from your progress update. You have already used tools in this turn, "
+    "so treat plain status text as progress, not a final answer. Respond with the "
+    "next concrete tool call, code change, or an explicit <final> answer only if "
+    "the task is truly complete."
+)
+
+NUDGE_AFTER_EMPTY_RESPONSE = (
+    "Your last response was empty after recent tool results. Continue immediately "
+    "by trying the next concrete step, adapting to any tool errors, or giving an "
+    "explicit <final> answer only if the task is complete."
+)
+
+NUDGE_AFTER_EMPTY_NO_TOOLS = (
+    "Your last response was empty. Continue immediately with concrete tool calls, "
+    "code changes, or an explicit <final> answer only if the task is complete."
+)
+
+RESUME_AFTER_PAUSE = (
+    "Resume from the previous pause and continue immediately with the next concrete "
+    "tool call, code change, or an explicit <final> answer only if the task is complete."
+)
+
+RESUME_AFTER_MAX_TOKENS = (
+    "Your previous response hit max_tokens during thinking before producing the next "
+    "actionable step. Resume immediately and continue with the next concrete tool call, "
+    "code change, or an explicit <final> answer only if the task is complete."
+)
+
 
 def _is_empty_assistant_response(content: str) -> bool:
     return len(content.strip()) == 0
@@ -82,9 +117,9 @@ def run_agent_turn(
                     {
                         "role": "user",
                         "content": (
-                            "Continue from your progress update. You have already used tools in this turn, so treat plain status text as progress, not a final answer. Respond with the next concrete tool call, code change, or an explicit <final> answer only if the task is truly complete."
+                            NUDGE_AFTER_TOOL_RESULT
                             if saw_tool_result and getattr(next_step, 'kind', None) != "progress"
-                            else "Continue immediately from your <progress> update with concrete tool calls, code changes, or an explicit <final> answer only if the task is complete."
+                            else NUDGE_CONTINUE
                         ),
                     }
                 )
@@ -111,9 +146,9 @@ def run_agent_turn(
                     {
                         "role": "user",
                         "content": (
-                            "Resume from the previous pause and continue immediately with the next concrete tool call, code change, or an explicit <final> answer only if the task is complete."
+                            RESUME_AFTER_PAUSE
                             if stop_reason == "pause_turn"
-                            else "Your previous response hit max_tokens during thinking before producing the next actionable step. Resume immediately and continue with the next concrete step."
+                            else RESUME_AFTER_MAX_TOKENS
                         ),
                     }
                 )
@@ -125,9 +160,9 @@ def run_agent_turn(
                     {
                         "role": "user",
                         "content": (
-                            "Your last response was empty after recent tool results. Continue immediately by trying the next concrete step, adapting to any tool errors, or giving an explicit <final> answer only if the task is complete."
+                            NUDGE_AFTER_EMPTY_RESPONSE
                             if saw_tool_result
-                            else "Your last response was empty. Continue immediately with concrete tool calls, code changes, or an explicit <final> answer only if the task is complete."
+                            else NUDGE_AFTER_EMPTY_NO_TOOLS
                         ),
                     }
                 )
@@ -166,7 +201,7 @@ def run_agent_turn(
                 current_messages.append(
                     {
                         "role": "user",
-                        "content": "Continue immediately from your <progress> update with concrete tool calls, code changes, or an explicit <final> answer only if the task is complete.",
+                        "content": NUDGE_CONTINUE,
                     }
                 )
             else:
