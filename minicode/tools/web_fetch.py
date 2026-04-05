@@ -1,11 +1,34 @@
 from __future__ import annotations
 
 import json
+import socket
 import urllib.request
 import urllib.error
+from ipaddress import ip_address
 from minicode.tooling import ToolDefinition, ToolResult
 
 MAX_CONTENT_LENGTH = 50000
+MAX_REDIRECTS = 5  # 限制重定向次数防止 SSRF
+
+
+def _is_safe_url(url: str) -> tuple[bool, str]:
+    """检查 URL 是否安全（非内网地址）"""
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(url)
+        hostname = parsed.hostname
+        
+        if not hostname:
+            return False, "Invalid URL: no hostname"
+        
+        # 阻止本地和內网地址
+        blocked_prefixes = ["localhost", "127.", "10.", "192.168.", "172.16.", "0.0.0.0", "::1", "fe80:"]
+        if any(hostname.startswith(p) for p in blocked_prefixes):
+            return False, f"Access to internal addresses blocked: {hostname}"
+        
+        return True, "OK"
+    except Exception as e:
+        return False, f"URL validation failed: {e}"
 
 
 def _validate(input_data: dict) -> dict:
@@ -24,6 +47,11 @@ def _run(input_data: dict, context) -> ToolResult:
     url = input_data["url"]
     max_chars = input_data["max_chars"]
 
+    # SSRF 防护：检查 URL 安全性
+    is_safe, reason = _is_safe_url(url)
+    if not is_safe:
+        return ToolResult(ok=False, output=f"Security Error: {reason}\nURL: {url}")
+
     try:
         req = urllib.request.Request(
             url,
@@ -33,7 +61,20 @@ def _run(input_data: dict, context) -> ToolResult:
             },
         )
 
-        with urllib.request.urlopen(req, timeout=30) as response:
+        # 限制重定向次数
+        class LimitedRedirectHandler(urllib.request.HTTPRedirectHandler):
+            def __init__(self):
+                self.redirect_count = 0
+            
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                self.redirect_count += 1
+                if self.redirect_count > MAX_REDIRECTS:
+                    raise urllib.error.HTTPError(req.full_url, code, f"Too many redirects (>{MAX_REDIRECTS})", msg, fp)
+                return urllib.request.HTTPRedirectHandler.redirect_request(self, req, fp, code, msg, headers, newurl)
+
+        opener = urllib.request.build_opener(LimitedRedirectHandler())
+        
+        with opener.open(req, timeout=30) as response:
             content_type = response.headers.get("Content-Type", "")
             charset = "utf-8"
 

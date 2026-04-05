@@ -156,8 +156,11 @@ class ToolRegistry:
         try:
             parsed = tool.validator(input_data)
             return tool.run(parsed, context)
+        except (KeyboardInterrupt, SystemExit):
+            # 这些异常应该向上传播，不应该被捕获
+            raise
         except Exception as error:  # noqa: BLE001
-            return ToolResult(ok=False, output=str(error))
+            return ToolResult(ok=False, output=f"{type(tool).__name__} error: {error}")
 
     def dispose(self) -> None:
         if self._disposer is not None:

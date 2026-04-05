@@ -48,14 +48,30 @@ SYSTEM_PROMPT_RESERVED = 1
 # ---------------------------------------------------------------------------
 
 def estimate_tokens(text: str) -> int:
-    """Rough token estimation based on character count.
+    """改进的 token 估算，支持中英文
     
-    Uses average of ~4 characters per token (works for English and code).
-    For production, consider tiktoken or exact tokenizer.
+    - 英文/代码：约 4 字符/token
+    - 中文/日文：约 1.5 字符/token
+    - 混合文本：使用启发式估算
     """
     if not text:
         return 0
-    return max(1, int(len(text) / CHARS_PER_TOKEN))
+    
+    # 统计中文字符数量
+    cjk_count = 0
+    for char in text:
+        code = ord(char)
+        if (0x4E00 <= code <= 0x9FFF or  # CJK 统一表意文字
+            0x3040 <= code <= 0x309F or  # 平假名
+            0x30A0 <= code <= 0x30FF or  # 片假名
+            0xAC00 <= code <= 0xD7AF):   # 韩文音节
+            cjk_count += 1
+    
+    # CJK 字符约 1.5 字符/token，英文约 4 字符/token
+    cjk_chars = cjk_count
+    ascii_chars = len(text) - cjk_count
+    
+    return max(1, int(cjk_chars / 1.5 + ascii_chars / 4.0))
 
 
 def estimate_message_tokens(message: dict[str, Any]) -> int:
