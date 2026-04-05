@@ -11,7 +11,10 @@ YELLOW = "\u001b[33m"
 BOLD = "\u001b[1m"
 REVERSE = "\u001b[7m"
 
-# Use full-width space for CJK cursor alignment
+# Use a colored background for the cursor to ensure visibility over CJK characters
+# Light Blue Background
+CURSOR_BG = "\u001b[48;5;39m"
+# Use full-width space for CJK cursor alignment at end of line
 FULL_WIDTH_SPACE = "\u3000"
 
 
@@ -35,6 +38,7 @@ def render_input_prompt(current_input: str, cursor_offset: int) -> str:
 
     line1 = f"{YELLOW}{BOLD}prompt{RESET} {DIM}Enter send | /help commands | Esc clear | Ctrl+C exit{RESET}"
     line2 = ""
-    line3 = f"{GREEN}{BOLD}mini-code>{RESET} {before}{REVERSE}{current}{RESET}{after}{DIM}{placeholder}{RESET}"
+    # Use CURSOR_BG for better visibility on CJK
+    line3 = f"{GREEN}{BOLD}mini-code>{RESET} {before}{CURSOR_BG}{current}{RESET}{after}{DIM}{placeholder}{RESET}"
 
     return "\n".join([line1, line2, line3])

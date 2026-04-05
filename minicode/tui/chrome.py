@@ -166,7 +166,7 @@ def empty_panel_row(width: int) -> str:
 
 def wrap_panel_body_line(line: str, width: int) -> list[str]:
     """Wrap long lines for panel, CJK aware."""
-    inner_width = width - 4
+    inner_width = width - 6  # Increased margin to prevent wrapping/shift
     if string_display_width(line) <= inner_width:
         return [line]
 
