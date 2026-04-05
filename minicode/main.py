@@ -308,8 +308,22 @@ def main() -> None:
             resume_session=args.resume,
             list_sessions_only=args.list_sessions,
         )
+    except KeyboardInterrupt:
+        print("\n\nInterrupted by user. Shutting down gracefully...")
     finally:
-        tools.dispose()
+        # Graceful shutdown: clean up all resources
+        from minicode.logging_config import get_logger
+        logger = get_logger("main")
+        logger.info("Shutting down...")
+        
+        # Dispose tools (closes MCP connections)
+        try:
+            tools.dispose()
+            logger.info("Tools disposed successfully")
+        except Exception as e:
+            logger.warning("Error disposing tools: %s", e)
+        
+        logger.info("Shutdown complete")
 
 
 if __name__ == "__main__":
