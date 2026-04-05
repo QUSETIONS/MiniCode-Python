@@ -153,6 +153,18 @@ def try_handle_local_command(user_input: str, tools=None) -> str | None:
         from minicode.config import format_config_diagnostic
         return format_config_diagnostic()
 
+    if user_input == "/context":
+        # Context usage display
+        try:
+            from minicode.context_manager import load_context_state
+            ctx_mgr = load_context_state()
+            if ctx_mgr:
+                return ctx_mgr.format_context_details()
+            else:
+                return "No context state available. Context tracking starts after first turn."
+        except Exception as e:
+            return f"Error loading context: {e}"
+
     if user_input == "/mcp":
         servers = tools.get_mcp_servers() if tools else []
         if not servers:

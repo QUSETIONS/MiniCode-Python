@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from minicode.context_manager import ContextManager, estimate_message_tokens
+from minicode.logging_config import get_logger
 from minicode.tooling import ToolContext, ToolRegistry
 from minicode.types import ChatMessage, ModelAdapter
+
+logger = get_logger("agent_loop")
 
 # 常量：避免重复的提示文本
 NUDGE_CONTINUE = (
@@ -84,6 +88,7 @@ def run_agent_turn(
     on_tool_result=None,
     on_assistant_message=None,
     on_progress_message=None,
+    context_manager: ContextManager | None = None,  # 新增：上下文管理器
 ) -> list[ChatMessage]:
     current_messages = list(messages)
     saw_tool_result = False
@@ -91,6 +96,20 @@ def run_agent_turn(
     recoverable_thinking_retry_count = 0
     tool_error_count = 0
     step = 0
+
+    # 检查上下文状态
+    if context_manager:
+        context_manager.messages = current_messages
+        stats = context_manager.get_stats()
+        logger.info("Context: %d tokens (%.0f%%), %d messages", 
+                   stats.total_tokens, stats.usage_percentage, stats.messages_count)
+        
+        # 如果需要压缩，自动执行
+        if context_manager.should_compact():
+            logger.warning("Context near limit, auto-compacting...")
+            current_messages = context_manager.compact_messages()
+            if on_assistant_message:
+                on_assistant_message(context_manager.get_context_summary())
 
     while max_steps is None or step < max_steps:
         step += 1

@@ -193,6 +193,16 @@ def main() -> None:
         if runtime is None or os.environ.get("MINI_CODE_MODEL_MODE") == "mock"
         else AnthropicModelAdapter(runtime, tools)
     )
+    
+    # Initialize ContextManager for context window management
+    from minicode.context_manager import ContextManager
+    from minicode.logging_config import get_logger
+    logger = get_logger("main")
+    context_mgr = None
+    if runtime:
+        context_mgr = ContextManager(model=runtime.get("model", "default"))
+        logger.info("Context manager initialized for model: %s", runtime.get("model", "unknown"))
+    
     messages = [
         {
             "role": "system",
@@ -290,8 +300,14 @@ def main() -> None:
                     messages=messages,
                     cwd=cwd,
                     permissions=permissions,
+                    context_manager=context_mgr,
                 )
                 permissions.end_turn()
+                
+                # Log context usage after turn
+                if context_mgr:
+                    stats = context_mgr.get_stats()
+                    logger.debug("After turn: %d tokens (%.0f%%)", stats.total_tokens, stats.usage_percentage)
                 last_assistant = next((message for message in reversed(messages) if message["role"] == "assistant"), None)
                 if last_assistant:
                     _append_transcript(transcript, kind="assistant", body=last_assistant["content"])
