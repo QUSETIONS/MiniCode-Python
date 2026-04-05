@@ -212,35 +212,15 @@ def parse_input_chunk(chunk: str) -> ParseResult:
             i += 1
             continue
 
-        # Regular text - handle UTF-8 multi-byte characters
+        # Regular text - handle CJK and other multi-width characters
         byte_val = ord(char)
         if byte_val > 0x7F:
-            # Multi-byte UTF-8 character
-            # Determine sequence length from first byte
-            if byte_val < 0xC0:
-                # Invalid continuation byte, skip
-                i += 1
-                continue
-            elif byte_val < 0xE0:
-                seq_len = 2
-            elif byte_val < 0xF0:
-                seq_len = 3
-            elif byte_val < 0xF8:
-                seq_len = 4
-            else:
-                # Invalid or too long, skip
-                i += 1
-                continue
-
-            # Check if we have enough bytes
-            if i + seq_len > len(chunk):
-                # Need more bytes, save as remainder
-                break
-
-            # Extract full UTF-8 character
-            utf8_char = chunk[i:i + seq_len]
-            events.append(TextEvent(text=utf8_char, ctrl=False, meta=False))
-            i += seq_len
+            # Non-ASCII character (CJK, emoji, etc.)
+            # In Python 3, strings are already Unicode, so `char` is a full character.
+            # We don't need to manually parse UTF-8 sequences.
+            # Just check if we have a complete character and add it.
+            events.append(TextEvent(text=char, ctrl=False, meta=False))
+            i += 1
         else:
             # Single-byte ASCII character
             events.append(TextEvent(text=char, ctrl=False, meta=False))
