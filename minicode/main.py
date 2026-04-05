@@ -119,8 +119,13 @@ def main() -> None:
     runtime = None
     try:
         runtime = load_runtime_config(cwd)
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001
         runtime = None
+        print(
+            f"Warning: Failed to load runtime config: {e}\n"
+            f"Falling back to mock model. Set ANTHROPIC_MODEL and ANTHROPIC_API_KEY to use a real model.",
+            file=sys.stderr,
+        )
 
     prompt_handler = _make_cli_permission_prompt() if sys.stdin.isatty() else None
     tools = create_default_tool_registry(cwd, runtime=runtime)

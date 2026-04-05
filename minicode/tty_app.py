@@ -36,6 +36,7 @@ from minicode.session import (
 from minicode.state import AppState, Store, create_app_store, format_app_state_summary
 from minicode.tooling import ToolContext, ToolRegistry
 from minicode.tui.chrome import (
+    _cached_terminal_size,
     get_permission_prompt_max_scroll_offset,
     render_banner,
     render_footer_bar,
@@ -70,26 +71,11 @@ from minicode.types import ChatMessage, ModelAdapter
 from minicode.workspace import resolve_tool_path
 
 # ---------------------------------------------------------------------------
-# Terminal size cache (avoid repeated syscalls)
+# Terminal size — use unified cache from chrome module
 # ---------------------------------------------------------------------------
 
-_terminal_size_cache: tuple[int, int] | None = None
-_terminal_size_cache_time: float = 0.0
-_TERMINAL_SIZE_TTL: float = 0.5  # refresh every 500ms
-
-
-def _get_terminal_size() -> tuple[int, int]:
-    """Cached terminal size to avoid repeated os.get_terminal_size() syscalls."""
-    global _terminal_size_cache, _terminal_size_cache_time
-    now = time.monotonic()
-    if _terminal_size_cache is None or (now - _terminal_size_cache_time) > _TERMINAL_SIZE_TTL:
-        try:
-            ts = os.get_terminal_size()
-            _terminal_size_cache = (ts.columns, ts.lines)
-        except (AttributeError, ValueError, OSError):
-            _terminal_size_cache = (100, 40)
-        _terminal_size_cache_time = now
-    return _terminal_size_cache
+# Alias to the single canonical implementation in chrome.py
+_get_terminal_size = _cached_terminal_size
 
 
 # ---------------------------------------------------------------------------
@@ -101,9 +87,9 @@ class _ThrottledRenderer:
 
     __slots__ = ("_render_fn", "_min_interval", "_pending", "_last_render_time", "_lock")
 
-    def __init__(self, render_fn: Callable[[], None], min_interval: float = 0.016) -> None:
+    def __init__(self, render_fn: Callable[[], None], min_interval: float = 0.033) -> None:
         self._render_fn = render_fn
-        self._min_interval = min_interval  # ~60 fps cap
+        self._min_interval = min_interval  # ~30 fps cap (sufficient for terminal UI)
         self._pending = False
         self._last_render_time: float = 0.0
         self._lock = threading.Lock()
@@ -476,17 +462,60 @@ def _get_visible_commands(input_text: str) -> list[Any]:
 
 
 # ---------------------------------------------------------------------------
-# Rendering
+# Rendering — cached header & footer
 # ---------------------------------------------------------------------------
+
+# Banner cache: the banner rarely changes (only when cwd, model, or stats change).
+_banner_cache: dict[str, tuple[tuple, str]] = {"key": ((), "")}
 
 
 def _render_header_panel(args: TtyAppArgs, state: ScreenState) -> str:
-    return render_banner(
+    stats = _get_session_stats(args, state)
+    cache_key = (
+        args.cwd,
+        id(args.runtime),
+        stats.get("transcriptCount"),
+        stats.get("messageCount"),
+        stats.get("skillCount"),
+        stats.get("mcpCount"),
+        _cached_terminal_size(),
+    )
+    cached = _banner_cache.get("key")
+    if cached and cached[0] == cache_key:
+        return cached[1]
+    result = render_banner(
         args.runtime,
         args.cwd,
         args.permissions.get_summary(),
-        _get_session_stats(args, state),
+        stats,
     )
+    _banner_cache["key"] = (cache_key, result)
+    return result
+
+
+# Footer cache: only changes with status, tool/skill state, background tasks
+_footer_cache: dict[str, tuple[tuple, str]] = {"key": ((), "")}
+
+
+def _render_footer_cached(
+    status: str | None,
+    tools_enabled: bool,
+    skills_enabled: bool,
+    background_tasks: list[dict[str, Any]],
+) -> str:
+    cache_key = (
+        status,
+        tools_enabled,
+        skills_enabled,
+        len(background_tasks),
+        _cached_terminal_size(),
+    )
+    cached = _footer_cache.get("key")
+    if cached and cached[0] == cache_key:
+        return cached[1]
+    result = render_footer_bar(status, tools_enabled, skills_enabled, background_tasks)
+    _footer_cache["key"] = (cache_key, result)
+    return result
 
 
 def _render_prompt_panel(state: ScreenState) -> str:
@@ -512,6 +541,8 @@ def _render_screen(args: TtyAppArgs, state: ScreenState) -> None:
     buf.append(_render_header_panel(args, state))
     buf.append("\n\n")
 
+    has_skills = len(args.tools.get_skills()) > 0
+
     if state.pending_approval:
         # Permission approval overlay
         buf.append(
@@ -532,14 +563,7 @@ def _render_screen(args: TtyAppArgs, state: ScreenState) -> None:
             )
         )
         buf.append("\n\n")
-        buf.append(
-            render_footer_bar(
-                state.status,
-                True,
-                len(args.tools.get_skills()) > 0,
-                background_tasks,
-            )
-        )
+        buf.append(_render_footer_cached(state.status, True, has_skills, background_tasks))
         sys.stdout.write("".join(buf))
         sys.stdout.flush()
         return
@@ -566,15 +590,8 @@ def _render_screen(args: TtyAppArgs, state: ScreenState) -> None:
     buf.append(_render_prompt_panel(state))
     buf.append("\n\n")
 
-    # Footer
-    buf.append(
-        render_footer_bar(
-            state.status,
-            True,
-            len(args.tools.get_skills()) > 0,
-            background_tasks,
-        )
-    )
+    # Footer (cached)
+    buf.append(_render_footer_cached(state.status, True, has_skills, background_tasks))
     sys.stdout.write("".join(buf))
     sys.stdout.flush()
 
@@ -583,16 +600,65 @@ def _render_screen(args: TtyAppArgs, state: ScreenState) -> None:
 # Cross-platform raw mode stdin
 # ---------------------------------------------------------------------------
 
+# Windows msvcrt scan-code → ANSI escape sequence mapping.
+# msvcrt.getwch() returns a two-char sequence for special keys:
+#   prefix ('\x00' or '\xe0') + scan-code byte.
+# We translate these to the ANSI sequences that input_parser.py already
+# understands.
+_WIN_SCANCODE_TO_ANSI: dict[int, str] = {
+    72: "\x1b[A",    # Up
+    80: "\x1b[B",    # Down
+    77: "\x1b[C",    # Right
+    75: "\x1b[D",    # Left
+    71: "\x1b[H",    # Home
+    79: "\x1b[F",    # End
+    73: "\x1b[5~",   # Page Up
+    81: "\x1b[6~",   # Page Down
+    83: "\x1b[3~",   # Delete
+    82: "\x1b[2~",   # Insert
+    # Alt+Arrow (returned with \x00 prefix on some terminals)
+    152: "\x1b[1;3A",  # Alt+Up
+    160: "\x1b[1;3B",  # Alt+Down
+    157: "\x1b[1;3C",  # Alt+Right
+    155: "\x1b[1;3D",  # Alt+Left
+    # Ctrl+Arrow
+    141: "\x1b[1;5A",  # Ctrl+Up
+    145: "\x1b[1;5B",  # Ctrl+Down
+    116: "\x1b[1;5C",  # Ctrl+Right
+    115: "\x1b[1;5D",  # Ctrl+Left
+}
+
+
+def _win_read_one_key() -> str:
+    """Read one logical key from Windows msvcrt, translating special keys
+    into ANSI escape sequences.
+
+    Returns an empty string if no key is available.
+    """
+    import msvcrt
+
+    if not msvcrt.kbhit():
+        return ""
+
+    ch = msvcrt.getwch()
+
+    # Special-key prefix: next char is a scan code
+    if ch in ("\x00", "\xe0"):
+        if msvcrt.kbhit():
+            scan = ord(msvcrt.getwch())
+        else:
+            # Prefix arrived alone (rare) — treat as Escape
+            return "\x1b"
+        return _WIN_SCANCODE_TO_ANSI.get(scan, "")
+
+    # Ctrl+C → keep as '\x03' so parse_input_chunk handles it
+    return ch
+
 
 def _read_raw_char() -> str:
     """Read a single character from stdin in raw mode, cross-platform."""
     if sys.platform == "win32":
-        import msvcrt
-
-        if msvcrt.kbhit():
-            ch = msvcrt.getwch()
-            return ch
-        return ""
+        return _win_read_one_key()
     else:
         import select
 
@@ -605,11 +671,12 @@ def _read_raw_char() -> str:
 def _read_raw_chunk() -> str:
     """Read all available raw chars as a single chunk."""
     if sys.platform == "win32":
-        import msvcrt
-
         result = ""
-        while msvcrt.kbhit():
-            result += msvcrt.getwch()
+        while True:
+            ch = _win_read_one_key()
+            if not ch:
+                break
+            result += ch
         return result
     else:
         import select
@@ -627,13 +694,32 @@ def _read_raw_chunk() -> str:
 
 
 class _RawModeContext:
-    """Context manager for raw terminal mode (Unix only; Windows uses msvcrt natively)."""
+    """Context manager for raw terminal mode.
+
+    On Unix: switches stdin to raw mode via termios/tty and restores on exit.
+    On Windows: msvcrt provides character-at-a-time input natively, but we
+    need to ensure the console code page is set for UTF-8 and VT processing
+    is enabled.
+    """
 
     def __init__(self) -> None:
         self._old_settings: Any = None
+        self._old_cp: int | None = None
 
     def __enter__(self) -> _RawModeContext:
-        if sys.platform != "win32":
+        if sys.platform == "win32":
+            # Ensure VT processing is active (idempotent)
+            from minicode.tui.screen import _enable_windows_vt_processing
+            _enable_windows_vt_processing()
+            # Switch console to UTF-8 code page for proper Unicode handling
+            try:
+                import ctypes
+                kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+                self._old_cp = kernel32.GetConsoleOutputCP()
+                kernel32.SetConsoleOutputCP(65001)  # UTF-8
+            except Exception:
+                pass
+        else:
             import termios
             import tty
 
@@ -642,7 +728,14 @@ class _RawModeContext:
         return self
 
     def __exit__(self, *_: Any) -> None:
-        if sys.platform != "win32" and self._old_settings is not None:
+        if sys.platform == "win32":
+            if self._old_cp is not None:
+                try:
+                    import ctypes
+                    ctypes.windll.kernel32.SetConsoleOutputCP(self._old_cp)  # type: ignore[attr-defined]
+                except Exception:
+                    pass
+        elif self._old_settings is not None:
             import termios
 
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self._old_settings)
@@ -962,8 +1055,10 @@ def _handle_input(
     agent_thread = threading.Thread(target=_run_agent_background, daemon=True)
     agent_thread.start()
     state.agent_thread = agent_thread
-    state.agent_result = agent_result
+    # Assign lock BEFORE result — the main loop checks agent_result first,
+    # so the lock must already be available to avoid AttributeError.
     state.agent_lock = agent_thread_lock
+    state.agent_result = agent_result
     
     # Return immediately - agent runs in background
     return False
@@ -1099,6 +1194,21 @@ def run_tty_app(
 
     enter_alternate_screen()
     hide_cursor()
+
+    # On Unix, listen for SIGWINCH so terminal resizes are picked up
+    # immediately rather than waiting for the 0.5s cache TTL.
+    _prev_sigwinch = None
+    if sys.platform != "win32":
+        import signal as _signal
+
+        from minicode.tui.chrome import invalidate_terminal_size_cache
+
+        def _on_sigwinch(_signum: int, _frame: Any) -> None:
+            invalidate_terminal_size_cache()
+            throttled.request()
+
+        _prev_sigwinch = _signal.signal(_signal.SIGWINCH, _on_sigwinch)
+
     try:
         _render_screen(args, state)
 
@@ -1111,11 +1221,13 @@ def run_tty_app(
                     state.autosave.save_if_needed()
                 
                 # Check if background agent thread completed
-                if hasattr(state, 'agent_result') and state.agent_result.get("done"):
-                    with state.agent_lock:
-                        if state.agent_result.get("messages"):
-                            args.messages = state.agent_result["messages"]
-                        state.agent_result["done"] = False  # Reset flag
+                ar = state.agent_result
+                lock = getattr(state, "agent_lock", None)
+                if ar is not None and lock is not None and ar.get("done"):
+                    with lock:
+                        if ar.get("messages"):
+                            args.messages = ar["messages"]
+                        ar["done"] = False  # Reset flag
 
                 # Read raw input
                 if sys.platform == "win32":
@@ -1126,9 +1238,13 @@ def run_tty_app(
                         throttled.flush()
                         time.sleep(0.02)
                         continue
+                    # Use _win_read_one_key to translate special keys
                     chunk = ""
-                    while msvcrt.kbhit():
-                        chunk += msvcrt.getwch()
+                    while True:
+                        ch = _win_read_one_key()
+                        if not ch:
+                            break
+                        chunk += ch
                 else:
                     import select
 
@@ -1174,6 +1290,12 @@ def run_tty_app(
                 throttled.flush()
 
     finally:
+        # Restore previous SIGWINCH handler on Unix
+        if _prev_sigwinch is not None and sys.platform != "win32":
+            import signal as _signal
+
+            _signal.signal(_signal.SIGWINCH, _prev_sigwinch)
+
         show_cursor()
         exit_alternate_screen()
         

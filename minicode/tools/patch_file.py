@@ -28,6 +28,10 @@ def _validate(input_data: dict) -> dict:
             raise ValueError("replacement search must be a non-empty string")
         if not isinstance(replace, str):
             raise ValueError("replacement replace must be a string")
+        # Normalize \r\n → \n so search/replace strings always match
+        # file content (read_text uses universal newlines).
+        search = search.replace("\r\n", "\n")
+        replace = replace.replace("\r\n", "\n")
         normalized.append({"search": search, "replace": replace, "replace_all": replace_all})
     return {"path": path, "replacements": normalized}
 

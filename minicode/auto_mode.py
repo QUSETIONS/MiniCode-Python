@@ -73,6 +73,7 @@ MEDIUM_RISK_TOOLS = {
 
 # High-risk commands (block or require strong justification)
 HIGH_RISK_COMMANDS = {
+    # Unix
     "rm -rf",
     "rm -r",
     "git reset --hard",
@@ -81,16 +82,37 @@ HIGH_RISK_COMMANDS = {
     "sudo",
     "chmod -R",
     "chown -R",
+    # Windows
+    "del /s",
+    "del /q",
+    "rmdir /s",
+    "rd /s",
+    "icacls",
+    "takeown",
+    "net user",
+    "net localgroup",
+    "reg delete",
+    "format",
 }
 
 # Dangerous patterns (always block)
 DANGEROUS_PATTERNS = [
+    # Unix
     r"rm\s+-rf\s+/",           # Delete root
     r"chmod\s+777",            # World-writable
     r"curl.*\|\s*sh",          # Pipe curl to shell
     r"wget.*\|\s*sh",
     r"mkfs",                   # Format filesystem
     r"dd\s+if=",               # Disk dump
+    # Windows
+    r"del\s+/[sfq].*[\\]",     # Recursive/force delete with path
+    r"rmdir\s+/s\s+/q",        # Silent recursive dir removal
+    r"rd\s+/s\s+/q",
+    r"format\s+[a-zA-Z]:",     # Format drive
+    r"powershell.*\biex\b",    # PowerShell invoke-expression from remote
+    r"powershell.*Invoke-Expression", 
+    r"iwr.*\|\s*iex",          # Download and execute (PowerShell)
+    r"reg\s+delete\s+HKLM",   # Delete machine-wide registry keys
 ]
 
 
@@ -248,11 +270,12 @@ class AutoModeChecker:
         path = tool_input.get("path", "")
         
         # Check if editing sensitive files
+        # Use [/\\] to match both Unix / and Windows \ separators
         sensitive_patterns = [
             r"\.env",
-            r"\.git/",
-            r"node_modules/",
-            r"__pycache__/",
+            r"\.git[/\\]",
+            r"node_modules[/\\]",
+            r"__pycache__[/\\]",
             r"\.pyc$",
         ]
         
@@ -307,9 +330,16 @@ class AutoModeChecker:
             (is_unsafe, reason)
         """
         unsafe_patterns = [
+            # Unix
             r"rm\s+-rf",
             r"sudo\s+",
             r"chmod\s+777",
+            # Windows
+            r"del\s+/[sfq]",
+            r"rmdir\s+/s",
+            r"rd\s+/s",
+            r"format\s+[a-zA-Z]:",
+            # SQL
             r"DROP\s+TABLE",
             r"DELETE\s+FROM.*WHERE\s+1\s*=\s*1",
         ]

@@ -209,25 +209,34 @@ class ContextManager:
             if m.get("role") != "assistant_progress"
         ]
         
-        # If still too large, truncate from oldest
+        # If still too large, drop oldest messages one at a time.
+        # Prefer dropping tool-call/tool-result pairs first, then plain
+        # assistant/user messages.  Always keep the most recent messages.
         while estimate_messages_tokens(filtered) > target_tokens and len(filtered) > MIN_MESSAGES_TO_KEEP:
-            # Remove oldest non-tool message
             removed = False
-            for i, msg in enumerate(filtered):
-                if msg.get("role") not in ("assistant_tool_call", "tool_result"):
-                    # Remove this message and its pair if exists
-                    if (i + 1 < len(filtered) and 
-                        filtered[i + 1].get("role") == "tool_result" and
-                        filtered[i].get("role") == "assistant_tool_call"):
-                        filtered.pop(i)
-                        filtered.pop(i)
+            for i in range(len(filtered) - MIN_MESSAGES_TO_KEEP):
+                role = filtered[i].get("role")
+                # Drop tool-call + its result as a pair
+                if role == "assistant_tool_call":
+                    if (i + 1 < len(filtered) and
+                            filtered[i + 1].get("role") == "tool_result"):
+                        del filtered[i:i + 2]
                     else:
-                        filtered.pop(i)
+                        del filtered[i]
                     removed = True
                     break
-            
+                # Drop standalone tool_result (orphaned)
+                if role == "tool_result":
+                    del filtered[i]
+                    removed = True
+                    break
+                # Drop plain user/assistant messages
+                if role in ("user", "assistant"):
+                    del filtered[i]
+                    removed = True
+                    break
+
             if not removed:
-                # If can't remove more, break
                 break
         
         # Add compaction marker

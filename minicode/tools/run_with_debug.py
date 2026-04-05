@@ -9,6 +9,24 @@ from minicode.tooling import ToolDefinition, ToolResult
 
 
 # ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _try_relative(abs_path: Path, cwd: str, fallback: str) -> str:
+    """Try to make *abs_path* relative to *cwd*.
+
+    On Windows this can fail when the paths live on different drives,
+    or when case differences make ``relative_to`` raise ``ValueError``.
+    In those cases we fall back to the original *fallback* string.
+    """
+    try:
+        return str(abs_path.relative_to(cwd))
+    except (ValueError, TypeError):
+        return fallback
+
+
+# ---------------------------------------------------------------------------
 # Debug Output Parsers
 # ---------------------------------------------------------------------------
 
@@ -61,7 +79,7 @@ def _parse_python_error(output: str, cwd: str) -> list[dict[str, Any]]:
                 context_lines = ["Unable to read file"]
         
         errors.append({
-            "file": str(abs_path.relative_to(cwd)) if str(abs_path).startswith(cwd) else file_path,
+            "file": _try_relative(abs_path, cwd, file_path),
             "line": int(line_num),
             "function": func_name,
             "context": "\n".join(context_lines),
@@ -179,7 +197,7 @@ def _run(input_data: dict, context) -> ToolResult:
     
     # Determine shell
     if sys.platform == "win32":
-        shell_cmd = ["cmd", "/c", command]
+        shell_cmd = ["cmd", "/d", "/s", "/c", command]
     else:
         shell_cmd = ["/bin/sh", "-c", command]
     

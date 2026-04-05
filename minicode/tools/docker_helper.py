@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import shlex
 import subprocess
 import sys
 import re
@@ -209,7 +211,10 @@ def _run(input_data: dict, context) -> ToolResult:
         
         elif action == "exec":
             # Execute command in container
-            cmd_parts = command.split()
+            try:
+                cmd_parts = shlex.split(command, posix=(os.name != "nt"))
+            except ValueError:
+                cmd_parts = command.split()
             success, stdout, stderr = _run_docker_command(
                 ["exec", container] + cmd_parts,
                 timeout,

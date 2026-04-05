@@ -15,6 +15,7 @@ Hooks can trigger external scripts, logging, or custom behaviors.
 from __future__ import annotations
 
 import asyncio
+import sys
 import time
 from dataclasses import dataclass, field
 from enum import Enum
@@ -325,8 +326,26 @@ def create_script_hook(script_path: Path) -> AsyncHookHandler:
     """
     async def handler(ctx: HookContext) -> str:
         try:
+            # On Windows, CreateProcess can't directly execute script files
+            # (.py, .sh, etc.).  Detect the script type and invoke through
+            # the appropriate interpreter / shell.
+            script_str = str(script_path)
+            suffix = script_path.suffix.lower()
+            if sys.platform == "win32" and suffix in (".py", ".sh", ".bat", ".cmd", ".ps1"):
+                if suffix == ".py":
+                    cmd_prefix = [sys.executable, script_str]
+                elif suffix in (".bat", ".cmd"):
+                    cmd_prefix = ["cmd", "/c", script_str]
+                elif suffix == ".ps1":
+                    cmd_prefix = ["powershell", "-ExecutionPolicy", "Bypass", "-File", script_str]
+                else:
+                    # .sh on Windows — try bash if available, fall back to sh
+                    cmd_prefix = ["bash", script_str]
+            else:
+                cmd_prefix = [script_str]
+
             process = await asyncio.create_subprocess_exec(
-                str(script_path),
+                *cmd_prefix,
                 ctx.event.value,
                 *([str(v) for v in ctx.data.values()]),
                 stdout=asyncio.subprocess.PIPE,

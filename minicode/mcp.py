@@ -11,6 +11,16 @@ from typing import Any
 
 from minicode.tooling import ToolDefinition, ToolResult
 
+# 安全常量：禁止在命令参数中出现的危险字符
+DANGEROUS_SHELL_CHARS = set('|&;`$(){}<>\n\r')
+
+# 允许的命令白名单（常见的 MCP 服务器命令）
+ALLOWED_COMMANDS = {
+    'node', 'npm', 'npx', 'python', 'python3', 'pip', 'pip3',
+    'uv', 'deno', 'bun', 'cargo', 'go', 'java', 'javac',
+    'ruby', 'gem', 'dotnet', 'curl', 'wget',
+}
+
 
 JsonRpcProtocol = str
 
@@ -31,6 +41,71 @@ def _sanitize_tool_segment(value: str) -> str:
     normalized = "".join(char.lower() if char.isalnum() or char in {"_", "-"} else "_" for char in value)
     normalized = normalized.strip("_")
     return normalized or "tool"
+
+
+def _validate_mcp_command(command: str) -> None:
+    """验证 MCP 命令的合法性"""
+    from pathlib import Path
+    
+    normalized = Path(command).resolve().as_posix()
+    
+    # 不允许路径遍历字符
+    if '..' in normalized or '~' in normalized:
+        raise RuntimeError(f"Invalid MCP command: contains path traversal characters")
+    
+    # 提取命令的基本名称
+    base_command = Path(command).name.lower()
+    # 处理 .exe 后缀
+    if base_command.endswith('.exe'):
+        base_command = base_command[:-4]
+    
+    # 如果是绝对路径，需要额外验证
+    if Path(command).is_absolute():
+        # 检查是否在常见的系统目录中
+        allowed_system_dirs = ['/usr/bin', '/usr/local/bin', '/usr/sbin', '/opt']
+        if os.name == 'nt':
+            allowed_system_dirs.extend([
+                'C:\\Program Files',
+                'C:\\Program Files (x86)',
+                'C:\\Windows\\System32',
+            ])
+        
+        is_in_allowed_dir = any(normalized.lower().startswith(d.lower()) for d in allowed_system_dirs)
+        
+        # 不在允许的系统目录且不在白名单中
+        if not is_in_allowed_dir and base_command not in ALLOWED_COMMANDS:
+            raise RuntimeError(
+                f"MCP command \"{command}\" is not in the allowed list. "
+                f"Use a whitelisted command or place the executable in a standard system directory."
+            )
+        
+        # 禁止危险的系统 shell
+        dangerous_shells = ['cmd.exe', 'command.com', 'powershell.exe', 'pwsh.exe']
+        if any(normalized.lower().endswith(d) for d in dangerous_shells):
+            raise RuntimeError(
+                f"MCP command \"{command}\" is a dangerous system shell. "
+                f"Direct execution of shells is not allowed for security reasons."
+            )
+        return
+    
+    # 相对路径必须在白名单中
+    if base_command not in ALLOWED_COMMANDS:
+        raise RuntimeError(
+            f"MCP command \"{command}\" is not in the allowed list. "
+            f"Allowed commands: {', '.join(sorted(ALLOWED_COMMANDS))}. "
+            f"Use absolute paths for custom commands."
+        )
+
+
+def _validate_mcp_args(args: list[str]) -> None:
+    """验证 MCP 参数不包含危险的 shell 元字符"""
+    for arg in args:
+        for char in arg:
+            if char in DANGEROUS_SHELL_CHARS:
+                raise RuntimeError(
+                    f"Invalid MCP argument: contains dangerous shell character '{char}'. "
+                    f"MCP server arguments cannot contain shell metacharacters for security reasons."
+                )
 
 
 def _normalize_input_schema(schema: dict[str, Any] | None) -> dict[str, Any]:
@@ -152,6 +227,10 @@ class StdioMcpClient:
         if not command:
             raise RuntimeError(f'MCP server "{self.server_name}" has no command configured.')
 
+        # 安全验证：检查命令和参数的合法性
+        _validate_mcp_command(command)
+        _validate_mcp_args(list(self.config.get("args", []) or []))
+
         process_cwd = Path(self.cwd)
         if self.config.get("cwd"):
             process_cwd = (process_cwd / str(self.config["cwd"])).resolve()
@@ -159,6 +238,11 @@ class StdioMcpClient:
         for key, value in dict(self.config.get("env", {}) or {}).items():
             env[str(key)] = str(value)
 
+        popen_kwargs: dict = {}
+        if os.name == "nt":
+            # Prevent a console window from popping up for the child process
+            CREATE_NO_WINDOW = 0x08000000
+            popen_kwargs["creationflags"] = CREATE_NO_WINDOW
         try:
             self.process = subprocess.Popen(  # noqa: S603
                 [command, *list(self.config.get("args", []) or [])],
@@ -169,6 +253,7 @@ class StdioMcpClient:
                 stderr=subprocess.PIPE,
                 text=True,
                 bufsize=1,
+                **popen_kwargs,
             )
         except FileNotFoundError:
             raise RuntimeError(f"Command not found: {command}. Install it first and ensure it is available in PATH.") from None
@@ -320,9 +405,49 @@ class StdioMcpClient:
         self.pending.clear()
         for queue in pending:
             queue.put({"error": {"message": f'MCP server "{self.server_name}" closed before completing the request.'}})
+        
         if self.process is not None:
-            self.process.kill()
-            self.process = None
+            try:
+                # 跨平台进程终止
+                if os.name == "nt":
+                    # Windows: 使用 taskkill 终止进程树
+                    try:
+                        subprocess.run(
+                            ["taskkill", "/T", "/F", "/PID", str(self.process.pid)],
+                            capture_output=True,
+                            timeout=5
+                        )
+                    except subprocess.TimeoutExpired:
+                        # taskkill 本身超时，强制 kill
+                        try:
+                            self.process.kill()
+                        except OSError:
+                            pass
+                    except Exception:
+                        try:
+                            self.process.kill()
+                        except OSError:
+                            pass
+                else:
+                    # Unix: 先 SIGTERM，超时后 SIGKILL
+                    self.process.terminate()
+                    try:
+                        self.process.wait(timeout=3)
+                    except subprocess.TimeoutExpired:
+                        try:
+                            self.process.kill()
+                        except OSError:
+                            pass
+
+                try:
+                    self.process.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    pass
+            except OSError:
+                pass  # 进程可能已经退出
+            finally:
+                self.process = None
+        
         self.protocol = None
         self._stdout_thread = None
         self._stderr_thread = None
@@ -335,78 +460,87 @@ def create_mcp_backed_tools(*, cwd: str, mcp_servers: dict[str, dict[str, Any]])
     resource_index: dict[str, dict[str, Any]] = {}
     prompt_index: dict[str, dict[str, Any]] = {}
 
-    for server_name, config in mcp_servers.items():
-        if config.get("enabled") is False:
-            servers.append(asdict(McpServerSummary(name=server_name, command=config.get("command", ""), status="disabled", toolCount=0, protocol=config.get("protocol"))))
-            continue
+    try:
+        for server_name, config in mcp_servers.items():
+            if config.get("enabled") is False:
+                servers.append(asdict(McpServerSummary(name=server_name, command=config.get("command", ""), status="disabled", toolCount=0, protocol=config.get("protocol"))))
+                continue
 
-        client = StdioMcpClient(server_name, config, cwd)
-        try:
-            client.start()
-            descriptors = client.list_tools()
+            client = StdioMcpClient(server_name, config, cwd)
             try:
-                resources = client.list_resources()
-            except Exception:  # noqa: BLE001
-                resources = []
+                client.start()
+                descriptors = client.list_tools()
+                try:
+                    resources = client.list_resources()
+                except Exception:  # noqa: BLE001
+                    resources = []
+                try:
+                    prompts = client.list_prompts()
+                except Exception:  # noqa: BLE001
+                    prompts = []
+                clients.append(client)
+
+                for resource in resources:
+                    resource_index[f"{server_name}:{resource.get('uri')}"] = {"serverName": server_name, "resource": resource}
+                for prompt in prompts:
+                    prompt_index[f"{server_name}:{prompt.get('name')}"] = {"serverName": server_name, "prompt": prompt}
+
+                for descriptor in descriptors:
+                    wrapped_name = f"mcp__{_sanitize_tool_segment(server_name)}__{_sanitize_tool_segment(str(descriptor.get('name', 'tool')))}"
+                    descriptor_name = str(descriptor.get("name", "tool"))
+                    input_schema = _normalize_input_schema(descriptor.get("inputSchema"))
+
+                    def _validator(value: Any) -> Any:
+                        return value
+
+                    def _run(input_data: Any, _context, *, _client=client, _descriptor_name=descriptor_name):
+                        return _client.call_tool(_descriptor_name, input_data)
+
+                    tools.append(
+                        ToolDefinition(
+                            name=wrapped_name,
+                            description=str(descriptor.get("description") or f"Call MCP tool {descriptor_name} from server {server_name}."),
+                            input_schema=input_schema,
+                            validator=_validator,
+                            run=_run,
+                        )
+                    )
+
+                servers.append(
+                    asdict(
+                        McpServerSummary(
+                            name=server_name,
+                            command=config.get("command", ""),
+                            status="connected",
+                            toolCount=len(descriptors),
+                            protocol=client.protocol,
+                            resourceCount=len(resources),
+                            promptCount=len(prompts),
+                        )
+                    )
+                )
+            except Exception as error:  # noqa: BLE001
+                client.close()
+                servers.append(
+                    asdict(
+                        McpServerSummary(
+                            name=server_name,
+                            command=config.get("command", ""),
+                            status="error",
+                            toolCount=0,
+                            error=str(error),
+                            protocol=config.get("protocol"),
+                        )
+                    )
+                )
+    except Exception:
+        # 清理所有已连接的客户端，防止资源泄漏
+        for client in clients:
             try:
-                prompts = client.list_prompts()
-            except Exception:  # noqa: BLE001
-                prompts = []
-            clients.append(client)
-
-            for resource in resources:
-                resource_index[f"{server_name}:{resource.get('uri')}"] = {"serverName": server_name, "resource": resource}
-            for prompt in prompts:
-                prompt_index[f"{server_name}:{prompt.get('name')}"] = {"serverName": server_name, "prompt": prompt}
-
-            for descriptor in descriptors:
-                wrapped_name = f"mcp__{_sanitize_tool_segment(server_name)}__{_sanitize_tool_segment(str(descriptor.get('name', 'tool')))}"
-                descriptor_name = str(descriptor.get("name", "tool"))
-                input_schema = _normalize_input_schema(descriptor.get("inputSchema"))
-
-                def _validator(value: Any) -> Any:
-                    return value
-
-                def _run(input_data: Any, _context, *, _client=client, _descriptor_name=descriptor_name):
-                    return _client.call_tool(_descriptor_name, input_data)
-
-                tools.append(
-                    ToolDefinition(
-                        name=wrapped_name,
-                        description=str(descriptor.get("description") or f"Call MCP tool {descriptor_name} from server {server_name}."),
-                        input_schema=input_schema,
-                        validator=_validator,
-                        run=_run,
-                    )
-                )
-
-            servers.append(
-                asdict(
-                    McpServerSummary(
-                        name=server_name,
-                        command=config.get("command", ""),
-                        status="connected",
-                        toolCount=len(descriptors),
-                        protocol=client.protocol,
-                        resourceCount=len(resources),
-                        promptCount=len(prompts),
-                    )
-                )
-            )
-        except Exception as error:  # noqa: BLE001
-            client.close()
-            servers.append(
-                asdict(
-                    McpServerSummary(
-                        name=server_name,
-                        command=config.get("command", ""),
-                        status="error",
-                        toolCount=0,
-                        error=str(error),
-                        protocol=config.get("protocol"),
-                    )
-                )
-            )
+                client.close()
+            except Exception:
+                pass
+        raise
 
     if resource_index:
         tools.append(

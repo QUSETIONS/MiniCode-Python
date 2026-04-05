@@ -16,6 +16,10 @@ def _validate(input_data: dict) -> dict:
         raise ValueError("search and replace must be strings")
     if not search:
         raise ValueError("search must be non-empty")
+    # Normalize \r\n → \n so that search/replace strings provided by the
+    # model always match the file content (read_text uses universal newlines).
+    search = search.replace("\r\n", "\n")
+    replace = replace.replace("\r\n", "\n")
     return {"path": path, "search": search, "replace": replace, "replace_all": replace_all}
 
 

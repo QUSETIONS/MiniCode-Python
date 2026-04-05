@@ -21,17 +21,34 @@ def _run(input_data: dict, context) -> ToolResult:
     root = resolve_tool_path(context, input_data["path"], "search")
     regex = re.compile(input_data["pattern"])
     results: list[str] = []
-    for file_path in sorted(root.rglob("*")):
+    skipped = 0
+    
+    try:
+        all_files = sorted(root.rglob("*"))
+    except PermissionError:
+        return ToolResult(ok=False, output=f"Permission denied: {root}")
+    except OSError as e:
+        return ToolResult(ok=False, output=f"Cannot read directory: {e}")
+
+    for file_path in all_files:
         if not file_path.is_file():
             continue
         try:
             lines = file_path.read_text(encoding="utf-8").splitlines()
         except UnicodeDecodeError:
+            skipped += 1
+            continue
+        except OSError:
+            skipped += 1
             continue
         for index, line in enumerate(lines, start=1):
             if regex.search(line):
                 results.append(f"{file_path.relative_to(Path(context.cwd)).as_posix()}:{index}:{line}")
-    return ToolResult(ok=True, output="\n".join(results) if results else "No matches found.")
+    
+    output = "\n".join(results) if results else "No matches found."
+    if skipped > 0:
+        output += f"\n({skipped} file(s) skipped)"
+    return ToolResult(ok=True, output=output)
 
 
 grep_files_tool = ToolDefinition(

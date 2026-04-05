@@ -44,7 +44,7 @@ def run_agent_turn(
     messages: list[ChatMessage],
     cwd: str,
     permissions=None,
-    max_steps: int | None = None,
+    max_steps: int = 50,  # 设置合理的默认上限
     on_tool_start=None,
     on_tool_result=None,
     on_assistant_message=None,
@@ -59,7 +59,14 @@ def run_agent_turn(
 
     while max_steps is None or step < max_steps:
         step += 1
-        next_step = model.next(current_messages)
+        try:
+            next_step = model.next(current_messages)
+        except Exception as error:
+            fallback = f"Model API error: {error}"
+            if on_assistant_message:
+                on_assistant_message(fallback)
+            current_messages.append({"role": "assistant", "content": fallback})
+            return current_messages
 
         if next_step.type == "assistant":
             is_empty = _is_empty_assistant_response(next_step.content)

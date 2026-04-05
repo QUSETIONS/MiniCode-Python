@@ -59,9 +59,10 @@ def _install_launcher_script() -> str | None:
         launcher_path = target_bin_dir / "minicode.bat"
         
         # Create batch script for Windows
+        python_exe = sys.executable.replace("/", "\\")
         launcher_script = "\r\n".join([
             "@echo off",
-            f"python -m minicode.main %*",
+            f'"{python_exe}" -m minicode.main %*',
             "",
         ])
     else:
@@ -70,10 +71,11 @@ def _install_launcher_script() -> str | None:
         launcher_path = target_bin_dir / "minicode"
         
         # Create bash script for Unix
+        python_exe = sys.executable
         launcher_script = "\n".join([
             "#!/usr/bin/env bash",
             "set -euo pipefail",
-            'exec python -m minicode.main "$@"',
+            f'exec "{python_exe}" -m minicode.main "$@"',
             "",
         ])
     

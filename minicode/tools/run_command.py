@@ -3,13 +3,20 @@ from __future__ import annotations
 import os
 import shlex
 import subprocess
+import sys
 from typing import Sequence
 
 from minicode.background_tasks import register_background_shell_task
 from minicode.tooling import ToolDefinition, ToolResult
 from minicode.workspace import resolve_tool_path
 
+# 命令执行超时（秒）- 5 分钟
+COMMAND_TIMEOUT = 300
+
+# Read-only commands that never need permission prompts.
+# Includes both Unix and Windows equivalents.
 READONLY_COMMANDS = {
+    # Unix
     "pwd",
     "ls",
     "find",
@@ -24,8 +31,16 @@ READONLY_COMMANDS = {
     "df",
     "du",
     "whoami",
+    # Windows equivalents
+    "dir",
+    "type",
+    "where",
+    "findstr",
+    "more",
+    "hostname",
 }
 
+# Development commands (write access but commonly allowed).
 DEVELOPMENT_COMMANDS = {
     "git",
     "npm",
@@ -35,19 +50,45 @@ DEVELOPMENT_COMMANDS = {
     "pytest",
     "bash",
     "sh",
+    # Windows-common development tools
+    "pip",
+    "pip3",
+    "cargo",
+    "go",
+    "make",
+    "cmake",
+    "dotnet",
+    "powershell",
+    "pwsh",
+    "cmd",
 }
 
 
 def split_command_line(command_line: str) -> list[str]:
+    """Split a command string into tokens.
+
+    On Windows, ``shlex.split(posix=True)`` can choke on backslash paths
+    (e.g. ``C:\\Users\\foo``).  We fall back to ``posix=False`` which
+    preserves backslashes, then try the native ``shlex.split`` as a
+    last resort.
+    """
+    if os.name == "nt":
+        try:
+            return shlex.split(command_line, posix=False)
+        except ValueError:
+            # If even non-posix fails, fall back to simple whitespace split
+            return command_line.split()
     return shlex.split(command_line, posix=True)
 
 
 def _is_allowed_command(command: str) -> bool:
-    return command in READONLY_COMMANDS or command in DEVELOPMENT_COMMANDS
+    cmd = command.lower() if os.name == "nt" else command
+    return cmd in READONLY_COMMANDS or cmd in DEVELOPMENT_COMMANDS
 
 
 def _is_read_only_command(command: str) -> bool:
-    return command in READONLY_COMMANDS
+    cmd = command.lower() if os.name == "nt" else command
+    return cmd in READONLY_COMMANDS
 
 
 def _looks_like_shell_snippet(command: str, args: list[str]) -> bool:
@@ -158,7 +199,15 @@ def _run(input_data: dict, context) -> ToolResult:
             context.permissions.ensure_command(command, args, effective_cwd)
 
     if use_shell and background_shell:
-        creation_flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        # Platform-specific process isolation flags
+        popen_kwargs: dict = {}
+        if os.name == "nt":
+            popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        else:
+            # On Unix, start the background process in its own session so
+            # it is not killed when the parent terminal closes.
+            popen_kwargs["start_new_session"] = True
+
         child = subprocess.Popen(  # noqa: S603
             [command, *args],
             cwd=effective_cwd,
@@ -166,8 +215,15 @@ def _run(input_data: dict, context) -> ToolResult:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             stdin=subprocess.DEVNULL,
-            creationflags=creation_flags,
+            **popen_kwargs,
         )
+        
+        if child.pid is None:
+            return ToolResult(
+                ok=False,
+                output="Failed to get PID for background command. Process may have exited immediately.",
+            )
+        
         background_task = register_background_shell_task(
             command=_strip_trailing_background_operator(input_data["command"]),
             pid=child.pid,
@@ -179,16 +235,25 @@ def _run(input_data: dict, context) -> ToolResult:
             backgroundTask=background_task,
         )
 
-    completed = subprocess.run(  # noqa: S603
-        [command, *args],
-        cwd=effective_cwd,
-        env=os.environ.copy(),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    output = "\n".join(part for part in [completed.stdout.strip(), completed.stderr.strip()] if part).strip()
-    return ToolResult(ok=completed.returncode == 0, output=output)
+    try:
+        completed = subprocess.run(  # noqa: S603
+            [command, *args],
+            cwd=effective_cwd,
+            env=os.environ.copy(),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",  # 显式指定 UTF-8
+            errors="replace",   # 无法解码时替换字符而非报错
+            check=False,
+            timeout=COMMAND_TIMEOUT,
+        )
+        output = "\n".join(part for part in [completed.stdout.strip(), completed.stderr.strip()] if part).strip()
+        return ToolResult(ok=completed.returncode == 0, output=output)
+    except subprocess.TimeoutExpired as e:
+        return ToolResult(
+            ok=False,
+            output=f"Command timed out after {COMMAND_TIMEOUT} seconds. Command: {normalized_command} {' '.join(normalized_args)}",
+        )
 
 
 run_command_tool = ToolDefinition(

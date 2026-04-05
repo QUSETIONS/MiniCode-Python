@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 import time
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -90,6 +91,16 @@ def _cached_terminal_size() -> tuple[int, int]:
     return _ts_cache
 
 
+def invalidate_terminal_size_cache() -> None:
+    """Force the next ``_cached_terminal_size`` call to re-query the OS.
+
+    Called from the SIGWINCH handler on Unix so that a terminal resize
+    is picked up immediately instead of waiting for the TTL to expire.
+    """
+    global _ts_cache
+    _ts_cache = None
+
+
 # ---------------------------------------------------------------------------
 # Width computation — optimized hot path
 # ---------------------------------------------------------------------------
@@ -124,9 +135,9 @@ def char_display_width(char: str) -> int:
     return 1
 
 
-def string_display_width(text: str) -> int:
-    """Sum of char_display_width for stripped text. Optimized to avoid per-char function calls."""
-    stripped = _ANSI_RE.sub("", text)
+@lru_cache(maxsize=2048)
+def _stripped_display_width(stripped: str) -> int:
+    """Width of a string that is already ANSI-stripped. Cached for hot paths."""
     width = 0
     for c in stripped:
         code = ord(c)
@@ -148,6 +159,12 @@ def string_display_width(text: str) -> int:
         else:
             width += 1
     return width
+
+
+def string_display_width(text: str) -> int:
+    """Sum of char_display_width for stripped text. Uses LRU cache on stripped content."""
+    stripped = _ANSI_RE.sub("", text)
+    return _stripped_display_width(stripped)
 
 
 def truncate_plain(text: str, width: int) -> str:
@@ -263,21 +280,31 @@ def empty_panel_row(width: int) -> str:
 
 
 def wrap_panel_body_line(line: str, width: int) -> list[str]:
-    """Wrap long lines for panel, CJK aware."""
+    """Wrap long lines for panel, CJK aware. Uses finditer for ANSI positions."""
     inner_width = width - 4
     if string_display_width(line) <= inner_width:
         return [line]
 
-    lines = []
+    # Pre-compute ANSI escape positions so we don't regex-match per character
+    ansi_spans: list[tuple[int, int]] = []
+    for m in _ANSI_RE.finditer(line):
+        ansi_spans.append((m.start(), m.end()))
+
+    lines: list[str] = []
     current_line = ""
     current_w = 0
     i = 0
+    span_idx = 0  # pointer into ansi_spans
+
     while i < len(line):
-        m = _ANSI_RE.match(line, i)
-        if m:
-            current_line += m.group()
-            i = m.end()
+        # Check if current position is the start of a known ANSI escape
+        if span_idx < len(ansi_spans) and i == ansi_spans[span_idx][0]:
+            end = ansi_spans[span_idx][1]
+            current_line += line[i:end]
+            i = end
+            span_idx += 1
             continue
+
         char = line[i]
         cw = char_display_width(char)
         if current_w + cw > inner_width:

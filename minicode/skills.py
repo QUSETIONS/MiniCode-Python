@@ -32,7 +32,7 @@ def extract_description(markdown: str) -> str:
 
 
 def _home_dir() -> Path:
-    return Path(os.environ.get("HOME") or os.environ.get("USERPROFILE") or str(Path.home()))
+    return Path.home()
 
 
 def _skill_roots(cwd: str | Path) -> list[tuple[Path, str]]:

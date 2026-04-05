@@ -22,7 +22,15 @@ def _validate(input_data: dict) -> dict:
 
 def _run(input_data: dict, context) -> ToolResult:
     target = resolve_tool_path(context, input_data["path"], "read")
-    content = target.read_text(encoding="utf-8")
+    
+    try:
+        content = target.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return ToolResult(
+            ok=False,
+            output=f"File {input_data['path']} appears to be binary. Cannot read as text.",
+        )
+    
     offset = input_data["offset"]
     limit = input_data["limit"]
     end = min(len(content), offset + limit)

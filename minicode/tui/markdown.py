@@ -1,5 +1,6 @@
 from __future__ import annotations
 import re
+from functools import lru_cache
 
 RESET = "\u001b[0m"
 DIM = "\u001b[2m"
@@ -22,10 +23,26 @@ HEADING_ACCENT = "\u001b[38;5;39m"  # bright blue for headings
 _RE_TABLE_SEP = re.compile(r"^\|(?:\s*:?-+:?\s*\|)+$")
 _RE_TABLE_ROW = re.compile(r"^\|.*\|$")
 _RE_LIST_ITEM = re.compile(r"^(\s*)[-*]\s+")
-_RE_INLINE_CODE = re.compile(r"`([^`]+)`")
-_RE_BOLD = re.compile(r"\*\*([^*]+)\*\*")
-_RE_ITALIC = re.compile(r"(?<!\*)\*([^*]+)\*(?!\*)")
 _RE_NUMBERED_LIST = re.compile(r"^(\s*)\d+\.\s+")
+
+# Combined inline pattern: match code, bold, or italic in a single pass
+# Order matters: code first (most specific), then bold, then italic
+_RE_INLINE_COMBINED = re.compile(
+    r"`([^`]+)`"              # group 1: inline code
+    r"|\*\*([^*]+)\*\*"      # group 2: bold
+    r"|(?<!\*)\*([^*]+)\*(?!\*)"  # group 3: italic
+)
+
+
+def _inline_replace(m: re.Match) -> str:
+    """Single-pass replacement callback for inline markdown."""
+    if m.group(1) is not None:
+        return f"{CODE_BG}{CODE_FG}{m.group(1)}{RESET}"
+    if m.group(2) is not None:
+        return f"{BOLD}{m.group(2)}{RESET}"
+    if m.group(3) is not None:
+        return f"{ITALIC}{m.group(3)}{RESET}"
+    return m.group(0)
 
 def render_markdownish(input_text: str) -> str:
     lines = input_text.split("\n")
@@ -97,12 +114,8 @@ def render_markdownish(input_text: str) -> str:
                 num = line[len(indent):m2.end()].strip()
                 formatted = f"{indent}{BRIGHT_CYAN}{num}{RESET} {rest}"
 
-        # Inline formatting
-        formatted = _RE_INLINE_CODE.sub(
-            rf"{CODE_BG}{CODE_FG}\1{RESET}", formatted
-        )
-        formatted = _RE_BOLD.sub(rf"{BOLD}\1{RESET}", formatted)
-        formatted = _RE_ITALIC.sub(rf"{ITALIC}\1{RESET}", formatted)
+        # Inline formatting — single-pass for code + bold + italic
+        formatted = _RE_INLINE_COMBINED.sub(_inline_replace, formatted)
 
         result_lines.append(formatted)
 

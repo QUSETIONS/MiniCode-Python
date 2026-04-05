@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Callable
 
@@ -49,7 +50,32 @@ def _classify_dangerous_command(command: str, args: list[str]) -> str | None:
     if command == "npm" and "publish" in normalized_args:
         return f"npm publish affects a registry outside this machine ({signature})"
 
-    if command in {"node", "python", "python3", "bun", "bash", "sh"}:
+    # 灾难性删除命令检测
+    if command == "rm":
+        # 组合所有标志（支持 -rf, -fr, -Rf, -r -f 等）
+        combined_flags = "".join(arg for arg in normalized_args if arg.startswith("-")).lower()
+        # 检查是否同时有递归和强制标志
+        if "r" in combined_flags and "f" in combined_flags:
+            # 检查是否针对根目录或使用 --no-preserve-root
+            if any(arg in {"/", "/*"} for arg in normalized_args) or "--no-preserve-root" in normalized_args:
+                return f"rm -rf can cause catastrophic data loss ({signature})"
+            # 即使不是根目录，rm -rf 也是危险的
+            return f"rm -rf can cause catastrophic data loss ({signature})"
+
+    # 磁盘写入/格式化命令检测
+    if command in {"dd", "mkfs", "mkfs.ext4", "mkfs.vfat", "fdisk", "format"}:
+        return f"{command} can modify or destroy disk partitions ({signature})"
+
+    # 权限全开命令检测
+    if command == "chmod":
+        if "777" in normalized_args or any(arg.endswith("777") for arg in normalized_args):
+            return f"chmod 777 opens permissions to all users ({signature})"
+
+    if command in {
+        "node", "python", "python3", "pythonw",
+        "bun", "bash", "sh", "zsh", "fish",
+        "powershell", "pwsh",
+    }:
         return f"{command} can execute arbitrary local code ({signature})"
 
     return None
@@ -58,12 +84,42 @@ def _classify_dangerous_command(command: str, args: list[str]) -> str | None:
 def _read_permission_store() -> dict[str, Any]:
     if not MINI_CODE_PERMISSIONS_PATH.exists():
         return {}
-    return json.loads(MINI_CODE_PERMISSIONS_PATH.read_text(encoding="utf-8"))
+    try:
+        data = json.loads(MINI_CODE_PERMISSIONS_PATH.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return {}
+        return data
+    except (json.JSONDecodeError, OSError) as e:
+        # 损坏的文件 — 返回空存储并记录警告
+        import warnings
+        warnings.warn(f"Corrupted permissions file, resetting: {e}")
+        return {}
 
 
 def _write_permission_store(store: dict[str, Any]) -> None:
+    """使用原子写入持久化权限存储，防止竞争条件"""
+    import tempfile
+    
     MINI_CODE_PERMISSIONS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    MINI_CODE_PERMISSIONS_PATH.write_text(json.dumps(store, indent=2) + "\n", encoding="utf-8")
+    
+    # 写入临时文件
+    fd, tmp_path = tempfile.mkstemp(
+        dir=MINI_CODE_PERMISSIONS_PATH.parent,
+        suffix=".tmp"
+    )
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            json.dump(store, f, indent=2)
+            f.write('\n')
+        # 原子替换
+        os.replace(tmp_path, MINI_CODE_PERMISSIONS_PATH)
+    except Exception:
+        # 清理临时文件
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 class PermissionManager:
