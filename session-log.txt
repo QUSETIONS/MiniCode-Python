@@ -1,0 +1,15 @@
+you
+  hello world
+
+---
+
+assistant
+  This is a minimal MiniCode Python shell.
+  You can try:
+  /tools
+  /ls
+  /grep pattern::src
+  /read README.md
+  /cmd pwd
+  /write notes.txt::hello
+  /edit notes.txt::hello::hello world
