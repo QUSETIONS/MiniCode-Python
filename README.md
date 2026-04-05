@@ -57,7 +57,7 @@ tools on | skills on | memory: 3 entries
 |---------|-------------|-----------------|---------------------|
 | **Terminal-First UI** | ✅ | ❌ | ✅ |
 | **Full Agent Loop** | ✅ | Partial | ✅ |
-| **Tool System** | ~40 tools | ~5 tools | **18 tools** |
+| **Tool System** | ~40 tools | ~5 tools | **30 tools** |
 | **Permission System** | ✅ | ❌ | ✅ |
 | **MCP Integration** | ✅ | ❌ | ✅ |
 | **Skills System** | ✅ | ❌ | ✅ |
@@ -118,23 +118,27 @@ tools on | skills on | memory: 3 entries
 
 ---
 
-## 🛠️ Tool Ecosystem (18 Tools)
+## 🛠️ Tool Ecosystem (30 Tools)
 
 <div align="center">
 
-| Category | Tools | Description |
-|----------|-------|-------------|
-| **📁 File Operations** | `read_file` `write_file` `edit_file` `patch_file` `modify_file` | Complete file lifecycle with review-before-write |
-| **🔍 Code Search** | `list_files` `grep_files` | Fast file discovery and content search |
-| **💻 Command Execution** | `run_command` | Shell command execution with background support |
-| **🌐 Web Access** | `web_fetch` `web_search` | URL content fetching and web search (no API key) |
-| **📋 Task Management** | `todo_write` | Structured task tracking with auto-detection |
-| **🔧 Git Workflow** | `git` | Status, diff, log, commit, and review |
-| **📓 Notebook** | `notebook_edit` | Jupyter Notebook editing support |
-| **🎯 Governance** | `governance_audit` | Engineering governance compliance check |
-| **🤖 User Interaction** | `ask_user` | Clarifying questions with structured input |
-| **🧩 Skills** | `load_skill` | Local skill discovery and loading |
-| **🔌 MCP** | Dynamic | MCP server tools, resources, and prompts |
+| Category | Tools | Count |
+|----------|-------|-------|
+| **📁 File Operations** | `read_file` `write_file` `edit_file` `patch_file` `modify_file` `list_files` `grep_files` | 7 |
+| **🔍 Code Intelligence** | `find_symbols` `find_references` `get_ast_info` `multi_edit` `code_review` | 5 |
+| **💻 Command Execution** | `run_command` `run_with_debug` | 2 |
+| **🧪 Testing & Debugging** | `test_runner` | 1 |
+| **🎨 Visualization** | `file_tree` `diff_viewer` | 2 |
+| **🌐 Web & API** | `web_fetch` `web_search` `api_tester` | 3 |
+| **🗄️ Database** | `db_explorer` (SQLite) | 1 |
+| **🐳 Docker** | `docker_helper` (containers & compose) | 1 |
+| **📋 Task Management** | `todo_write` | 1 |
+| **🔧 Git Workflow** | `git` (status/diff/log/commit/review) | 1 |
+| **📓 Notebook** | `notebook_edit` | 1 |
+| **🏗️ Governance** | `governance_audit` | 1 |
+| **🤖 User Interaction** | `ask_user` | 1 |
+| **🧩 Skills** | `load_skill` | 1 |
+| **🔌 MCP** | Dynamic (as configured) | ∞ |
 
 </div>
 
@@ -193,10 +197,10 @@ python -m minicode.main --resume <session-id>
 
 | Metric | Value | Badge |
 |--------|-------|-------|
-| **Code Lines** | ~11,000 | 📝 |
+| **Code Lines** | ~16,000 | 📝 |
 | **Test Cases** | 92 (100% pass) | ✅ |
 | **External Dependencies** | 0 | 🎯 |
-| **Tools Available** | 18 | 🛠️ |
+| **Tools Available** | 30 | 🛠️ |
 | **Slash Commands** | 20+ | ⌨️ |
 | **Startup Time** | <1 second | ⚡ |
 | **Memory Usage** | ~15MB | 💾 |
@@ -390,10 +394,20 @@ MiniCode-Python/
 │   ├── install.py             # 📦 Interactive installer
 │   ├── prompt.py              # 📝 System prompt builder
 │   ├── tty_app.py             # 🖥️ Main TUI application
-│   ├── tools/                 # 🛠️ 18 built-in tools
-│   │   ├── governance_audit.py    # 🏗️ Governance compliance checker
-│   │   ├── git.py                 # 🔧 Git workflow tool
-│   │   └── notebook_edit.py       # 📓 Jupyter Notebook editor
+│   ├── tools/                 # 🛠️ 30 built-in tools
+│   │   ├── code_nav.py            # 🔍 Code intelligence (AST analysis)
+│   │   ├── code_review.py         # 📝 Automated code quality checks
+│   │   ├── multi_edit.py          # ✏️ Cross-file refactoring
+│   │   ├── file_tree.py           # 🌳 Visual file browser
+│   │   ├── diff_viewer.py         # 🔀 Diff visualization
+│   │   ├── run_with_debug.py      # 🐛 Error parsing & diagnostics
+│   │   ├── test_runner.py         # 🧪 Smart test discovery
+│   │   ├── api_tester.py          # 🌐 HTTP API testing
+│   │   ├── db_explorer.py         # 🗄️ SQLite database explorer
+│   │   ├── docker_helper.py       # 🐳 Docker & Compose manager
+│   │   ├── git.py                 # 🔧 Git workflow tools
+│   │   ├── governance_audit.py    # 🏗️ Governance compliance
+│   │   └── ... (18 more tools)
 │   └── tui/                   # 🎨 Terminal UI components
 ├── tests/                     # 🧪 92 test cases
 └── docs/                      # 📚 Documentation
