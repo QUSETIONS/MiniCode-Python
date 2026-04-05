@@ -1,451 +1,362 @@
-# 🚀 MiniCode Python
-
-> **A terminal coding assistant that writes, thinks, and engineers like Claude Code — but in pure Python with zero dependencies.**
-
 <div align="center">
 
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
-[![Tests: 92 passed](https://img.shields.io/badge/tests-92%20passed-brightgreen.svg?style=for-the-badge)](https://github.com/QUSETIONS/MiniCode-Python)
-[![Dependencies: 0](https://img.shields.io/badge/dependencies-0-orange.svg?style=for-the-badge)](https://github.com/QUSETIONS/MiniCode-Python)
-[![Claude Code Alignment: 93.5%](https://img.shields.io/badge/claude%20code%20alignment-93.5%25-purple.svg?style=for-the-badge)](https://github.com/QUSETIONS/MiniCode-Python)
-[![Version: 0.5.0](https://img.shields.io/badge/version-0.5.0-red.svg?style=for-the-badge)](https://github.com/QUSETIONS/MiniCode-Python)
+# MiniCode Python
+
+### Terminal-native AI coding assistant — pure Python, zero dependencies
+
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-22c55e?style=for-the-badge)](LICENSE)
+[![Dependencies: 0](https://img.shields.io/badge/dependencies-0-f97316?style=for-the-badge)](pyproject.toml)
+[![Tools: 30](https://img.shields.io/badge/tools-30-8b5cf6?style=for-the-badge)](#-built-in-tools)
+
+A full-featured terminal coding assistant inspired by [Claude Code](https://docs.anthropic.com/en/docs/claude-code), rebuilt from scratch in **pure Python** with the standard library alone. Rich TUI, 30 built-in tools, session persistence, MCP integration, and more — all in ~15 000 lines of dependency-free code.
 
 </div>
 
 ---
 
-## 🎬 Demo
+## Demo
 
 ```
-╭────────────────────────────────────────────────────────────────────────╮
-│ MiniCode                               │ provider: offline             │
-│ Terminal coding assistant for MiniCode.                                │
-│                                                                          │
-│ minicode                  │ .../Desktop/project                        │
-│ [provider] offline  [model] claude-sonnet-4  [msgs] 15  [events] 8    │
-│ cwd: D:\Desktop\project                                               │
-╰────────────────────────────────────────────────────────────────────────╯
+╭────────────────────────────── MiniCode ───────────────────────────────╮
+│ provider: anthropic    model: claude-sonnet-4    cwd: ~/my-project  │
+╰───────────────────────────────────────────────────────────────────────╯
 
-╭──────────────────── session feed ──────────────────────────────────────╮
-│ you                                                                    │
-│   帮我实现一个快速排序算法                                             │
-│ ·                                                                      │
-│ assistant                                                              │
-│   我来为你实现快速排序算法，并添加测试。                               │
-│ ·                                                                      │
-│ tool write_file ok                                                     │
-│   FILE: sort.py                                                        │
-│   Successfully wrote 45 lines                                          │
-│ ·                                                                      │
-│ tool run_command ok                                                    │
-│   ✓ All 5 tests passed in 0.12s                                        │
-╰────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────── session feed ── 6 events ─────────────────────╮
+│ 👤 you                                                                │
+│   帮我实现一个快速排序算法，加上单元测试                              │
+│ · ─── ·                                                               │
+│ 🤖 assistant                                                          │
+│   我来为你实现快速排序，并编写完整的测试用例。                        │
+│ · ─── ·                                                               │
+│ 🔧 tool write_file ✔ ok                                               │
+│   FILE: quicksort.py — Successfully wrote 42 lines                    │
+│ · ─── ·                                                               │
+│ 🔧 tool run_command ✔ ok                                              │
+│   ✓ All 8 tests passed in 0.03s                                       │
+╰───────────────────────────────────────────────────────────────────────╯
 
-╭──────────────────── prompt ────────────────────────────────────────────╮
-│ > 再帮我优化一下时间复杂度                                             │
-╰────────────────────────────────────────────────────────────────────────╯
-
-tools on | skills on | memory: 3 entries
+╭──────────────────────── prompt ────────────────────────────────────────╮
+│ > _                                                                   │
+╰───────────────────────────────────────────────────────────────────────╯
+ tools on │ skills on │ /help for commands
 ```
 
 ---
 
-## ✨ Why MiniCode Python?
+## Features
 
-| Feature | Claude Code | Other CLI Tools | **MiniCode Python** |
-|---------|-------------|-----------------|---------------------|
-| **Terminal-First UI** | ✅ | ❌ | ✅ |
-| **Full Agent Loop** | ✅ | Partial | ✅ |
-| **Tool System** | ~40 tools | ~5 tools | **30 tools** |
-| **Permission System** | ✅ | ❌ | ✅ |
-| **MCP Integration** | ✅ | ❌ | ✅ |
-| **Skills System** | ✅ | ❌ | ✅ |
-| **Session Persistence** | ❌ | ❌ | ✅ **Exclusive** |
-| **Layered Memory** | Basic | ❌ | ✅ **3-Tier** |
-| **Context Management** | ✅ | ❌ | ✅ |
-| **Auto Mode** | ✅ | ❌ | ✅ |
-| **Sub-Agents** | ✅ | ❌ | ✅ **Lightweight** |
-| **Governance Rules** | ❌ | ❌ | ✅ **Built-in** |
-| **External Dependencies** | npm | Varies | **0 (stdlib only!)** |
-| **Startup Time** | ~2s | ~1s | **<1s** |
-| **Language** | TypeScript | Various | **Python 3.11+** |
+### Core
 
----
+- **Rich Terminal UI** — Alternate-screen TUI with panels, ANSI styling, smooth scrolling, and 60 FPS throttled rendering
+- **Agent Loop** — Multi-turn tool-use loop that plans, executes, and iterates until the task is done
+- **30 Built-in Tools** — File I/O, code search, shell execution, git, testing, code review, and more
+- **Permission System** — Approve, deny, or auto-allow tool calls with configurable rules
+- **Slash Commands** — `/help`, `/tools`, `/compact`, `/cost`, `/clear`, `/exit`, and more
 
-## 🧠 Core Architecture
+### Advanced
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     MiniCode Python v0.5.0                      │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │  Agent Loop  │──│ Tool System  │──│ Permission Manager   │  │
-│  │  (Recovery)  │  │ (18 Tools)   │  │ (Interactive UI)     │  │
-│  └──────┬───────┘  └──────┬───────┘  └──────────┬───────────┘  │
-│         │                 │                      │              │
-│  ┌──────▼───────┐  ┌──────▼───────┐  ┌──────────▼───────────┐  │
-│  │ MCP Client   │──│ Skills Sys   │──│ Config System        │  │
-│  │ (Dynamic)    │  │ (Discovery)  │  │ (Multi-Source)       │  │
-│  └──────┬───────┘  └──────┬───────┘  └──────────┬───────────┘  │
-│         │                 │                      │              │
-│  ┌──────▼─────────────────▼──────────────────────▼───────────┐  │
-│  │                    TUI Engine                             │  │
-│  │  • Full-Screen Rendering  • ANSI Input Parser             │  │
-│  │  • Unicode Borders        • CJK/Emoji Width Support       │  │
-│  │  • Markdown Rendering       • Transcript Scrolling        │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│                                                                 │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │              Advanced Features (Python Exclusive)          │  │
-│  │  ┌────────────┐ ┌───────────┐ ┌──────────────────────┐   │  │
-│  │  │ Session    │ │ Layered   │ │ Context Management   │   │  │
-│  │  │ Persistence│ │ Memory    │ │ (Auto-Compaction)    │   │  │
-│  │  └────────────┘ └───────────┘ └──────────────────────┘   │  │
-│  │  ┌────────────┐ ┌───────────┐ ┌──────────────────────┐   │  │
-│  │  │ Cost       │ │ Sub-      │ │ Auto Mode            │   │  │
-│  │  │ Tracking   │ │ Agents    │ │ (Risk Assessment)    │   │  │
-│  │  └────────────┘ └───────────┘ └──────────────────────┘   │  │
-│  │  ┌────────────┐ ┌───────────┐ ┌──────────────────────┐   │  │
-│  │  │ Governance │ │ Hooks     │ │ Task Tracking        │   │  │
-│  │  │ Rules      │ │ System    │ │ (Auto-Detect)        │   │  │
-│  │  └────────────┘ └───────────┘ └──────────────────────┘   │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+- **Session Persistence** — Save & resume conversations across restarts (`--resume`)
+- **3-Tier Memory** — Conversation → session → long-term memory for context retention
+- **MCP Integration** — Connect external Model Context Protocol servers for extended capabilities
+- **Skills System** — Drop-in skill files for domain-specific workflows
+- **Sub-Agents** — Spawn lightweight agents for parallel sub-tasks
+- **Auto Mode** — Automatically approve safe tool calls without human interaction
+- **Hooks System** — Lifecycle event hooks for extensibility
+- **Context Management** — Smart context window tracking to stay within token limits
+- **Cost Tracking** — Real-time API cost estimation and display
+
+### Performance
+
+- **Per-entry Render Cache** — Transcript entries are cached and only re-rendered when their state changes
+- **Throttled Screen Refresh** — Renders are coalesced at ~60 FPS to eliminate flicker and lag
+- **Buffered I/O** — Full screen frames are built in memory and flushed in a single `write()` call
+- **Terminal Size Caching** — `os.get_terminal_size()` results are cached with a 500 ms TTL
 
 ---
 
-## 🛠️ Tool Ecosystem (30 Tools)
+## Quick Start
 
-<div align="center">
-
-| Category | Tools | Count |
-|----------|-------|-------|
-| **📁 File Operations** | `read_file` `write_file` `edit_file` `patch_file` `modify_file` `list_files` `grep_files` | 7 |
-| **🔍 Code Intelligence** | `find_symbols` `find_references` `get_ast_info` `multi_edit` `code_review` | 5 |
-| **💻 Command Execution** | `run_command` `run_with_debug` | 2 |
-| **🧪 Testing & Debugging** | `test_runner` | 1 |
-| **🎨 Visualization** | `file_tree` `diff_viewer` | 2 |
-| **🌐 Web & API** | `web_fetch` `web_search` `api_tester` | 3 |
-| **🗄️ Database** | `db_explorer` (SQLite) | 1 |
-| **🐳 Docker** | `docker_helper` (containers & compose) | 1 |
-| **📋 Task Management** | `todo_write` | 1 |
-| **🔧 Git Workflow** | `git` (status/diff/log/commit/review) | 1 |
-| **📓 Notebook** | `notebook_edit` | 1 |
-| **🏗️ Governance** | `governance_audit` | 1 |
-| **🤖 User Interaction** | `ask_user` | 1 |
-| **🧩 Skills** | `load_skill` | 1 |
-| **🔌 MCP** | Dynamic (as configured) | ∞ |
-
-</div>
-
----
-
-## 🚀 Quick Start
-
-### One-Line Install & Run
+### 1. Clone
 
 ```bash
-# Clone and run (no dependencies needed!)
 git clone https://github.com/QUSETIONS/MiniCode-Python.git
 cd MiniCode-Python
-python -m minicode.main
 ```
 
-### Interactive Setup
+### 2. Install
 
 ```bash
-# First-time setup wizard
+# Option A: interactive installer (recommended)
 python -m minicode.main --install
 
-# It will ask for:
-# - Model name (e.g., claude-sonnet-4-20250514)
-# - API base URL (default: https://api.anthropic.com)
-# - Auth token (your API key)
+# Option B: pip editable install
+pip install -e .
 ```
 
-### Test Mode (No API Key Required)
+The installer will walk you through setting your model name, API base URL, and auth token. Configuration is saved to `~/.mini-code/settings.json`.
+
+### 3. Run
 
 ```bash
-# Mock mode for testing UI and features
-export MINI_CODE_MODEL_MODE=mock  # Linux/macOS
-set MINI_CODE_MODEL_MODE=mock     # Windows
+# If installed via pip
+minicode-py
+
+# Or run directly
 python -m minicode.main
 ```
 
-### Session Management
+### Environment variables
+
+| Variable | Description | Default |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Anthropic API key | — |
+| `ANTHROPIC_AUTH_TOKEN` | Auth token (alternative) | — |
+| `ANTHROPIC_BASE_URL` | API base URL | `https://api.anthropic.com` |
+| `ANTHROPIC_MODEL` / `MINI_CODE_MODEL` | Model name | — |
+| `MINI_CODE_MAX_OUTPUT_TOKENS` | Max output tokens | Model default |
+| `MINI_CODE_MODEL_MODE` | Set to `mock` for offline testing | — |
+
+---
+
+## Usage
+
+### Slash commands
+
+| Command | Description |
+|---|---|
+| `/help` | Show available commands |
+| `/tools` | List all registered tools |
+| `/cost` | Display current session cost |
+| `/compact` | Compact conversation context |
+| `/clear` | Clear transcript |
+| `/exit` | Exit MiniCode |
+| `/transcript-save <path>` | Save conversation to file |
+
+### Keyboard shortcuts
+
+| Key | Action |
+|---|---|
+| `Enter` | Submit input |
+| `Up` / `Down` | Input history |
+| `Alt+Up` / `Alt+Down` | Scroll transcript by 1 line |
+| `PageUp` / `PageDown` | Scroll transcript by 8 lines |
+| `Ctrl+A` (empty input) | Jump to top of transcript |
+| `Ctrl+E` (empty input) | Jump to bottom |
+| `Ctrl+U` | Clear input line |
+| `Ctrl+C` | Cancel current operation |
+| `Escape` | Clear input |
+| Mouse wheel | Scroll transcript |
+
+### Sessions
 
 ```bash
-# Resume last session
+# Resume the most recent session
 python -m minicode.main --resume
 
-# List all sessions
-python -m minicode.main --list-sessions
-
-# Resume specific session
+# Resume a specific session
 python -m minicode.main --resume <session-id>
+
+# List all saved sessions
+python -m minicode.main --list-sessions
 ```
+
+Sessions auto-save every 30 seconds and on exit.
 
 ---
 
-## 📊 Project Stats
+## Built-in Tools
 
-<div align="center">
+### File Operations
+| Tool | Description |
+|---|---|
+| `list_files` | List directory contents with glob patterns |
+| `grep_files` | Regex search across files |
+| `read_file` | Read file contents with line ranges |
+| `write_file` | Create or overwrite files |
+| `modify_file` | Find-and-replace edits |
+| `edit_file` | Structured file editing |
+| `patch_file` | Apply unified diff patches |
 
-| Metric | Value | Badge |
-|--------|-------|-------|
-| **Code Lines** | ~16,000 | 📝 |
-| **Test Cases** | 92 (100% pass) | ✅ |
-| **External Dependencies** | 0 | 🎯 |
-| **Tools Available** | 30 | 🛠️ |
-| **Slash Commands** | 20+ | ⌨️ |
-| **Startup Time** | <1 second | ⚡ |
-| **Memory Usage** | ~15MB | 💾 |
-| **Claude Code Alignment** | 93.5% | 🎯 |
-| **Python Version** | 3.11+ | 🐍 |
+### Code Intelligence
+| Tool | Description |
+|---|---|
+| `find_symbols` | AST-based symbol search (functions, classes) |
+| `find_references` | Find all references to a symbol |
+| `get_ast_info` | Inspect AST structure of a file |
+| `multi_edit` | Cross-file batch refactoring |
+| `code_review` | Automated code quality analysis |
 
-</div>
+### Execution & Testing
+| Tool | Description |
+|---|---|
+| `run_command` | Execute shell commands with timeout |
+| `run_with_debug` | Run with automatic error parsing & diagnostics |
+| `test_runner` | Smart test discovery and execution |
+| `api_tester` | HTTP API endpoint testing |
 
----
+### Web & Search
+| Tool | Description |
+|---|---|
+| `web_fetch` | Fetch and extract web page content |
+| `web_search` | Web search via API |
 
-## 🎮 Slash Commands
+### DevOps
+| Tool | Description |
+|---|---|
+| `git` | Git workflow (status, diff, log, commit, etc.) |
+| `docker_helper` | Docker & Docker Compose management |
+| `db_explorer` | SQLite database exploration & queries |
 
-Type `/` in the TUI to see all available commands:
-
-| Command | Description | Category |
-|---------|-------------|----------|
-| `/help` | Show all available commands | 📖 Help |
-| `/status` | Application state summary | 📊 Status |
-| `/cost` | API cost and usage report | 💰 Cost |
-| `/context` | Context window usage | 🧠 Context |
-| `/tasks` | Current task list | ✅ Tasks |
-| `/memory` | Memory system status | 🧩 Memory |
-| `/tools` | List all available tools | 🛠️ Tools |
-| `/skills` | List discovered skills | 🎯 Skills |
-| `/mcp` | MCP server status | 🔌 MCP |
-| `/model` | Show/change model | ⚙️ Config |
-| `/history` | Recent input history | 📜 History |
-| `/permissions` | Permission storage path | 🔒 Security |
-| `/config-paths` | Config file locations | ⚙️ Config |
-| `/exit` | Exit application | 🚪 Exit |
-
----
-
-## 🏗️ Architecture Deep Dive
-
-### State Management (Zustand-Style)
-
-```python
-from minicode.state import create_app_store, set_busy, set_idle
-
-# Create store
-app_state = create_app_store({"model": "claude-sonnet-4"})
-
-# Subscribe to changes
-def on_change(new_state, old_state):
-    print(f"State changed: {old_state.is_busy} → {new_state.is_busy}")
-
-app_state.subscribe(on_change)
-
-# Update state
-app_state.set_state(set_busy("read_file"))
-# → "State changed: False → True"
-```
-
-### Engineering Governance (Built-in)
-
-Every code generation automatically follows:
-
-```
-Iron Laws (8):
-1. Theory first          5. Audit loop
-2. Requirements first    6. Single sink (business/src/ = 1)
-3. 1:1 binding           7. One-way dependencies (zero cycles)
-4. Design-driven         8. No skipping phases
-
-Package Structure:
-my_package/
-├── port/
-│   ├── port_entry/      # Entry points (can import anything)
-│   └── port_exit/       # Exit points (export interface)
-├── wrap/
-│   ├── src/             # External library adapters
-│   └── config/          # Adapter configuration (zero deps)
-├── business/
-│   ├── src/             # Business logic (CORE - exactly 1 sink)
-│   └── config/          # Business configuration (zero deps)
-├── test/
-│   ├── src/             # Test code
-│   └── config/          # Test configuration (zero deps)
-└── docs/
-    ├── requirements/    # User scenarios (pure, no implementation)
-    ├── knowledge/       # Business rules & constraints (1:1 with requirements)
-    └── design/          # Technical design (maps to code structure)
-
-Dependency Flow:
-vendor/ → port_entry → wrap/src → business/src → port_exit
-              ↑                      ↑
-         (external libs)      (business config last)
-
-Audit Checklist (Auto-Executed):
-✓ Audit 0: Knowledge ↔ Requirements 1:1
-✓ Audit 1: Design ← Requirements + Knowledge coverage
-✓ Audit 2: Code ← Design isomorphism + Dependency compliance
-✓ Audit 3: business/src/ single sink + Package DAG
-```
-
-Use the `governance_audit` tool to check your code:
-
-```python
-# AI automatically runs this after code changes
-governance_audit(action="full", path="my_package")
-
-# Output:
-# Governance Audit Result
-# ==================================================
-# ✓ PASSED - All governance rules satisfied
-# 
-# Dependencies: 12 edges
-# Sink files:
-#   business_src: 1 sink
-#     - src/service.py
-```
-
-### Session Persistence
-
-```python
-# Sessions are auto-saved every 30 seconds
-~/.mini-code/
-├── sessions/
-│   ├── abc123.json    # Full session data
-│   └── def456.json
-└── sessions_index.json # Session metadata
-```
+### Visualization & Misc
+| Tool | Description |
+|---|---|
+| `file_tree` | Visual directory tree |
+| `diff_viewer` | Rich diff visualization |
+| `notebook_edit` | Jupyter notebook cell editing |
+| `todo_write` | Task list management |
+| `ask_user` | Prompt user for clarification |
+| `load_skill` | Load domain-specific skill files |
+| `governance_audit` | Engineering governance compliance checks |
 
 ---
 
-## 🔗 Related Projects
+## Configuration
 
-| Version | Language | Repository | Maintainer |
-|---------|----------|------------|------------|
-| **Main** | TypeScript | [MiniCode](https://github.com/LiuMengxuan04/MiniCode) | [@LiuMengxuan04](https://github.com/LiuMengxuan04) |
-| **Python** | Python | **[This Repository](https://github.com/QUSETIONS/MiniCode-Python)** | **[@QUSETIONS](https://github.com/QUSETIONS)** |
+### Settings file
 
-> 💡 **Note**: This Python version is a companion implementation. Many features originated from the main TypeScript version, with additional exclusive features developed independently.
+`~/.mini-code/settings.json`:
+
+```json
+{
+  "model": "claude-sonnet-4-20250514",
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://api.anthropic.com",
+    "ANTHROPIC_AUTH_TOKEN": "your-token-here"
+  }
+}
+```
+
+### MCP servers
+
+Global: `~/.mini-code/mcp.json`  
+Per-project: `.mcp.json` in project root
+
+```json
+{
+  "mcpServers": {
+    "my-server": {
+      "command": "node",
+      "args": ["path/to/server.js"],
+      "env": {}
+    }
+  }
+}
+```
+
+### Skills
+
+Place `.md` skill files in your project's `.minicode/skills/` directory. Each skill file describes domain-specific workflows, tools, or conventions that the agent can load on demand via the `load_skill` tool.
+
+### Permissions
+
+Permissions are managed interactively via the TUI approval prompt. You can:
+- **Allow once** — permit a single tool call
+- **Allow always** — auto-approve this tool for the session
+- **Deny** — reject the tool call
 
 ---
 
-## 📚 Documentation
+## Architecture
 
-| Document | Description |
-|----------|-------------|
-| [Usage Guide](USAGE_GUIDE.md) | Complete user manual with examples |
-| [Architecture Learning](CLAUDE_CODE_ARCHITECTURE_LEARNING.md) | Learn from Claude Code's design patterns |
-| [Integration Guide](INTEGRATION_GUIDE.md) | How to use new features |
-| [Features Report](NEW_FEATURES_REPORT.md) | What's new in v0.3.0+ |
-| [Completion Report](COMPLETION_REPORT.md) | v0.2.0 completion status |
-| [Audit Report](FINAL_AUDIT_REPORT.md) | Complete code audit results |
-| [Progress Report](PROGRESS_REPORT.md) | Development progress tracking |
+```
+minicode/
+├── main.py                 # Entry point & CLI arg parsing
+├── tty_app.py              # TUI application loop & event handling
+├── agent_loop.py           # Multi-turn agent execution loop
+├── anthropic_adapter.py    # LLM API adapter (Anthropic-compatible)
+├── tooling.py              # Tool protocol, registry & execution
+├── permissions.py          # Permission management system
+├── config.py               # Configuration loading & merging
+├── session.py              # Session persistence & autosave
+├── state.py                # Application state store
+├── context_manager.py      # Token context window management
+├── memory.py               # 3-tier memory system
+├── cost_tracker.py         # API cost estimation
+├── mcp.py                  # Model Context Protocol client
+├── skills.py               # Skill file discovery
+├── sub_agents.py           # Sub-agent spawning
+├── auto_mode.py            # Auto-approval engine
+├── hooks.py                # Lifecycle event hooks
+├── prompt.py               # System prompt builder
+├── tools/                  # 30 built-in tool implementations
+│   ├── read_file.py
+│   ├── write_file.py
+│   ├── run_command.py
+│   ├── git.py
+│   ├── code_nav.py         # AST-based code intelligence
+│   ├── test_runner.py
+│   └── ...
+└── tui/                    # Terminal UI components
+    ├── chrome.py            # Panels, banners, status bar
+    ├── transcript.py        # Cached transcript renderer
+    ├── input.py             # Input prompt rendering
+    ├── input_parser.py      # Raw key/mouse event parsing
+    ├── markdown.py          # ANSI markdown renderer
+    ├── screen.py            # Alternate screen management
+    └── types.py             # TUI data types
+```
+
+**Key design principles:**
+
+- **Zero dependencies** — Only Python 3.11+ standard library
+- **Single-threaded TUI** — Non-blocking I/O with `select()`-based event loop
+- **Functional rendering** — Pure functions produce ANSI strings; state is separate
+- **Tool protocol** — Every tool is a simple dataclass with `name`, `description`, `params`, and an `execute` callable
+- **Layered config** — Claude settings → global MiniCode settings → project settings → environment variables
 
 ---
 
-## 🧪 Development
+## Development
 
 ```bash
-# Run all tests
-python -m pytest tests/ -v
+# Clone the repo
+git clone https://github.com/QUSETIONS/MiniCode-Python.git
+cd MiniCode-Python
 
-# Run integration tests
-python test_integration.py
+# Run tests
+pip install -e ".[dev]"
+pytest
 
-# Run specific test file
-python -m pytest tests/test_agent_loop.py -v
+# Run in mock mode (no API key needed)
+MINI_CODE_MODEL_MODE=mock python -m minicode.main
 
-# Check code compilation
-python -m py_compile minicode/*.py
+# Run smoke tests
+python smoke_test.py
 ```
 
-### Project Structure
+### Project stats
 
-```
-MiniCode-Python/
-├── minicode/
-│   ├── agent_loop.py          # 🔄 Core agent loop with recovery
-│   ├── tooling.py             # 🛠️ Tool system + Protocol
-│   ├── permissions.py         # 🔒 Permission management
-│   ├── mcp.py                 # 🔌 MCP client
-│   ├── skills.py              # 🎯 Skill discovery
-│   ├── config.py              # ⚙️ Configuration system
-│   ├── state.py               # 📊 Store state management
-│   ├── cost_tracker.py        # 💰 API cost tracking
-│   ├── context_manager.py     # 🧠 Context window management
-│   ├── memory.py              # 🧩 Layered memory system
-│   ├── task_tracker.py        # ✅ Task tracking
-│   ├── poly_commands.py       # ⌨️ Polyorphic commands
-│   ├── async_context.py       # ⚡ Async context collector
-│   ├── sub_agents.py          # 🤖 Sub-agent system
-│   ├── auto_mode.py           # 🔄 Auto mode engine
-│   ├── hooks.py               # 🔗 Hooks event system
-│   ├── session.py             # 💾 Session persistence
-│   ├── api_retry.py           # 🔁 API retry mechanism
-│   ├── install.py             # 📦 Interactive installer
-│   ├── prompt.py              # 📝 System prompt builder
-│   ├── tty_app.py             # 🖥️ Main TUI application
-│   ├── tools/                 # 🛠️ 30 built-in tools
-│   │   ├── code_nav.py            # 🔍 Code intelligence (AST analysis)
-│   │   ├── code_review.py         # 📝 Automated code quality checks
-│   │   ├── multi_edit.py          # ✏️ Cross-file refactoring
-│   │   ├── file_tree.py           # 🌳 Visual file browser
-│   │   ├── diff_viewer.py         # 🔀 Diff visualization
-│   │   ├── run_with_debug.py      # 🐛 Error parsing & diagnostics
-│   │   ├── test_runner.py         # 🧪 Smart test discovery
-│   │   ├── api_tester.py          # 🌐 HTTP API testing
-│   │   ├── db_explorer.py         # 🗄️ SQLite database explorer
-│   │   ├── docker_helper.py       # 🐳 Docker & Compose manager
-│   │   ├── git.py                 # 🔧 Git workflow tools
-│   │   ├── governance_audit.py    # 🏗️ Governance compliance
-│   │   └── ... (18 more tools)
-│   └── tui/                   # 🎨 Terminal UI components
-├── tests/                     # 🧪 92 test cases
-└── docs/                      # 📚 Documentation
-```
+| Metric | Value |
+|---|---|
+| Python files | 69 |
+| Lines of code | ~15 000 |
+| Built-in tools | 30 |
+| External dependencies | 0 |
 
 ---
 
-## 🏆 Key Achievements
+## Acknowledgments
 
-<div align="center">
-
-| Achievement | Description | Icon |
-|-------------|-------------|------|
-| **Zero Dependencies** | Pure Python standard library only | 🎯 |
-| **93.5% Claude Code Alignment** | Architecturally aligned | 🎯 |
-| **100% Test Pass Rate** | 92 tests, zero failures | ✅ |
-| **Session Persistence** | Exclusive feature not in TS version | 💾 |
-| **Layered Memory** | 3-tier memory system | 🧩 |
-| **Governance Rules** | Built-in engineering standards | 🏗️ |
-| **Sub-Agents** | Lightweight specialized agents | 🤖 |
-| **Auto Mode** | Intelligent permission handling | 🔄 |
-| **Hooks System** | Lifecycle event extensibility | 🔗 |
-
-</div>
-
----
-
-## 🙏 Acknowledgments
-
-- **[@LiuMengxuan04](https://github.com/LiuMengxuan04)** — Creator of MiniCode, architecture reference
-- **Claude Code** — Design patterns and architecture inspiration
+- **[@LiuMengxuan04](https://github.com/LiuMengxuan04)** — Creator of [MiniCode](https://github.com/LiuMengxuan04/MiniCode) (TypeScript original), architecture reference
+- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** — Design patterns and architecture inspiration
 - **All Contributors** — Everyone who contributed to the MiniCode ecosystem
 
 ---
 
-## 📜 License
+## License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE) for details.
 
 ---
 
@@ -455,6 +366,6 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 *A lightweight terminal coding assistant for local development workflows.*
 
-[⬆ Back to Top](#-minicode-python)
+[⬆ Back to Top](#minicode-python)
 
 </div>
