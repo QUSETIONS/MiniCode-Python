@@ -45,6 +45,8 @@ from minicode.tui.chrome import (
     render_slash_menu,
     render_status_line,
     render_tool_panel,
+    SUBTLE,
+    RESET,
 )
 from minicode.tui.input import render_input_prompt
 from minicode.tui.input_parser import (
@@ -188,6 +190,8 @@ class ScreenState:
     agent_thread: Any = None
     agent_result: dict | None = None
     agent_lock: Any = None
+    # Tool execution时间跟踪
+    tool_start_time: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -293,6 +297,31 @@ def _schedule_tool_auto_collapse(
 
     t = threading.Thread(target=_do_collapse, daemon=True)
     t.start()
+
+
+def _get_contextual_help(state: ScreenState, args: TtyAppArgs) -> str | None:
+    """根据当前状态提供上下文相关的帮助提示"""
+    # 空闲状态 - 显示快速提示
+    if not state.is_busy and not state.pending_approval:
+        tips = [
+            "💡 Tip: Use /skills to see available workflows",
+            "💡 Tip: Try '帮我分析这个项目' to get started",
+            "💡 Tip: Use Tab to autocomplete commands",
+            "💡 Tip: Type /help for all commands",
+            "💡 Tip: Use Ctrl+R to search history",
+        ]
+        import random
+        return random.choice(tips)
+    
+    # 工具运行中 - 显示相关提示
+    if state.is_busy and state.active_tool:
+        return f"⏳ Running {state.active_tool}... Press Ctrl+C to cancel"
+    
+    # 权限审批中
+    if state.pending_approval:
+        return "🔒 Permission required. Use arrow keys and Enter to choose"
+    
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -532,6 +561,9 @@ def _render_prompt_panel(state: ScreenState) -> str:
 def _render_screen(args: TtyAppArgs, state: ScreenState) -> None:
     background_tasks = list_background_tasks()
 
+    # 获取上下文帮助
+    contextual_help = _get_contextual_help(state, args)
+
     # Build the entire frame into a buffer, then write once
     buf: list[str] = []
     # CSI H + CSI J  (cursor home + erase to end) – avoids full clear flicker
@@ -592,6 +624,11 @@ def _render_screen(args: TtyAppArgs, state: ScreenState) -> None:
 
     # Footer (cached)
     buf.append(_render_footer_cached(state.status, True, has_skills, background_tasks))
+    
+    # 上下文帮助行
+    if contextual_help:
+        buf.append(f"\n{SUBTLE}{contextual_help}{RESET}")
+    
     sys.stdout.write("".join(buf))
     sys.stdout.flush()
 
@@ -907,6 +944,7 @@ def _handle_input(
     def on_tool_start(tool_name: str, tool_input: Any) -> None:
         state.status = f"Running {tool_name}..."
         state.active_tool = tool_name
+        state.tool_start_time = time.monotonic()  # 记录工具启动时间
 
         target_path = _extract_path_from_tool_input(tool_input)
         can_aggregate = _is_file_edit_tool(tool_name) and target_path is not None
@@ -957,6 +995,13 @@ def _handle_input(
         rerender()
 
     def on_tool_result(tool_name: str, output: str, is_error: bool) -> None:
+        # 计算并显示工具执行时间
+        elapsed = ""
+        if hasattr(state, 'tool_start_time'):
+            elapsed_secs = time.monotonic() - state.tool_start_time
+            if elapsed_secs > 1:
+                elapsed = f" ({elapsed_secs:.1f}s)"
+        
         pending = pending_tool_entries.get(tool_name, [])
         entry_id = pending.pop(0) if pending else None
         if entry_id is not None:
@@ -996,16 +1041,34 @@ def _handle_input(
                     "name": tool_name,
                     "status": "error" if is_error else "success",
                 })
+                
+                # 错误恢复引导
+                display_output = output
+                if is_error:
+                    suggestions = []
+                    output_lower = output.lower()
+                    if "not found" in output_lower or "no such file" in output_lower:
+                        suggestions.append("💡 File not found. Try /ls to see available files")
+                    elif "permission" in output_lower or "denied" in output_lower:
+                        suggestions.append("💡 Permission denied. Check file access rights")
+                    elif "syntax" in output_lower or "error" in output_lower:
+                        suggestions.append("💡 Error occurred. Review the output and fix issues")
+                    
+                    if suggestions:
+                        display_output = f"ERROR: {output}\n\n" + "\n".join(suggestions)
+                    else:
+                        display_output = f"ERROR: {output}"
+                
                 _update_tool_entry(
                     state,
                     entry_id,
                     "error" if is_error else "success",
-                    f"ERROR: {output}" if is_error else output,
+                    display_output,
                 )
                 _schedule_tool_auto_collapse(
                     state,
                     entry_id,
-                    f"ERROR: {output}" if is_error else output,
+                    display_output,
                     rerender,
                 )
 
