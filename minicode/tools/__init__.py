@@ -20,6 +20,8 @@ from minicode.tools.notebook_edit import notebook_edit_tool
 from minicode.tools.patch_file import patch_file_tool
 from minicode.tools.read_file import read_file_tool
 from minicode.tools.run_command import run_command_tool
+from minicode.tools.run_with_debug import run_with_debug_tool
+from minicode.tools.test_runner import test_runner_tool
 from minicode.tools.todo_write import todo_write_tool
 from minicode.tools.web_fetch import web_fetch_tool
 from minicode.tools.web_search import web_search_tool
@@ -43,6 +45,7 @@ def create_default_tool_registry(cwd: str, runtime: dict | None = None) -> ToolR
             patch_file_tool,
             # Command execution
             run_command_tool,
+            run_with_debug_tool,
             # Web tools
             web_fetch_tool,
             web_search_tool,
@@ -58,9 +61,11 @@ def create_default_tool_registry(cwd: str, runtime: dict | None = None) -> ToolR
             get_ast_info_tool,
             multi_edit_tool,
             code_review_tool,
-            # Visualization (NEW!)
+            # Visualization
             file_tree_tool,
             diff_viewer_tool,
+            # Testing & Debugging (NEW!)
+            test_runner_tool,
             # Governance audit
             governance_audit_tool,
             # Skills
