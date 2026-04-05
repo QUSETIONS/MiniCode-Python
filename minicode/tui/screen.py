@@ -5,6 +5,8 @@ import sys
 ENTER_ALT_SCREEN = "\u001b[?1049h"
 EXIT_ALT_SCREEN = "\u001b[?1049l"
 ERASE_SCREEN_AND_HOME = "\u001b[2J\u001b[H"
+ENABLE_MOUSE_TRACKING = "\u001b[?1000h"
+DISABLE_MOUSE_TRACKING = "\u001b[?1000l"
 
 
 def hide_cursor() -> None:

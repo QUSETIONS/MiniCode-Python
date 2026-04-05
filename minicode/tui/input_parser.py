@@ -167,9 +167,9 @@ def parse_input_chunk(chunk: str) -> ParseResult:
     while i < len(chunk):
         if maybe_need_more_for_escape_sequence(chunk[i:]):
             break
-            
+
         char = chunk[i]
-        
+
         # Escape sequence
         if char == '\x1b':
             event, consumed = parse_escape_sequence(chunk[i:])
@@ -186,24 +186,24 @@ def parse_input_chunk(chunk: str) -> ParseResult:
                 i += 1
             events.append(KeyEvent(name='return', ctrl=False, meta=False))
             continue
-            
+
         if char == '\n':
             events.append(KeyEvent(name='return', ctrl=False, meta=False))
             i += 1
             continue
-            
+
         # Tab
         if char == '\t':
             events.append(KeyEvent(name='tab', ctrl=False, meta=False))
             i += 1
             continue
-            
+
         # Backspace (0x7f, 0x08)
         if char in ('\x7f', '\x08'):
             events.append(KeyEvent(name='backspace', ctrl=False, meta=False))
             i += 1
             continue
-            
+
         # Ctrl chars (0x01-0x1a)
         if '\x01' <= char <= '\x1a':
             if char in CTRL_CHAR_TO_NAME:
@@ -212,8 +212,38 @@ def parse_input_chunk(chunk: str) -> ParseResult:
             i += 1
             continue
 
-        # Regular text
-        events.append(TextEvent(text=char, ctrl=False, meta=False))
-        i += 1
-        
+        # Regular text - handle UTF-8 multi-byte characters
+        byte_val = ord(char)
+        if byte_val > 0x7F:
+            # Multi-byte UTF-8 character
+            # Determine sequence length from first byte
+            if byte_val < 0xC0:
+                # Invalid continuation byte, skip
+                i += 1
+                continue
+            elif byte_val < 0xE0:
+                seq_len = 2
+            elif byte_val < 0xF0:
+                seq_len = 3
+            elif byte_val < 0xF8:
+                seq_len = 4
+            else:
+                # Invalid or too long, skip
+                i += 1
+                continue
+
+            # Check if we have enough bytes
+            if i + seq_len > len(chunk):
+                # Need more bytes, save as remainder
+                break
+
+            # Extract full UTF-8 character
+            utf8_char = chunk[i:i + seq_len]
+            events.append(TextEvent(text=utf8_char, ctrl=False, meta=False))
+            i += seq_len
+        else:
+            # Single-byte ASCII character
+            events.append(TextEvent(text=char, ctrl=False, meta=False))
+            i += 1
+
     return ParseResult(events=events, rest=chunk[i:])
