@@ -3,10 +3,13 @@ from dataclasses import asdict
 from minicode.mcp import create_mcp_backed_tools
 from minicode.skills import discover_skills
 from minicode.tooling import ToolRegistry
+from minicode.tools.api_tester import api_tester_tool
 from minicode.tools.ask_user import ask_user_tool
 from minicode.tools.code_nav import find_symbols_tool, find_references_tool, get_ast_info_tool
 from minicode.tools.code_review import code_review_tool
+from minicode.tools.db_explorer import db_explorer_tool
 from minicode.tools.diff_viewer import diff_viewer_tool
+from minicode.tools.docker_helper import docker_helper_tool
 from minicode.tools.edit_file import edit_file_tool
 from minicode.tools.file_tree import file_tree_tool
 from minicode.tools.git import git_tool
@@ -49,6 +52,7 @@ def create_default_tool_registry(cwd: str, runtime: dict | None = None) -> ToolR
             # Web tools
             web_fetch_tool,
             web_search_tool,
+            api_tester_tool,
             # Task management
             todo_write_tool,
             # Git workflow
@@ -64,8 +68,11 @@ def create_default_tool_registry(cwd: str, runtime: dict | None = None) -> ToolR
             # Visualization
             file_tree_tool,
             diff_viewer_tool,
-            # Testing & Debugging (NEW!)
+            # Testing & Debugging
             test_runner_tool,
+            # Database & Docker (NEW!)
+            db_explorer_tool,
+            docker_helper_tool,
             # Governance audit
             governance_audit_tool,
             # Skills
