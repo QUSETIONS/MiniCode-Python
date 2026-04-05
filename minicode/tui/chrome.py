@@ -135,30 +135,20 @@ def char_display_width(char: str) -> int:
     return 1
 
 
+# Pre-compiled regex for wide character detection (CJK + Emoji)
+_WIDE_CHAR_PATTERN = re.compile(
+    r'[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF'
+    r'\uF900-\uFAFF\uFE10-\uFE19\uFE30-\uFE6F\uFF00-\uFF60\uFFE0-\uFFE6'
+    r'\U0001F300-\U0001FAF6\U00020000-\U0003FFFD]'
+)
+
+
 @lru_cache(maxsize=2048)
 def _stripped_display_width(stripped: str) -> int:
     """Width of a string that is already ANSI-stripped. Cached for hot paths."""
-    width = 0
-    for c in stripped:
-        code = ord(c)
-        if (
-            0x1100 <= code <= 0x115F
-            or code == 0x2329
-            or code == 0x232A
-            or (0x2E80 <= code <= 0xA4CF and code != 0x303F)
-            or 0xAC00 <= code <= 0xD7A3
-            or 0xF900 <= code <= 0xFAFF
-            or 0xFE10 <= code <= 0xFE19
-            or 0xFE30 <= code <= 0xFE6F
-            or 0xFF00 <= code <= 0xFF60
-            or 0xFFE0 <= code <= 0xFFE6
-            or 0x1F300 <= code <= 0x1FAF6
-            or 0x20000 <= code <= 0x3FFFD
-        ):
-            width += 2
-        else:
-            width += 1
-    return width
+    # Fast path: count wide characters using regex
+    wide_chars = len(_WIDE_CHAR_PATTERN.findall(stripped))
+    return len(stripped) + wide_chars
 
 
 def string_display_width(text: str) -> int:

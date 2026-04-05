@@ -1,0 +1,12 @@
+MiniCode Python Benchmark Results
+================================================================================
+
+render_panel (100 lines)                     0.30 ms  (3317249.10 ops/sec)     0.0 MB  106x8
+render_banner                                0.05 ms  (18757221.54 ops/sec)     0.0 MB  
+string_display_width (avg)                   0.00 ms  (573631315.70 ops/sec)     0.0 MB  4 strings
+render_footer_bar                            0.00 ms  (224668614.49 ops/sec)     0.0 MB  
+estimate_tokens (ASCII only)                 0.13 ms  (7551772.12 ops/sec)     0.0 MB  1200 chars -> 300 tokens
+estimate_tokens (Chinese only)               0.05 ms  (21099917.61 ops/sec)     0.0 MB  400 chars -> 266 tokens
+estimate_tokens (Mixed CJK/ASCII)            0.11 ms  (8954991.85 ops/sec)     0.0 MB  900 chars -> 308 tokens
+estimate_tokens (Code sample)                0.16 ms  (6213121.24 ops/sec)     0.0 MB  1250 chars -> 312 tokens
+estimate_tokens (Long text)                  0.80 ms  (1245175.29 ops/sec)     0.0 MB  6000 chars -> 1500 tokens
