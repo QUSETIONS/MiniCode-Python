@@ -212,18 +212,8 @@ def parse_input_chunk(chunk: str) -> ParseResult:
             i += 1
             continue
 
-        # Regular text - handle CJK and other multi-width characters
-        byte_val = ord(char)
-        if byte_val > 0x7F:
-            # Non-ASCII character (CJK, emoji, etc.)
-            # In Python 3, strings are already Unicode, so `char` is a full character.
-            # We don't need to manually parse UTF-8 sequences.
-            # Just check if we have a complete character and add it.
-            events.append(TextEvent(text=char, ctrl=False, meta=False))
-            i += 1
-        else:
-            # Single-byte ASCII character
-            events.append(TextEvent(text=char, ctrl=False, meta=False))
-            i += 1
+        # Regular text
+        events.append(TextEvent(text=char, ctrl=False, meta=False))
+        i += 1
 
     return ParseResult(events=events, rest=chunk[i:])

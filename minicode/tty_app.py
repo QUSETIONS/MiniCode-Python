@@ -985,7 +985,6 @@ def run_tty_app(
 
     input_remainder = ""
     should_exit = False
-    input_byte_buffer = b""  # Buffer for raw bytes to handle UTF-8 correctly
 
     enter_alternate_screen()
     hide_cursor()
@@ -1008,119 +1007,44 @@ def run_tty_app(
                     chunk = ""
                     while msvcrt.kbhit():
                         chunk += msvcrt.getwch()
-                    
-                    if chunk:
-                        parsed = parse_input_chunk(input_remainder + chunk)
-                        input_remainder = parsed.rest
-                        # Process events...
-                        for event in parsed.events:
-                            try:
-                                _handle_event(args, state, event, rerender, approval_event, approval_result)
-                                if state.input == "/exit" or (
-                                    isinstance(event, KeyEvent)
-                                    and event.name == "c"
-                                    and event.ctrl
-                                ):
-                                    pass
-                            except SystemExit:
-                                should_exit = True
-                                break
-                            except Exception as exc:
-                                _push_transcript_entry(
-                                    state,
-                                    kind="assistant",
-                                    body=str(exc),
-                                )
-                                state.input = ""
-                                state.cursor_offset = 0
-                                state.selected_slash_index = 0
-                                state.status = None
-                                _render_screen(args, state)
                 else:
                     import select
-                    import io
 
-                    # Check if stdin buffer is ready
-                    try:
-                        ready, _, _ = select.select([sys.stdin.buffer], [], [], 0.05)
-                    except (ValueError, io.UnsupportedOperation):
-                        ready = False
-
+                    ready, _, _ = select.select([sys.stdin], [], [], 0.05)
                     if not ready:
                         continue
-
-                    # Read available bytes (non-blocking)
-                    import fcntl
-                    import os
-                    fd = sys.stdin.buffer.fileno()
-                    flags = fcntl.fcntl(fd, fcntl.F_GETFL)
-                    fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
-                    
-                    try:
-                        raw_data = sys.stdin.buffer.read(4096)
-                        if raw_data is None:
-                            raw_data = b""
-                    except BlockingIOError:
-                        raw_data = b""
-                    except Exception:
-                        raw_data = b""
-                    finally:
-                        # Restore blocking mode
-                        fcntl.fcntl(fd, fcntl.F_SETFL, flags)
-
-                    if not raw_data:
-                        # No data available, might be partial UTF-8 sequence
-                        continue
-
-                    input_byte_buffer += raw_data
-
-                    # Try to decode
                     chunk = ""
+                    while True:
+                        ready2, _, _ = select.select([sys.stdin], [], [], 0)
+                        if not ready2:
+                            break
+                        ch = sys.stdin.read(1)
+                        if not ch:
+                            should_exit = True
+                            break
+                        chunk += ch
+
+                if not chunk:
+                    continue
+
+                parsed = parse_input_chunk(input_remainder + chunk)
+                input_remainder = parsed.rest
+
+                for event in parsed.events:
                     try:
-                        # Try to decode the whole buffer
-                        chunk = input_byte_buffer.decode("utf-8")
-                        input_byte_buffer = b""
-                    except UnicodeDecodeError as e:
-                        # If decoding fails, we might have a partial character at the end.
-                        # Check if the error is at the very end.
-                        # e.start is the index of the first invalid byte.
-                        # If e.start > 0, we have valid text before it.
-                        if e.start > 0:
-                            chunk = input_byte_buffer[: e.start].decode("utf-8")
-                            input_byte_buffer = input_byte_buffer[e.start :]
-                        else:
-                            # Cannot decode anything yet (partial char at start)
-                            # Wait for more bytes
-                            continue
-
-                    if chunk:
-                        parsed = parse_input_chunk(input_remainder + chunk)
-                        input_remainder = parsed.rest
-
-                        for event in parsed.events:
-                            try:
-                                _handle_event(args, state, event, rerender, approval_event, approval_result)
-                                if state.input == "/exit" or (
-                                    isinstance(event, KeyEvent)
-                                    and event.name == "c"
-                                    and event.ctrl
-                                ):
-                                    # Check for Ctrl+C
-                                    pass
-                            except SystemExit:
-                                should_exit = True
-                                break
-                            except Exception as exc:
-                                _push_transcript_entry(
-                                    state,
-                                    kind="assistant",
-                                    body=str(exc),
-                                )
-                                state.input = ""
-                                state.cursor_offset = 0
-                                state.selected_slash_index = 0
-                                state.status = None
-                                _render_screen(args, state)
+                        _handle_event(args, state, event, rerender, approval_event, approval_result)
+                        if state.input == "/exit" or (
+                            isinstance(event, KeyEvent)
+                            and event.name == "c"
+                            and event.ctrl
+                        ):
+                            raise SystemExit(0)
+                    except SystemExit:
+                        should_exit = True
+                        break
+                    except Exception:
+                        # Silently ignore rendering errors
+                        pass
 
     finally:
         show_cursor()
