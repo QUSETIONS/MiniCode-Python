@@ -6,6 +6,7 @@ import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable
 
@@ -69,6 +70,75 @@ from minicode.types import ChatMessage, ModelAdapter
 from minicode.workspace import resolve_tool_path
 
 # ---------------------------------------------------------------------------
+# Terminal size cache (avoid repeated syscalls)
+# ---------------------------------------------------------------------------
+
+_terminal_size_cache: tuple[int, int] | None = None
+_terminal_size_cache_time: float = 0.0
+_TERMINAL_SIZE_TTL: float = 0.5  # refresh every 500ms
+
+
+def _get_terminal_size() -> tuple[int, int]:
+    """Cached terminal size to avoid repeated os.get_terminal_size() syscalls."""
+    global _terminal_size_cache, _terminal_size_cache_time
+    now = time.monotonic()
+    if _terminal_size_cache is None or (now - _terminal_size_cache_time) > _TERMINAL_SIZE_TTL:
+        try:
+            ts = os.get_terminal_size()
+            _terminal_size_cache = (ts.columns, ts.lines)
+        except (AttributeError, ValueError, OSError):
+            _terminal_size_cache = (100, 40)
+        _terminal_size_cache_time = now
+    return _terminal_size_cache
+
+
+# ---------------------------------------------------------------------------
+# Throttled renderer
+# ---------------------------------------------------------------------------
+
+class _ThrottledRenderer:
+    """Coalesces rapid rerender() calls into at most one actual render per interval."""
+
+    __slots__ = ("_render_fn", "_min_interval", "_pending", "_last_render_time", "_lock")
+
+    def __init__(self, render_fn: Callable[[], None], min_interval: float = 0.016) -> None:
+        self._render_fn = render_fn
+        self._min_interval = min_interval  # ~60 fps cap
+        self._pending = False
+        self._last_render_time: float = 0.0
+        self._lock = threading.Lock()
+
+    def request(self) -> None:
+        """Request a rerender. If within the throttle window, defers it."""
+        now = time.monotonic()
+        with self._lock:
+            elapsed = now - self._last_render_time
+            if elapsed >= self._min_interval:
+                self._pending = False
+                self._last_render_time = now
+            else:
+                self._pending = True
+                return
+        self._render_fn()
+
+    def flush(self) -> None:
+        """Force any pending deferred render to happen now."""
+        with self._lock:
+            if not self._pending:
+                return
+            self._pending = False
+            self._last_render_time = time.monotonic()
+        self._render_fn()
+
+    def force(self) -> None:
+        """Unconditionally render now, ignoring throttle."""
+        with self._lock:
+            self._pending = False
+            self._last_render_time = time.monotonic()
+        self._render_fn()
+
+
+# ---------------------------------------------------------------------------
 # Types
 # ---------------------------------------------------------------------------
 
@@ -128,6 +198,10 @@ class ScreenState:
     app_state: Store[AppState] | None = None
     # Cost tracking
     cost_tracker: CostTracker | None = None
+    # Background agent thread
+    agent_thread: Any = None
+    agent_result: dict | None = None
+    agent_lock: Any = None
 
 
 # ---------------------------------------------------------------------------
@@ -220,20 +294,18 @@ def _schedule_tool_auto_collapse(
     output: str,
     rerender: Callable[[], None],
 ) -> None:
+    """Collapse tool output with a brief animation. Optimized to use a single
+    combined delay instead of 3 separate sleep+rerender cycles."""
     summary = _summarize_collapsed_tool_body(output)
 
-    def _do_phases() -> None:
-        time.sleep(0.11)
-        _set_tool_entry_collapse_phase(state, entry_id, 1)
-        rerender()
-        time.sleep(0.11)
-        _set_tool_entry_collapse_phase(state, entry_id, 2)
-        rerender()
-        time.sleep(0.10)
+    def _do_collapse() -> None:
+        # Single delay then jump straight to collapsed state
+        # (avoids 3 separate rerender() calls for an animation most users barely see)
+        time.sleep(0.25)
         _collapse_tool_entry(state, entry_id, summary)
         rerender()
 
-    t = threading.Thread(target=_do_phases, daemon=True)
+    t = threading.Thread(target=_do_collapse, daemon=True)
     t.start()
 
 
@@ -295,18 +367,24 @@ def _extract_path_from_tool_input(tool_input: Any) -> str | None:
 # ---------------------------------------------------------------------------
 
 
+_HEADER_LINES_ESTIMATE = 11  # banner panel: top border + title + divider + 6 body lines + bottom border
+_PROMPT_LINES_ESTIMATE = 7   # prompt panel: top border + title + divider + 3 body + bottom border
+_FOOTER_LINES = 1
+_GAPS = 3
+_TRANSCRIPT_FRAME_LINES = 4  # top/bottom border + title + empty
+
 def _get_transcript_body_lines(args: TtyAppArgs, state: ScreenState) -> int:
-    try:
-        rows = max(24, os.get_terminal_size().lines)
-    except (AttributeError, ValueError, OSError):
-        rows = 40
-    header_lines = _render_header_panel(args, state).count("\n") + 1
-    prompt_lines = _render_prompt_panel(state).count("\n") + 1
-    footer_lines = 1
-    gaps_between_sections = 3
-    transcript_frame_lines = 4
-    remaining = rows - header_lines - prompt_lines - footer_lines - gaps_between_sections - transcript_frame_lines
-    return max(6, remaining)
+    _, rows = _get_terminal_size()
+    rows = max(24, rows)
+    # Use cached estimates instead of re-rendering header/prompt just to count lines
+    chrome_overhead = (
+        _HEADER_LINES_ESTIMATE
+        + _PROMPT_LINES_ESTIMATE
+        + _FOOTER_LINES
+        + _GAPS
+        + _TRANSCRIPT_FRAME_LINES
+    )
+    return max(6, rows - chrome_overhead)
 
 
 def _get_max_transcript_scroll_offset(args: TtyAppArgs, state: ScreenState) -> int:
@@ -424,14 +502,19 @@ def _render_prompt_panel(state: ScreenState) -> str:
 
 def _render_screen(args: TtyAppArgs, state: ScreenState) -> None:
     background_tasks = list_background_tasks()
-    clear_screen()
+
+    # Build the entire frame into a buffer, then write once
+    buf: list[str] = []
+    # CSI H + CSI J  (cursor home + erase to end) – avoids full clear flicker
+    buf.append("\u001b[H\u001b[J")
 
     # Header
-    sys.stdout.write(_render_header_panel(args, state) + "\n\n")
+    buf.append(_render_header_panel(args, state))
+    buf.append("\n\n")
 
     if state.pending_approval:
         # Permission approval overlay
-        sys.stdout.write(
+        buf.append(
             render_permission_prompt(
                 state.pending_approval.request,
                 expanded=state.pending_approval.details_expanded,
@@ -440,16 +523,16 @@ def _render_screen(args: TtyAppArgs, state: ScreenState) -> None:
                 feedback_mode=state.pending_approval.feedback_mode,
                 feedback_input=state.pending_approval.feedback_input,
             )
-            + "\n\n"
         )
-        sys.stdout.write(
+        buf.append("\n\n")
+        buf.append(
             render_panel(
                 "activity",
                 render_tool_panel(state.active_tool, state.recent_tools, background_tasks),
             )
-            + "\n\n"
         )
-        sys.stdout.write(
+        buf.append("\n\n")
+        buf.append(
             render_footer_bar(
                 state.status,
                 True,
@@ -457,6 +540,7 @@ def _render_screen(args: TtyAppArgs, state: ScreenState) -> None:
                 background_tasks,
             )
         )
+        sys.stdout.write("".join(buf))
         sys.stdout.flush()
         return
 
@@ -468,21 +552,22 @@ def _render_screen(args: TtyAppArgs, state: ScreenState) -> None:
         )
     else:
         transcript_body = f"{render_status_line(None)}\n\nType /help for commands."
-    sys.stdout.write(
+    buf.append(
         render_panel(
             "session feed",
             transcript_body,
             right_title=f"{len(state.transcript)} events",
             min_body_lines=body_lines,
         )
-        + "\n\n"
     )
+    buf.append("\n\n")
 
     # Prompt
-    sys.stdout.write(_render_prompt_panel(state) + "\n\n")
+    buf.append(_render_prompt_panel(state))
+    buf.append("\n\n")
 
     # Footer
-    sys.stdout.write(
+    buf.append(
         render_footer_bar(
             state.status,
             True,
@@ -490,6 +575,7 @@ def _render_screen(args: TtyAppArgs, state: ScreenState) -> None:
             background_tasks,
         )
     )
+    sys.stdout.write("".join(buf))
     sys.stdout.flush()
 
 
@@ -840,27 +926,46 @@ def _handle_input(
         rerender()
 
     args.permissions.begin_turn()
-    try:
-        next_messages = run_agent_turn(
-            model=args.model,
-            tools=args.tools,
-            messages=args.messages,
-            cwd=args.cwd,
-            permissions=args.permissions,
-            on_tool_start=on_tool_start,
-            on_tool_result=on_tool_result,
-            on_assistant_message=on_assistant_message,
-            on_progress_message=on_progress_message,
-        )
-        args.messages = next_messages
-    finally:
-        args.permissions.end_turn()
-        state.is_busy = False
-        state.active_tool = None
-        _finalize_dangling_running_tools(state)
-        if not _get_running_tool_entries(state):
+    
+    # Run agent turn in background thread to keep UI responsive
+    agent_error = None
+    agent_result: dict = {"messages": None}
+    agent_thread_lock = threading.Lock()
+    
+    def _run_agent_background():
+        nonlocal agent_error, agent_result
+        try:
+            next_messages = run_agent_turn(
+                model=args.model,
+                tools=args.tools,
+                messages=list(args.messages),  # Copy to avoid race condition
+                cwd=args.cwd,
+                permissions=args.permissions,
+                on_tool_start=on_tool_start,
+                on_tool_result=on_tool_result,
+                on_assistant_message=on_assistant_message,
+                on_progress_message=on_progress_message,
+            )
+            with agent_thread_lock:
+                agent_result["messages"] = next_messages
+        except Exception as e:
+            agent_error = e
+        finally:
+            args.permissions.end_turn()
+            with agent_thread_lock:
+                agent_result["done"] = True
+            state.is_busy = False
+            state.active_tool = None
             state.status = None
-
+            rerender()
+    
+    agent_thread = threading.Thread(target=_run_agent_background, daemon=True)
+    agent_thread.start()
+    state.agent_thread = agent_thread
+    state.agent_result = agent_result
+    state.agent_lock = agent_thread_lock
+    
+    # Return immediately - agent runs in background
     return False
 
 
@@ -980,11 +1085,17 @@ def run_tty_app(
 
     permissions.prompt = _permission_prompt_handler
 
+    # Throttled renderer: coalesces rapid rerender() calls to reduce flickering
+    throttled = _ThrottledRenderer(lambda: _render_screen(args, state), min_interval=0.016)
+
     def rerender() -> None:
-        _render_screen(args, state)
+        throttled.request()
 
     input_remainder = ""
     should_exit = False
+    # Autosave throttle: check at most every ~2 seconds, not every 20ms
+    _autosave_counter = 0
+    _AUTOSAVE_CHECK_INTERVAL = 100  # iterations (~2s at 20ms polling)
 
     enter_alternate_screen()
     hide_cursor()
@@ -993,15 +1104,26 @@ def run_tty_app(
 
         with _RawModeContext():
             while not should_exit:
-                # Autosave check
-                if state.autosave:
+                # Autosave check (throttled)
+                _autosave_counter += 1
+                if state.autosave and _autosave_counter >= _AUTOSAVE_CHECK_INTERVAL:
+                    _autosave_counter = 0
                     state.autosave.save_if_needed()
+                
+                # Check if background agent thread completed
+                if hasattr(state, 'agent_result') and state.agent_result.get("done"):
+                    with state.agent_lock:
+                        if state.agent_result.get("messages"):
+                            args.messages = state.agent_result["messages"]
+                        state.agent_result["done"] = False  # Reset flag
 
                 # Read raw input
                 if sys.platform == "win32":
                     import msvcrt
 
                     if not msvcrt.kbhit():
+                        # Flush any deferred renders during idle
+                        throttled.flush()
                         time.sleep(0.02)
                         continue
                     chunk = ""
@@ -1012,6 +1134,8 @@ def run_tty_app(
 
                     ready, _, _ = select.select([sys.stdin], [], [], 0.05)
                     if not ready:
+                        # Flush any deferred renders during idle
+                        throttled.flush()
                         continue
                     chunk = ""
                     while True:
@@ -1045,6 +1169,9 @@ def run_tty_app(
                     except Exception:
                         # Silently ignore rendering errors
                         pass
+
+                # Ensure the final state after processing all events is visible
+                throttled.flush()
 
     finally:
         show_cursor()

@@ -3,6 +3,13 @@ import re
 from dataclasses import dataclass
 from typing import Union, Literal
 
+# Pre-compiled regexes for escape sequence parsing
+_SGR_MOUSE_RE = re.compile(r'^\x1b\[<(\d+);(\d+);(\d+)([Mm])')
+_CSI_CURSOR_RE = re.compile(r'^\x1b\[(?:1;(\d+))?([A-DF-H])')
+_CSI_TILDE_RE = re.compile(r'^\x1b\[(\d+)~')
+_SS3_RE = re.compile(r'^\x1bO([A-DF-H])')
+_ESC_CHAR_RE = re.compile(r'^\x1b([^\x1b\[O])')
+
 ParsedKeyName = Literal[
     'return', 'tab', 'backspace', 'delete',
     'up', 'down', 'left', 'right',
@@ -89,7 +96,7 @@ def parse_escape_sequence(chunk: str) -> tuple[ParsedInputEvent | None, int]:
         return KeyEvent(name='escape', ctrl=False, meta=False), 1
 
     # SGR Mouse: ESC[<button;x;yM/m
-    sgr_match = re.match(r'^\x1b\[<(\d+);(\d+);(\d+)([Mm])', chunk)
+    sgr_match = _SGR_MOUSE_RE.match(chunk)
     if sgr_match:
         button = int(sgr_match.group(1))
         # wheel events (button & 0x43 == 0x40 → up, 0x41 → down)
@@ -109,7 +116,7 @@ def parse_escape_sequence(chunk: str) -> tuple[ParsedInputEvent | None, int]:
         return None, 6
 
     # CSI cursor: ESC[{1;modifier}A/B/C/D/H/F
-    csi_cursor_match = re.match(r'^\x1b\[(?:1;(\d+))?([A-DF-H])', chunk)
+    csi_cursor_match = _CSI_CURSOR_RE.match(chunk)
     if csi_cursor_match:
         mod_str = csi_cursor_match.group(1)
         key_char = csi_cursor_match.group(2)
@@ -128,7 +135,7 @@ def parse_escape_sequence(chunk: str) -> tuple[ParsedInputEvent | None, int]:
         return KeyEvent(name=name_map[key_char], ctrl=ctrl, meta=meta), csi_cursor_match.end()
 
     # CSI tilde: ESC[N~
-    csi_tilde_match = re.match(r'^\x1b\[(\d+)~', chunk)
+    csi_tilde_match = _CSI_TILDE_RE.match(chunk)
     if csi_tilde_match:
         n = int(csi_tilde_match.group(1))
         # 1=home,3=delete,4=end,5=pageup,6=pagedown,7=home,8=end
@@ -140,7 +147,7 @@ def parse_escape_sequence(chunk: str) -> tuple[ParsedInputEvent | None, int]:
         return None, csi_tilde_match.end()
 
     # SS3: ESC O A/B/C/D/H/F
-    ss3_match = re.match(r'^\x1bO([A-DF-H])', chunk)
+    ss3_match = _SS3_RE.match(chunk)
     if ss3_match:
         key_char = ss3_match.group(1)
         name_map: dict[str, str] = {
@@ -153,7 +160,7 @@ def parse_escape_sequence(chunk: str) -> tuple[ParsedInputEvent | None, int]:
         return KeyEvent(name='tab', ctrl=False, meta=True), 2
 
     # ESC+char (Alt+char)
-    esc_char_match = re.match(r'^\x1b([^\x1b\[O])', chunk)
+    esc_char_match = _ESC_CHAR_RE.match(chunk)
     if esc_char_match:
         char = esc_char_match.group(1)
         return TextEvent(text=char, ctrl=False, meta=True), 2

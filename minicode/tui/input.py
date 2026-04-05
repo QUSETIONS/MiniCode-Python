@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-RESET = "\u001b[0m"
-DIM = "\u001b[2m"
-CYAN = "\u001b[36m"
-GREEN = "\u001b[32m"
-YELLOW = "\u001b[33m"
-BOLD = "\u001b[1m"
-REVERSE = "\u001b[7m"
+from .chrome import (
+    RESET, DIM, CYAN, GREEN, YELLOW, BOLD, REVERSE, ITALIC,
+    BRIGHT_CYAN, BRIGHT_GREEN, ACCENT, ACCENT2, SUBTLE,
+    HIGHLIGHT_BG, ICON_PROMPT, ICON_DOT, ICON_ARROW,
+)
 
 
 def render_input_prompt(current_input: str, cursor_offset: int) -> str:
@@ -16,11 +14,19 @@ def render_input_prompt(current_input: str, cursor_offset: int) -> str:
     after = current_input[offset + 1 :]
 
     placeholder = (
-        "" if current_input else " Ask for code, files, tasks, or MCP tools"
+        "" if current_input else f"{ITALIC} Type a message or /help for commands{RESET}"
     )
 
-    line1 = f"{YELLOW}{BOLD}prompt{RESET} {DIM}Enter send | /help commands | Esc clear | Ctrl+C exit{RESET}"
+    # Hint bar with subtle key badges
+    key_enter = f"{SUBTLE}[{RESET}{DIM}Enter{RESET}{SUBTLE}]{RESET} {SUBTLE}send{RESET}"
+    key_help = f"{SUBTLE}[{RESET}{DIM}/help{RESET}{SUBTLE}]{RESET} {SUBTLE}cmds{RESET}"
+    key_esc = f"{SUBTLE}[{RESET}{DIM}Esc{RESET}{SUBTLE}]{RESET} {SUBTLE}clear{RESET}"
+    key_exit = f"{SUBTLE}[{RESET}{DIM}^C{RESET}{SUBTLE}]{RESET} {SUBTLE}exit{RESET}"
+
+    line1 = f"  {key_enter}  {key_help}  {key_esc}  {key_exit}"
     line2 = ""
-    line3 = f"{GREEN}{BOLD}mini-code>{RESET} {before}{REVERSE}{current}{RESET}{after}{DIM}{placeholder}{RESET}"
+    # Prompt line with colored chevron
+    prompt_icon = f"{ACCENT}{ICON_PROMPT}{ICON_PROMPT}{RESET}"
+    line3 = f" {prompt_icon} {before}{HIGHLIGHT_BG}{BRIGHT_GREEN}{current}{RESET}{after}{DIM}{placeholder}{RESET}"
 
     return "\n".join([line1, line2, line3])
