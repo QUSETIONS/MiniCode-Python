@@ -1,3 +1,14 @@
+"""MiniCode Python TTY Application.
+
+This module implements the full-screen terminal user interface for MiniCode,
+including:
+- Real-time transcript rendering with tool output collapsing
+- Interactive permission approval prompts
+- Background agent thread management
+- Keyboard event handling and command routing
+- Session persistence and autosave
+"""
+
 from __future__ import annotations
 
 import logging
@@ -202,6 +213,10 @@ class ScreenState:
 
 
 def _get_session_stats(args: TtyAppArgs, state: ScreenState) -> dict[str, int]:
+    """Get current session statistics.
+    
+    Returns a dict with transcript, message, skill, and MCP server counts.
+    """
     return {
         "transcriptCount": len(state.transcript),
         "messageCount": len(args.messages),
@@ -211,10 +226,31 @@ def _get_session_stats(args: TtyAppArgs, state: ScreenState) -> dict[str, int]:
 
 
 def _push_transcript_entry(state: ScreenState, **kwargs: Any) -> int:
+    """Create and append a new transcript entry.
+    
+    Returns the unique entry ID for later updates.
+    """
     entry_id = state.next_entry_id
     state.next_entry_id += 1
     state.transcript.append(TranscriptEntry(id=entry_id, **kwargs))
     return entry_id
+
+
+def _mark_running_tools_as_error(state: ScreenState, message: str) -> None:
+    """Mark all currently running tools as failed with the given error message.
+    
+    This is used when a turn ends unexpectedly while tools are still running.
+    """
+    for entry in state.transcript:
+        if entry.kind == "tool" and entry.status == "running":
+            entry.status = "error"
+            entry.body = message
+            entry.collapsed = False
+            entry.collapsedSummary = None
+            entry.collapsePhase = None
+            state.recent_tools.append({"name": entry.toolName or "unknown", "status": "error"})
+    if any(e.kind == "tool" and e.status == "error" for e in state.transcript):
+        state.active_tool = None
 
 
 def _update_tool_entry(
@@ -223,6 +259,10 @@ def _update_tool_entry(
     status: str,
     body: str,
 ) -> None:
+    """Update a tool entry's status and output body.
+    
+    Automatically un-collapses the entry so the new content is visible.
+    """
     for entry in state.transcript:
         if entry.id == entry_id and entry.kind == "tool":
             entry.status = status
@@ -234,6 +274,7 @@ def _update_tool_entry(
 
 
 def _set_tool_entry_collapse_phase(state: ScreenState, entry_id: int, phase: int) -> None:
+    """Set the collapse animation phase for a tool entry."""
     for entry in state.transcript:
         if entry.id == entry_id and entry.kind == "tool" and entry.status != "running":
             entry.collapsePhase = phase
@@ -241,6 +282,10 @@ def _set_tool_entry_collapse_phase(state: ScreenState, entry_id: int, phase: int
 
 
 def _collapse_tool_entry(state: ScreenState, entry_id: int, summary: str) -> None:
+    """Collapse a tool entry to show only a summary line.
+    
+    Used for completed tools to reduce visual clutter in the transcript.
+    """
     for entry in state.transcript:
         if entry.id == entry_id and entry.kind == "tool" and entry.status != "running":
             entry.collapsePhase = None
@@ -250,25 +295,25 @@ def _collapse_tool_entry(state: ScreenState, entry_id: int, summary: str) -> Non
 
 
 def _get_running_tool_entries(state: ScreenState) -> list[TranscriptEntry]:
+    """Get all transcript entries that are still in 'running' status."""
     return [e for e in state.transcript if e.kind == "tool" and e.status == "running"]
 
 
 def _finalize_dangling_running_tools(state: ScreenState) -> None:
+    """Mark all running tools as errors when a turn ends unexpectedly.
+    
+    This happens when the model stops responding but tools are still active,
+    indicating a potential sync issue or background process.
+    """
     running = _get_running_tool_entries(state)
-    for entry in running:
-        entry.status = "error"
-        entry.body = (
-            f"{entry.body}\n\n"
+    if running:
+        error_message = (
+            f"{running[0].body}\n\n"
             "ERROR: Tool did not report a final result before the turn ended. "
             "This usually means the command kept running in the background "
             "or the tool lifecycle got out of sync."
         )
-        entry.collapsed = False
-        entry.collapsedSummary = None
-        entry.collapsePhase = None
-        state.recent_tools.append({"name": entry.toolName or "unknown", "status": "error"})
-    if running:
-        state.active_tool = None
+        _mark_running_tools_as_error(state, error_message)
         state.status = f"Previous turn ended with {len(running)} unfinished tool call(s)."
 
 
@@ -500,6 +545,10 @@ _banner_cache: dict[str, tuple[tuple, str]] = {"key": ((), "")}
 
 
 def _render_header_panel(args: TtyAppArgs, state: ScreenState) -> str:
+    """Render the top banner panel with model info, cwd, and session stats.
+    
+    The result is cached to avoid re-rendering when stats haven't changed.
+    """
     stats = _get_session_stats(args, state)
     cache_key = (
         args.cwd,
@@ -533,6 +582,10 @@ def _render_footer_cached(
     skills_enabled: bool,
     background_tasks: list[dict[str, Any]],
 ) -> str:
+    """Render the bottom status bar with caching to reduce flicker.
+    
+    Shows current operation status, tool/skill availability, and background tasks.
+    """
     cache_key = (
         status,
         tools_enabled,
