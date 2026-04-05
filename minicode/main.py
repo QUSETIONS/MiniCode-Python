@@ -32,15 +32,42 @@ def _handle_local_command(user_input: str, tools) -> str | None:
 
 def _render_banner(runtime: dict | None, cwd: str, permission_summary: list[str], counts: dict[str, int]) -> str:
     model = runtime["model"] if runtime else "unconfigured"
-    return "\n".join(
-        [
-            "MiniCode Python",
-            f"model: {model}",
-            f"cwd: {cwd}",
-            *permission_summary,
-            f"transcript: {counts['transcriptCount']} messages={counts['messageCount']} skills={counts['skillCount']} mcp={counts['mcpCount']}",
-        ]
+    lines = [
+        "╔══════════════════════════════════════════════════════════╗",
+        "║  🤖 MiniCode Python - Your Terminal Coding Assistant    ║",
+        "╠══════════════════════════════════════════════════════════╣",
+        f"║  Model: {model:<46} ║",
+        f"║  CWD: {cwd:<50} ║",
+    ]
+    if permission_summary:
+        for perm in permission_summary[:2]:  # 只显示前2个权限摘要
+            lines.append(f"║  {perm:<60} ║")
+    lines.append("╠══════════════════════════════════════════════════════════╣")
+    lines.append(
+        f"║  📊 Skills: {counts['skillCount']:>2} | MCP Servers: {counts['mcpCount']:>2} | "
+        f"Transcript: {counts['transcriptCount']:>3} ║"
     )
+    lines.append("╚══════════════════════════════════════════════════════════╝")
+    return "\n".join(lines)
+
+
+def _render_quick_start() -> str:
+    """显示快速入门指南"""
+    return """
+💡 Quick Start Guide:
+  📝 Edit files:     edit_file.py or patch_file.py
+  🔍 Search code:    /grep <pattern> or grep_files tool
+  🏃 Run commands:   /cmd <command> or run_command tool
+  🧠 Think deeply:   Use sequential_thinking MCP tool
+  📚 View skills:    /skills
+  ❓ Get help:       /help
+
+🚀 Try saying:
+  "帮我分析这个项目的结构"
+  "用 TDD 方式实现 XX 功能"
+  "系统性地调试这个 bug"
+  "帮我写个技术方案"
+"""
 
 
 def _append_transcript(transcript: list[TranscriptEntry], **kwargs) -> None:
@@ -122,8 +149,18 @@ def main() -> None:
     except Exception as e:  # noqa: BLE001
         runtime = None
         print(
-            f"Warning: Failed to load runtime config: {e}\n"
-            f"Falling back to mock model. Set ANTHROPIC_MODEL and ANTHROPIC_API_KEY to use a real model.",
+            f"⚠️  Warning: Failed to load runtime config: {e}\n",
+            file=sys.stderr,
+        )
+        print(
+            "🔧 How to fix this:\n"
+            "  1. Set your model name: export ANTHROPIC_MODEL=claude-sonnet-4-20250514\n"
+            "  2. Set your API key: export ANTHROPIC_API_KEY=sk-ant-...\n"
+            "  3. Or edit ~/.mini-code/settings.json:\n"
+            '     {"model": "claude-sonnet-4-20250514", "env": {"ANTHROPIC_API_KEY": "sk-ant-..."}}\n'
+            "  4. Restart MiniCode\n\n"
+            "📖 For more info: https://github.com/QUSETIONS/MiniCode-Python\n"
+            "   Falling back to mock model for now...\n",
             file=sys.stderr,
         )
 
@@ -164,7 +201,12 @@ def main() -> None:
             },
         )
     )
-    print("")
+    
+    # 显示快速入门指南
+    if not sys.stdin.isatty() or os.environ.get("MINI_CODE_SHOW_GUIDE", "1") == "1":
+        print(_render_quick_start())
+    else:
+        print("")
 
     try:
         if not sys.stdin.isatty():

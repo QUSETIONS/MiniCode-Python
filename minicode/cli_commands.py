@@ -51,7 +51,66 @@ SLASH_COMMANDS = [
 
 
 def format_slash_commands() -> str:
-    return "\n".join(f"{command.usage}  {command.description}" for command in SLASH_COMMANDS)
+    lines = [
+        "╔══════════════════════════════════════════════════════════╗",
+        "║  📚 Available Commands                                  ║",
+        "╠══════════════════════════════════════════════════════════╣",
+    ]
+    
+    command_groups = {
+        "🔧 Core Commands": [
+            ("/help", "Show this help message"),
+            ("/exit", "Exit mini-code"),
+            ("/clear", "Clear the current transcript view"),
+            ("/history", "Show recent prompt history"),
+        ],
+        "🛠️ Tool Commands": [
+            ("/tools", "List all available tools"),
+            ("/skills", "List discovered SKILL.md workflows"),
+            ("/mcp", "Show MCP servers and connection state"),
+            ("/cmd", "Run development commands directly"),
+        ],
+        "📊 Status & Info": [
+            ("/status", "Show application state summary"),
+            ("/model", "Show or change current model"),
+            ("/cost", "Show API cost and usage report"),
+            ("/context", "Show context window usage"),
+            ("/tasks", "Show current task list"),
+            ("/memory", "Show memory system status"),
+        ],
+        "✏️ File Operations": [
+            ("/ls [path]", "List files in directory"),
+            ("/grep <pattern>", "Search text in files"),
+            ("/read <path>", "Read a file directly"),
+            ("/write <path>", "Write content to file"),
+            ("/edit <path>", "Edit file by exact replacement"),
+            ("/patch <path>", "Apply multiple replacements in one go"),
+            ("/modify <path>", "Replace file with reviewable diff"),
+        ],
+        "💾 Session Management": [
+            ("/transcript-save <path>", "Save transcript to text file"),
+            ("/retry", "Retry the last prompt"),
+            ("/permissions", "Show permission storage path"),
+            ("/config-paths", "Show settings file paths"),
+        ],
+    }
+    
+    for group_name, commands in command_groups.items():
+        lines.append(f"║  {group_name:<54}║")
+        for cmd, desc in commands:
+            cmd_display = f"    {cmd}"
+            lines.append(f"║  {cmd_display:<20} {desc:<33} ║")
+        lines.append("╠══════════════════════════════════════════════════════════╣")
+    
+    lines.extend([
+        "║  💡 Tips:                                              ║",
+        "║  - Use Tab to autocomplete commands                    ║",
+        "║  - Prefix with / to access any command                 ║",
+        "║  - Type naturally - I'll understand Chinese & English  ║",
+        "╚══════════════════════════════════════════════════════════╝",
+    ])
+    
+    return "\n".join(lines)
 
 
 def find_matching_slash_commands(user_input: str) -> list[str]:

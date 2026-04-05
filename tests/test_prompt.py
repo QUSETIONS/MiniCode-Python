@@ -30,4 +30,5 @@ def test_build_system_prompt_mentions_sequential_thinking_server(tmp_path: Path)
         },
     )
 
-    assert "sequential-thinking style MCP server is connected" in prompt
+    assert "SEQUENTIAL THINKING MCP SERVER IS CONNECTED" in prompt
+    assert "sequential_thinking" in prompt

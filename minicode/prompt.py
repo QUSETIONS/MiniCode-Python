@@ -128,9 +128,23 @@ def build_system_prompt(
         parts.append(
             "Available skills:\n"
             + "\n".join(f"- {skill['name']}: {skill['description']}" for skill in skills)
+            + "\n\n"
+            + "SKILL USAGE GUIDE:\n"
+            + "- When user asks for creative brainstorming, use 'brainstorming' skill\n"
+            + "- When writing implementation plans, use 'writing-plans' skill\n"
+            + "- When debugging systematically, use 'systematic-debugging' skill\n"
+            + "- When doing TDD, use 'test-driven-development' skill\n"
+            + "- When reviewing code in Chinese, use 'chinese-code-review' skill\n"
+            + "- When user asks about workflows, check 'using-superpowers' skill first\n"
+            + "- For complex multi-step tasks, consider 'subagent-driven-development'\n"
+            + "- Before completing, ALWAYS use 'verification-before-completion'"
         )
     else:
-        parts.append("Available skills:\n- none discovered")
+        parts.append(
+            "Available skills:\n"
+            + "- none discovered\n"
+            + "Tip: Install skills via `npx superpowers-zh` in your project directory"
+        )
 
     mcp_servers = extras.get("mcpServers", [])
     if mcp_servers:
@@ -160,7 +174,14 @@ def build_system_prompt(
         ]
         if any(server.get("status") == "connected" for server in sequential_servers):
             parts.append(
-                "A sequential-thinking style MCP server is connected. For complex implementation, debugging, migration, or architectural decisions, prefer using that reasoning MCP tool before or during tool-heavy work."
+                "\nSEQUENTIAL THINKING MCP SERVER IS CONNECTED!\n"
+                "When to use sequential_thinking tool:\n"
+                "- Breaking down complex implementation problems\n"
+                "- Multi-step debugging or investigation\n"
+                "- Architectural decisions requiring structured analysis\n"
+                "- Migration or refactoring planning\n"
+                "- Any situation requiring step-by-step reasoning\n\n"
+                "Usage: Call 'sequential_thinking' with structured thoughts before complex tool sequences"
             )
 
     if global_claude_md:
