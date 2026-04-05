@@ -203,6 +203,11 @@ def main() -> None:
         context_mgr = ContextManager(model=runtime.get("model", "default"))
         logger.info("Context manager initialized for model: %s", runtime.get("model", "unknown"))
     
+    # Initialize MemoryManager for cross-session knowledge retention
+    from minicode.memory import MemoryManager
+    memory_mgr = MemoryManager(project_root=Path(cwd))
+    logger.info("Memory manager initialized")
+    
     messages = [
         {
             "role": "system",
@@ -212,6 +217,7 @@ def main() -> None:
                 {
                     "skills": tools.get_skills(),
                     "mcpServers": tools.get_mcp_servers(),
+                    "memory_context": memory_mgr.get_relevant_context(),  # Inject memory
                 },
             ),
         }

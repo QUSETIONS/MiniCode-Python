@@ -153,6 +153,37 @@ def try_handle_local_command(user_input: str, tools=None) -> str | None:
         from minicode.config import format_config_diagnostic
         return format_config_diagnostic()
 
+    if user_input == "/memory":
+        # Memory system display
+        try:
+            from minicode.memory import MemoryManager
+            from pathlib import Path
+            memory_mgr = MemoryManager(project_root=Path(cwd))
+            
+            lines = ["Memory System Status", "=" * 40, ""]
+            
+            # Show summary
+            summary = memory_mgr.get_summary()
+            lines.append(f"User memory: {summary['user_entries']} entries")
+            lines.append(f"Project memory: {summary['project_entries']} entries")
+            lines.append(f"Local memory: {summary['local_entries']} entries")
+            lines.append(f"Total: {summary['total_entries']} entries")
+            lines.append("")
+            
+            # Show recent entries
+            lines.append("Recent Entries:")
+            recent = memory_mgr.search("", scope=None)[:10]  # Get 10 most recent
+            if recent:
+                for entry in recent:
+                    tags_str = f" [{', '.join(entry.tags)}]" if entry.tags else ""
+                    lines.append(f"  - {entry.content[:80]}{tags_str}")
+            else:
+                lines.append("  No entries yet")
+            
+            return "\n".join(lines)
+        except Exception as e:
+            return f"Error loading memory: {e}"
+
     if user_input == "/context":
         # Context usage display
         try:
