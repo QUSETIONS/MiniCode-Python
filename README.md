@@ -57,7 +57,7 @@ tools on | skills on | memory: 3 entries
 |---------|-------------|-----------------|---------------------|
 | **Terminal-First UI** | ✅ | ❌ | ✅ |
 | **Full Agent Loop** | ✅ | Partial | ✅ |
-| **Tool System** | ~40 tools | ~5 tools | **16 tools** |
+| **Tool System** | ~40 tools | ~5 tools | **18 tools** |
 | **Permission System** | ✅ | ❌ | ✅ |
 | **MCP Integration** | ✅ | ❌ | ✅ |
 | **Skills System** | ✅ | ❌ | ✅ |
@@ -82,7 +82,7 @@ tools on | skills on | memory: 3 entries
 │                                                                 │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
 │  │  Agent Loop  │──│ Tool System  │──│ Permission Manager   │  │
-│  │  (Recovery)  │  │ (16 Tools)   │  │ (Interactive UI)     │  │
+│  │  (Recovery)  │  │ (18 Tools)   │  │ (Interactive UI)     │  │
 │  └──────┬───────┘  └──────┬───────┘  └──────────┬───────────┘  │
 │         │                 │                      │              │
 │  ┌──────▼───────┐  ┌──────▼───────┐  ┌──────────▼───────────┐  │
@@ -118,7 +118,7 @@ tools on | skills on | memory: 3 entries
 
 ---
 
-## 🛠️ Tool Ecosystem (16 Tools)
+## 🛠️ Tool Ecosystem (18 Tools)
 
 <div align="center">
 
@@ -196,7 +196,7 @@ python -m minicode.main --resume <session-id>
 | **Code Lines** | ~11,000 | 📝 |
 | **Test Cases** | 92 (100% pass) | ✅ |
 | **External Dependencies** | 0 | 🎯 |
-| **Tools Available** | 16 | 🛠️ |
+| **Tools Available** | 18 | 🛠️ |
 | **Slash Commands** | 20+ | ⌨️ |
 | **Startup Time** | <1 second | ⚡ |
 | **Memory Usage** | ~15MB | 💾 |
@@ -257,21 +257,57 @@ Every code generation automatically follows:
 
 ```
 Iron Laws (8):
-1. Theory first
-2. Requirements first
-3. 1:1 binding (requirements ↔ knowledge)
-4. Design-driven
-5. Audit loop
-6. Single sink (business/src/ = exactly 1)
-7. One-way dependencies (zero cycles)
-8. No skipping phases
+1. Theory first          5. Audit loop
+2. Requirements first    6. Single sink (business/src/ = 1)
+3. 1:1 binding           7. One-way dependencies (zero cycles)
+4. Design-driven         8. No skipping phases
 
 Package Structure:
-├── port/port_entry/    # Entry points
-├── wrap/src/          # External adapters
-├── business/src/      # Business logic (CORE)
-├── test/src/          # Tests
-└── */config/          # Configuration (zero deps)
+my_package/
+├── port/
+│   ├── port_entry/      # Entry points (can import anything)
+│   └── port_exit/       # Exit points (export interface)
+├── wrap/
+│   ├── src/             # External library adapters
+│   └── config/          # Adapter configuration (zero deps)
+├── business/
+│   ├── src/             # Business logic (CORE - exactly 1 sink)
+│   └── config/          # Business configuration (zero deps)
+├── test/
+│   ├── src/             # Test code
+│   └── config/          # Test configuration (zero deps)
+└── docs/
+    ├── requirements/    # User scenarios (pure, no implementation)
+    ├── knowledge/       # Business rules & constraints (1:1 with requirements)
+    └── design/          # Technical design (maps to code structure)
+
+Dependency Flow:
+vendor/ → port_entry → wrap/src → business/src → port_exit
+              ↑                      ↑
+         (external libs)      (business config last)
+
+Audit Checklist (Auto-Executed):
+✓ Audit 0: Knowledge ↔ Requirements 1:1
+✓ Audit 1: Design ← Requirements + Knowledge coverage
+✓ Audit 2: Code ← Design isomorphism + Dependency compliance
+✓ Audit 3: business/src/ single sink + Package DAG
+```
+
+Use the `governance_audit` tool to check your code:
+
+```python
+# AI automatically runs this after code changes
+governance_audit(action="full", path="my_package")
+
+# Output:
+# Governance Audit Result
+# ==================================================
+# ✓ PASSED - All governance rules satisfied
+# 
+# Dependencies: 12 edges
+# Sink files:
+#   business_src: 1 sink
+#     - src/service.py
 ```
 
 ### Session Persistence
@@ -354,7 +390,10 @@ MiniCode-Python/
 │   ├── install.py             # 📦 Interactive installer
 │   ├── prompt.py              # 📝 System prompt builder
 │   ├── tty_app.py             # 🖥️ Main TUI application
-│   ├── tools/                 # 🛠️ 16 built-in tools
+│   ├── tools/                 # 🛠️ 18 built-in tools
+│   │   ├── governance_audit.py    # 🏗️ Governance compliance checker
+│   │   ├── git.py                 # 🔧 Git workflow tool
+│   │   └── notebook_edit.py       # 📓 Jupyter Notebook editor
 │   └── tui/                   # 🎨 Terminal UI components
 ├── tests/                     # 🧪 92 test cases
 └── docs/                      # 📚 Documentation
