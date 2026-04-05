@@ -1,0 +1,46 @@
+Multi-Round Performance Stress Test Results
+============================================================
+
+Token Estimation:
+  Round 1:
+    ASCII: 477,651 ops/sec -> 300 tokens
+    Chinese: 46,789 ops/sec -> 266 tokens
+    Mixed: 79,553 ops/sec -> 308 tokens
+  Round 2:
+    ASCII: 484,592 ops/sec -> 300 tokens
+    Chinese: 42,316 ops/sec -> 266 tokens
+    Mixed: 77,923 ops/sec -> 308 tokens
+  Round 3:
+    ASCII: 476,899 ops/sec -> 300 tokens
+    Chinese: 47,457 ops/sec -> 266 tokens
+    Mixed: 81,671 ops/sec -> 308 tokens
+  Round 4:
+    ASCII: 467,296 ops/sec -> 300 tokens
+    Chinese: 48,148 ops/sec -> 266 tokens
+    Mixed: 79,800 ops/sec -> 308 tokens
+  Round 5:
+    ASCII: 490,191 ops/sec -> 300 tokens
+    Chinese: 48,096 ops/sec -> 266 tokens
+    Mixed: 80,415 ops/sec -> 308 tokens
+
+Rendering:
+  Round 1:
+    render_panel: 5,980 ops/sec
+    render_banner: 34,348 ops/sec
+    render_footer: 386,967 ops/sec
+  Round 2:
+    render_panel: 6,157 ops/sec
+    render_banner: 36,921 ops/sec
+    render_footer: 396,464 ops/sec
+  Round 3:
+    render_panel: 6,062 ops/sec
+    render_banner: 37,526 ops/sec
+    render_footer: 383,215 ops/sec
+  Round 4:
+    render_panel: 6,046 ops/sec
+    render_banner: 36,839 ops/sec
+    render_footer: 377,344 ops/sec
+  Round 5:
+    render_panel: 6,180 ops/sec
+    render_banner: 37,267 ops/sec
+    render_footer: 339,893 ops/sec
