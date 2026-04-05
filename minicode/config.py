@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,34 @@ MINI_CODE_HISTORY_PATH = MINI_CODE_DIR / "history.json"
 MINI_CODE_PERMISSIONS_PATH = MINI_CODE_DIR / "permissions.json"
 MINI_CODE_MCP_PATH = MINI_CODE_DIR / "mcp.json"
 CLAUDE_SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
+
+# 已知的合法模型名称（用于拼写检查提示）
+KNOWN_MODELS = [
+    "claude-sonnet-4-20250514",
+    "claude-opus-4-20250514",
+    "claude-haiku-3-20240307",
+    "gpt-4o",
+    "gpt-4o-mini",
+    "gpt-4-turbo",
+]
+
+
+def _suggest_model_name(typed: str) -> str:
+    """根据输入建议最接近的合法模型名称"""
+    if not typed:
+        return ""
+    
+    # 简单的前缀匹配
+    for model in KNOWN_MODELS:
+        if model.startswith(typed.lower()):
+            return model
+    
+    # 模糊匹配：包含输入字符的模型
+    for model in KNOWN_MODELS:
+        if typed.lower() in model:
+            return model
+    
+    return ""
 
 
 def project_mcp_path(cwd: str | Path | None = None) -> Path:
@@ -139,3 +168,111 @@ def save_scoped_mcp_servers(scope: str, servers: dict[str, Any], cwd: str | Path
     target = get_mcp_config_path(scope, cwd)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps({"mcpServers": servers}, indent=2) + "\n", encoding="utf-8")
+
+
+def validate_config(cwd: str | Path | None = None) -> tuple[bool, list[str]]:
+    """验证配置完整性，返回 (是否有效，错误列表)
+    
+    检查项：
+    1. 模型名称是否配置
+    2. API key 是否配置
+    3. 模型名称拼写是否正确
+    4. MCP 配置文件是否合法
+    """
+    errors: list[str] = []
+    warnings: list[str] = []
+    
+    try:
+        config = load_runtime_config(cwd)
+        
+        # 检查模型名称拼写
+        model = config.get("model", "")
+        if model and not any(model.lower() == km.lower() for km in KNOWN_MODELS):
+            suggestion = _suggest_model_name(model)
+            if suggestion:
+                warnings.append(
+                    f"Unknown model '{model}'. Did you mean '{suggestion}'?"
+                )
+            else:
+                warnings.append(
+                    f"Unknown model '{model}'. Known models: {', '.join(KNOWN_MODELS[:3])}..."
+                )
+        
+        # 检查 MCP 配置
+        mcp_servers = config.get("mcpServers", {})
+        for name, server in mcp_servers.items():
+            if not server.get("command"):
+                errors.append(f"MCP server '{name}' has no command configured")
+        
+        return len(errors) == 0, errors + warnings
+        
+    except RuntimeError as e:
+        error_msg = str(e)
+        
+        # 提供友好的错误消息
+        if "No model configured" in error_msg:
+            suggestion = _suggest_model_name(os.environ.get("MINI_CODE_MODEL", ""))
+            help_msg = (
+                f"Error: {error_msg}\n\n"
+                "How to fix:\n"
+                "  1. Set model name: export ANTHROPIC_MODEL=claude-sonnet-4-20250514\n"
+                "  2. Or edit ~/.mini-code/settings.json:\n"
+                f'     {{"model": "claude-sonnet-4-20250514"}}\n'
+            )
+            if suggestion:
+                help_msg += f"\n  Did you mean: {suggestion}?\n"
+            help_msg += f"\n  Known models: {', '.join(KNOWN_MODELS[:3])}..."
+            errors.append(help_msg)
+            
+        elif "No auth configured" in error_msg:
+            help_msg = (
+                f"Error: {error_msg}\n\n"
+                "How to fix:\n"
+                "  1. Set API key: export ANTHROPIC_API_KEY=sk-ant-...\n"
+                "  2. Or edit ~/.mini-code/settings.json:\n"
+                '     {"env": {"ANTHROPIC_API_KEY": "sk-ant-..."}}\n'
+            )
+            errors.append(help_msg)
+        else:
+            errors.append(str(e))
+        
+        return False, errors
+    except Exception as e:
+        return False, [f"Unexpected error: {e}"]
+
+
+def format_config_diagnostic(cwd: str | Path | None = None) -> str:
+    """格式化配置诊断信息"""
+    is_valid, messages = validate_config(cwd)
+    
+    lines = ["Configuration Diagnostics", "=" * 40, ""]
+    
+    if is_valid:
+        lines.append("Status: OK")
+        if messages:
+            lines.append("")
+            lines.append("Warnings:")
+            for msg in messages:
+                lines.append(f"  ⚠️  {msg}")
+    else:
+        lines.append("Status: ERRORS")
+        lines.append("")
+        lines.append("Errors:")
+        for msg in messages:
+            lines.append(f"  ❌ {msg}")
+    
+    # 显示当前配置摘要
+    try:
+        config = load_runtime_config(cwd)
+        lines.append("")
+        lines.append("Current Configuration")
+        lines.append("-" * 40)
+        lines.append(f"  Model: {config.get('model', 'not set')}")
+        lines.append(f"  Base URL: {config.get('baseUrl', 'not set')}")
+        auth_method = "ANTHROPIC_AUTH_TOKEN" if config.get("authToken") else ("ANTHROPIC_API_KEY" if config.get("apiKey") else "not set")
+        lines.append(f"  Auth: {auth_method}")
+        lines.append(f"  MCP Servers: {len(config.get('mcpServers', {}))}")
+    except Exception:
+        pass
+    
+    return "\n".join(lines)

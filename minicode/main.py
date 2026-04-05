@@ -126,8 +126,29 @@ def main() -> None:
         action="store_true",
         help="Run the interactive installer",
     )
-    
+    parser.add_argument(
+        "--validate-config",
+        action="store_true",
+        help="Validate configuration and exit",
+    )
+    parser.add_argument(
+        "--log-level",
+        default="WARNING",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Set logging level (default: WARNING)",
+    )
+
     args = parser.parse_args()
+
+    # Initialize logging
+    from minicode.logging_config import setup_logging
+    setup_logging(level=args.log_level)
+
+    # Run config validation if requested
+    if args.validate_config:
+        from minicode.config import format_config_diagnostic
+        print(format_config_diagnostic())
+        return
     
     # Run installer if requested
     if args.install:

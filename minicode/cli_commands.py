@@ -28,6 +28,7 @@ SLASH_COMMANDS = [
     SlashCommand("/context", "/context", "Show context window usage."),
     SlashCommand("/tasks", "/tasks", "Show current task list."),
     SlashCommand("/memory", "/memory", "Show memory system status."),
+    SlashCommand("/config", "/config", "Show configuration diagnostics and validation."),
     SlashCommand("/history", "/history", "Show recent prompt history from ~/.mini-code/history.json."),
     SlashCommand("/clear", "/clear", "Clear the current transcript view."),
     SlashCommand("/retry", "/retry", "Retry the last natural-language prompt in this session."),
@@ -147,6 +148,10 @@ def try_handle_local_command(user_input: str, tools=None) -> str | None:
             f"{skill['name']}  {skill['description']}  [{skill['source']}]"
             for skill in skills
         )
+
+    if user_input == "/config":
+        from minicode.config import format_config_diagnostic
+        return format_config_diagnostic()
 
     if user_input == "/mcp":
         servers = tools.get_mcp_servers() if tools else []
