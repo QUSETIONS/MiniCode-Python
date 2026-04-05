@@ -6,7 +6,9 @@ from minicode.tooling import ToolRegistry
 from minicode.tools.ask_user import ask_user_tool
 from minicode.tools.code_nav import find_symbols_tool, find_references_tool, get_ast_info_tool
 from minicode.tools.code_review import code_review_tool
+from minicode.tools.diff_viewer import diff_viewer_tool
 from minicode.tools.edit_file import edit_file_tool
+from minicode.tools.file_tree import file_tree_tool
 from minicode.tools.git import git_tool
 from minicode.tools.governance_audit_tool import governance_audit_tool
 from minicode.tools.grep_files import grep_files_tool
@@ -50,12 +52,15 @@ def create_default_tool_registry(cwd: str, runtime: dict | None = None) -> ToolR
             git_tool,
             # Notebook editing
             notebook_edit_tool,
-            # Code intelligence (NEW!)
+            # Code intelligence
             find_symbols_tool,
             find_references_tool,
             get_ast_info_tool,
             multi_edit_tool,
             code_review_tool,
+            # Visualization (NEW!)
+            file_tree_tool,
+            diff_viewer_tool,
             # Governance audit
             governance_audit_tool,
             # Skills
