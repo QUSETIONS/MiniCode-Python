@@ -1338,13 +1338,13 @@ def run_tty_app(
                     state.autosave.save_if_needed()
                 
                 # Check if background agent thread completed
-                ar = state.agent_result
+                agent_result_data = state.agent_result
                 lock = getattr(state, "agent_lock", None)
-                if ar is not None and lock is not None and ar.get("done"):
+                if agent_result_data is not None and lock is not None and agent_result_data.get("done"):
                     with lock:
-                        if ar.get("messages"):
-                            args.messages = ar["messages"]
-                        ar["done"] = False  # Reset flag
+                        if agent_result_data.get("messages"):
+                            args.messages = agent_result_data["messages"]
+                        agent_result_data["done"] = False  # Reset flag
 
                 # Read raw input
                 if sys.platform == "win32":
@@ -1944,12 +1944,32 @@ def _handle_normal_mode_wheel(
 
 
 def summarize_tool_input(tool_name: str, tool_input: Any) -> str:
-    """Public wrapper around _summarize_tool_input for external callers."""
+    """Generate a human-readable summary of tool input.
+    
+    Public wrapper around _summarize_tool_input for external callers.
+    
+    Args:
+        tool_name: Name of the tool being called
+        tool_input: Input dictionary passed to the tool
+        
+    Returns:
+        Human-readable summary string for display in transcript
+    """
     return _summarize_tool_input(tool_name, tool_input)
 
 
 def summarize_tool_output(tool_name: str, output: str) -> str:
-    """Summarize tool output: pick first meaningful line, truncate."""
+    """Summarize tool output for collapsed display.
+    
+    Picks the first meaningful line and truncates to 140 characters.
+    
+    Args:
+        tool_name: Name of the tool (unused but kept for API consistency)
+        output: Full tool output string
+        
+    Returns:
+        Truncated summary suitable for collapsed tool display
+    """
     return _summarize_collapsed_tool_body(output)
 
 
