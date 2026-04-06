@@ -62,7 +62,20 @@ def _validate_mcp_command(command: str) -> None:
     # 如果是绝对路径，需要额外验证
     if Path(command).is_absolute():
         # 检查是否在常见的系统目录中
-        allowed_system_dirs = ['/usr/bin', '/usr/local/bin', '/usr/sbin', '/opt']
+        home_posix = str(Path.home().as_posix())
+        allowed_system_dirs = [
+            '/usr/bin', '/usr/local/bin', '/usr/local/sbin', '/usr/sbin', '/opt',
+            # macOS Homebrew
+            '/opt/homebrew/bin', '/opt/homebrew/sbin',  # Apple Silicon
+            '/usr/local/Cellar',  # Intel
+            # Linux extras
+            '/snap/bin',  # Ubuntu Snap
+            '/home/linuxbrew/.linuxbrew/bin',  # Homebrew on Linux
+            # User-level tool directories (pip --user, pipx, cargo, nvm, etc.)
+            f'{home_posix}/.local/bin',
+            f'{home_posix}/.cargo/bin',
+            f'{home_posix}/.nvm',
+        ]
         if os.name == 'nt':
             allowed_system_dirs.extend([
                 'C:\\Program Files',
@@ -182,10 +195,11 @@ class StdioMcpClient:
         self.server_name = server_name
         self.config = config
         self.cwd = cwd
-        self.process: subprocess.Popen[str] | None = None
+        self.process: subprocess.Popen[bytes] | None = None
         self.protocol: JsonRpcProtocol | None = None
         self.next_id = 1
-        self.pending: dict[int, Queue[Any]] = {}
+        self._pending: dict[int, Queue[Any]] = {}
+        self._lock = threading.Lock()
         self.stderr_lines: list[str] = []
         self._stderr_thread: threading.Thread | None = None
         self._stdout_thread: threading.Thread | None = None
@@ -251,25 +265,28 @@ class StdioMcpClient:
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1,
+                bufsize=0,
                 **popen_kwargs,
             )
         except FileNotFoundError:
             raise RuntimeError(f"Command not found: {command}. Install it first and ensure it is available in PATH.") from None
 
         self.stderr_lines = []
-        self.pending = {}
+        with self._lock:
+            self._pending = {}
         self._stderr_thread = threading.Thread(target=self._consume_stderr, daemon=True)
         self._stderr_thread.start()
 
     def _consume_stderr(self) -> None:
         assert self.process is not None and self.process.stderr is not None
         for line in self.process.stderr:
-            text = line.strip()
-            if text:
-                self.stderr_lines.append(text)
-                self.stderr_lines = self.stderr_lines[-8:]
+            try:
+                text = line.decode("utf-8", errors="replace").strip()
+                if text:
+                    self.stderr_lines.append(text)
+                    self.stderr_lines = self.stderr_lines[-8:]
+            except Exception:
+                continue
 
     def _ensure_stdout_thread(self) -> None:
         if self._stdout_thread is not None:
@@ -279,78 +296,100 @@ class StdioMcpClient:
 
     def _consume_stdout(self) -> None:
         assert self.process is not None and self.process.stdout is not None
+        try:
+            while True:
+                line_bytes = self.process.stdout.readline()
+                if not line_bytes:
+                    break
 
-        while True:
-            line = self.process.stdout.readline()
-            if not line:
-                break
-
-            stripped = line.strip()
-            if not stripped:
-                continue
-
-            # Auto-detect protocol if not determined yet
-            if self.protocol is None:
-                if line.lower().startswith("content-length:"):
-                    self.protocol = "content-length"
-                else:
-                    self.protocol = "newline-json"
-
-            if self.protocol == "newline-json":
                 try:
-                    self._handle_message(json.loads(stripped))
-                except json.JSONDecodeError:
+                    line = line_bytes.decode("utf-8")
+                except UnicodeDecodeError:
                     continue
-            else:
-                # Content-length protocol
-                # The current 'line' is the first header line
-                header_lines = [line.rstrip("\r\n")]
-                while True:
-                    next_line = self.process.stdout.readline()
-                    if not next_line:
-                        return
-                    h_stripped = next_line.rstrip("\r\n")
-                    if h_stripped == "":
-                        break
-                    header_lines.append(h_stripped)
 
-                content_length = 0
-                for header in header_lines:
-                    if header.lower().startswith("content-length:"):
-                        try:
-                            content_length = int(header.split(":", 1)[1].strip())
-                        except ValueError:
-                            pass
-                        break
+                stripped = line.strip()
+                if not stripped:
+                    continue
 
-                if content_length > 0:
-                    body = self.process.stdout.read(content_length)
-                    if not body:
-                        return
+                # Auto-detect protocol if not determined yet
+                if self.protocol is None:
+                    if line.lower().startswith("content-length:"):
+                        self.protocol = "content-length"
+                    else:
+                        self.protocol = "newline-json"
+
+                if self.protocol == "newline-json":
                     try:
-                        self._handle_message(json.loads(body))
+                        self._handle_message(json.loads(stripped))
                     except json.JSONDecodeError:
-                        pass
+                        continue
+                else:
+                    # Content-length protocol
+                    # The current 'line' is the first header line
+                    header_lines = [line.rstrip("\r\n")]
+                    while True:
+                        next_line_bytes = self.process.stdout.readline()
+                        if not next_line_bytes:
+                            return
+                        try:
+                            next_line = next_line_bytes.decode("utf-8")
+                        except UnicodeDecodeError:
+                            return
+                        h_stripped = next_line.rstrip("\r\n")
+                        if h_stripped == "":
+                            break
+                        header_lines.append(h_stripped)
+
+                    content_length = 0
+                    for header in header_lines:
+                        if header.lower().startswith("content-length:"):
+                            try:
+                                content_length = int(header.split(":", 1)[1].strip())
+                            except ValueError:
+                                pass
+                            break
+
+                    if content_length > 0:
+                        body_bytes = self.process.stdout.read(content_length)
+                        if len(body_bytes) < content_length:
+                            return
+                        try:
+                            self._handle_message(json.loads(body_bytes.decode("utf-8")))
+                        except (json.JSONDecodeError, UnicodeDecodeError):
+                            pass
+        finally:
+            # Bug 2: Notify pending requests when process exits
+            if self.process:
+                exit_code = self.process.poll()
+                error_msg = {"error": {"code": -1, "message": f"MCP server process exited (code={exit_code})"}}
+                with self._lock:
+                    for req_id, q in list(self._pending.items()):
+                        q.put(error_msg)
+                    self._pending.clear()
 
     def _handle_message(self, message: dict[str, Any]) -> None:
         message_id = message.get("id")
         if not isinstance(message_id, int):
             return
-        queue = self.pending.pop(message_id, None)
-        if queue is not None:
-            queue.put(message)
+        with self._lock:
+            queue = self._pending.pop(message_id, None)
+            if queue is not None:
+                queue.put(message)
 
     def send(self, message: dict[str, Any]) -> None:
         if self.process is None or self.process.stdin is None:
             raise RuntimeError(f'MCP server "{self.server_name}" is not running.')
-        payload = json.dumps(message, ensure_ascii=False)
+        
+        payload_bytes = json.dumps(message, ensure_ascii=False).encode("utf-8")
+        
         if self.protocol == "newline-json":
-            self.process.stdin.write(payload + "\n")
+            self.process.stdin.write(payload_bytes + b"\n")
             self.process.stdin.flush()
             self._ensure_stdout_thread()
             return
-        header = f"Content-Length: {len(payload.encode('utf-8'))}\r\n\r\n"
-        self.process.stdin.write(header + payload)
+        
+        header = f"Content-Length: {len(payload_bytes)}\r\n\r\n".encode("utf-8")
+        self.process.stdin.write(header + payload_bytes)
         self.process.stdin.flush()
         self._ensure_stdout_thread()
 
@@ -361,12 +400,14 @@ class StdioMcpClient:
         message_id = self.next_id
         self.next_id += 1
         response_queue: Queue[Any] = Queue(maxsize=1)
-        self.pending[message_id] = response_queue
+        with self._lock:
+            self._pending[message_id] = response_queue
         self.send({"jsonrpc": "2.0", "id": message_id, "method": method, "params": params})
         try:
             message = response_queue.get(timeout=timeout_seconds)
         except Empty as error:
-            self.pending.pop(message_id, None)
+            with self._lock:
+                self._pending.pop(message_id, None)
             stderr = "\n".join(self.stderr_lines)
             raise RuntimeError(
                 f"MCP {self.server_name}: request timed out for {method}" + (f"\n{stderr}" if stderr else "")
@@ -401,10 +442,11 @@ class StdioMcpClient:
         return _format_tool_call_result(self.request("tools/call", {"name": name, "arguments": input_data or {}}))
 
     def close(self) -> None:
-        pending = list(self.pending.values())
-        self.pending.clear()
-        for queue in pending:
-            queue.put({"error": {"message": f'MCP server "{self.server_name}" closed before completing the request.'}})
+        with self._lock:
+            pending = list(self._pending.values())
+            self._pending.clear()
+            for queue in pending:
+                queue.put({"error": {"message": f'MCP server "{self.server_name}" closed before completing the request.'}})
         
         if self.process is not None:
             try:

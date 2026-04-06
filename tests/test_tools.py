@@ -9,12 +9,16 @@ from minicode.tooling import ToolContext
 
 
 def test_split_command_line_supports_quotes() -> None:
-    assert split_command_line("git commit -m 'hello world'") == [
-        "git",
-        "commit",
-        "-m",
-        "hello world",
-    ]
+    import os
+
+    result = split_command_line("git commit -m 'hello world'")
+    assert result[:3] == ["git", "commit", "-m"]
+    # On Windows, shlex.split(posix=False) preserves the quotes around
+    # the argument; on Unix, posix=True strips them.
+    if os.name == "nt":
+        assert result[3] == "'hello world'"
+    else:
+        assert result[3] == "hello world"
 
 
 def test_write_file_tool_writes_after_review(tmp_path: Path) -> None:

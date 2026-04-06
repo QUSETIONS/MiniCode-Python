@@ -151,7 +151,10 @@ def _build_execution_command(
         shell_command = _strip_trailing_background_operator(raw_command) if background_shell else raw_command
         if os.name == "nt":
             return "cmd", ["/d", "/s", "/c", shell_command]
-        return "bash", ["-lc", shell_command]
+        # Use the user's preferred shell (macOS defaults to zsh since
+        # Catalina).  Fall back to /bin/sh for maximum POSIX compatibility.
+        shell = os.environ.get("SHELL", "/bin/sh")
+        return shell, ["-lc", shell_command]
     if _is_windows_shell_builtin(normalized_command):
         quoted_args = subprocess.list2cmdline(list(normalized_args))
         shell_command = normalized_command if not quoted_args else f"{normalized_command} {quoted_args}"

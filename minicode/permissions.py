@@ -2,11 +2,22 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 from minicode.config import MINI_CODE_PERMISSIONS_PATH
 
+# 权限决策类型 — 对齐 TS 版 PermissionDecision
+PermissionDecision = Literal[
+    "allow_once",
+    "allow_always",
+    "allow_turn",
+    "allow_all_turn",
+    "deny_once",
+    "deny_always",
+    "deny_with_feedback",
+]
 
 PromptHandler = Callable[[dict[str, Any]], dict[str, Any]]
 
@@ -16,8 +27,20 @@ def _normalize_path(target_path: str) -> str:
 
 
 def _is_within_directory(root: str, target: str) -> bool:
+    """Check if target is within root directory.
+    
+    On Windows, uses case-insensitive comparison since NTFS paths are
+    case-insensitive by default.
+    """
     try:
-        Path(target).resolve().relative_to(Path(root).resolve())
+        resolved_target = Path(target).resolve()
+        resolved_root = Path(root).resolve()
+        if sys.platform == "win32":
+            # Windows: case-insensitive path comparison
+            target_str = str(resolved_target).lower()
+            root_str = str(resolved_root).lower()
+            return target_str == root_str or target_str.startswith(root_str + os.sep)
+        resolved_target.relative_to(resolved_root)
         return True
     except ValueError:
         return False
@@ -77,6 +100,18 @@ def _classify_dangerous_command(command: str, args: list[str]) -> str | None:
         "powershell", "pwsh",
     }:
         return f"{command} can execute arbitrary local code ({signature})"
+
+    # macOS-specific dangerous commands
+    if command == "diskutil":
+        return f"diskutil can erase or partition disks ({signature})"
+    if command == "csrutil":
+        return f"csrutil modifies System Integrity Protection ({signature})"
+    if command == "defaults" and "write" in normalized_args:
+        return f"defaults write modifies system preferences ({signature})"
+    if command == "launchctl" and any(arg in {"unload", "bootout", "disable"} for arg in normalized_args):
+        return f"launchctl can disable system services ({signature})"
+    if command == "dscl":
+        return f"dscl can modify directory services and user accounts ({signature})"
 
     return None
 
@@ -249,10 +284,16 @@ class PermissionManager:
             return
         if self.prompt is None:
             raise RuntimeError(f"Command requires approval: {signature}. Start minicode in TTY mode to approve it.")
+        # Distinguish forced prompts (external trigger) from dangerous commands
+        summary = (
+            "mini-code wants to run a dangerous command"
+            if not force_prompt_reason
+            else "mini-code wants approval for this command"
+        )
         result = self.prompt(
             {
                 "kind": "command",
-                "summary": "mini-code wants approval for this command",
+                "summary": summary,
                 "details": [f"cwd: {command_cwd}", f"command: {signature}", f"reason: {reason}"],
                 "scope": signature,
                 "choices": [

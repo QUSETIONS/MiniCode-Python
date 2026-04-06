@@ -98,7 +98,15 @@ _get_terminal_size = _cached_terminal_size
 # ---------------------------------------------------------------------------
 
 class _ThrottledRenderer:
-    """Coalesces rapid rerender() calls into at most one actual render per interval."""
+    """Coalesces rapid rerender() calls into at most one actual render per interval.
+
+    THREAD SAFETY: The actual render function (_render_fn) is ONLY executed on
+    the thread that calls ``flush()`` or ``force()``.  ``request()`` never
+    invokes the render function directly — it only marks a pending flag.  This
+    ensures that background threads (agent, collapse timer) can safely call
+    ``request()`` without writing to stdout concurrently with the main UI
+    thread.
+    """
 
     __slots__ = ("_render_fn", "_min_interval", "_pending", "_last_render_time", "_lock")
 
@@ -110,29 +118,36 @@ class _ThrottledRenderer:
         self._lock = threading.Lock()
 
     def request(self) -> None:
-        """Request a rerender. If within the throttle window, defers it."""
-        now = time.monotonic()
+        """Mark that a rerender is needed.
+
+        This method is safe to call from any thread.  It never invokes the
+        render function — the actual render happens on the next ``flush()``
+        call from the main event loop.
+        """
         with self._lock:
-            elapsed = now - self._last_render_time
-            if elapsed >= self._min_interval:
-                self._pending = False
-                self._last_render_time = now
-            else:
-                self._pending = True
-                return
-        self._render_fn()
+            self._pending = True
 
     def flush(self) -> None:
-        """Force any pending deferred render to happen now."""
+        """Execute a pending render if the throttle interval has elapsed.
+
+        Must be called from the main UI thread only.
+        """
+        now = time.monotonic()
         with self._lock:
             if not self._pending:
                 return
+            elapsed = now - self._last_render_time
+            if elapsed < self._min_interval:
+                return  # Still within throttle window — defer
             self._pending = False
-            self._last_render_time = time.monotonic()
+            self._last_render_time = now
         self._render_fn()
 
     def force(self) -> None:
-        """Unconditionally render now, ignoring throttle."""
+        """Unconditionally render now, ignoring throttle.
+
+        Must be called from the main UI thread only.
+        """
         with self._lock:
             self._pending = False
             self._last_render_time = time.monotonic()
@@ -654,11 +669,14 @@ def _render_screen(args: TtyAppArgs, state: ScreenState) -> None:
         sys.stdout.flush()
         return
 
-    # Transcript
+    # Transcript — snapshot the list to avoid IndexError from concurrent
+    # agent-thread appends (CPython GIL makes list.append atomic but
+    # iteration + append can still race on length vs slot access).
+    transcript_snapshot = list(state.transcript)
     body_lines = _get_transcript_body_lines(args, state)
-    if state.transcript:
+    if transcript_snapshot:
         transcript_body = render_transcript(
-            state.transcript, state.transcript_scroll_offset, body_lines
+            transcript_snapshot, state.transcript_scroll_offset, body_lines
         )
     else:
         transcript_body = f"{render_status_line(None)}\n\nType /help for commands."
@@ -666,7 +684,7 @@ def _render_screen(args: TtyAppArgs, state: ScreenState) -> None:
         render_panel(
             "session feed",
             transcript_body,
-            right_title=f"{len(state.transcript)} events",
+            right_title=f"{len(transcript_snapshot)} events",
             min_body_lines=body_lines,
         )
     )
@@ -753,9 +771,14 @@ def _read_raw_char() -> str:
     else:
         import select
 
-        ready, _, _ = select.select([sys.stdin], [], [], 0.05)
+        fd = sys.stdin.fileno()
+        ready, _, _ = select.select([fd], [], [], 0.05)
         if ready:
-            return sys.stdin.read(1)
+            # Use os.read() to bypass Python's TextIOWrapper buffering.
+            # In raw/cbreak mode the kernel returns whatever bytes are
+            # available, so os.read() won't block.
+            data = os.read(fd, 4096)
+            return data.decode("utf-8", errors="replace") if data else ""
         return ""
 
 
@@ -772,16 +795,27 @@ def _read_raw_chunk() -> str:
     else:
         import select
 
-        result = ""
+        fd = sys.stdin.fileno()
+        # First wait with a timeout for initial data
+        ready, _, _ = select.select([fd], [], [], 0.05)
+        if not ready:
+            return ""
+        # Read all available bytes in one go.  In raw mode the kernel
+        # delivers whatever has arrived so far; os.read() returns
+        # immediately with 1..N bytes.
+        data = os.read(fd, 4096)
+        if not data:
+            return ""
+        # Drain any remaining bytes without blocking
         while True:
-            ready, _, _ = select.select([sys.stdin], [], [], 0)
-            if not ready:
+            ready2, _, _ = select.select([fd], [], [], 0)
+            if not ready2:
                 break
-            ch = sys.stdin.read(1)
-            if not ch:
+            more = os.read(fd, 4096)
+            if not more:
                 break
-            result += ch
-        return result
+            data += more
+        return data.decode("utf-8", errors="replace")
 
 
 class _RawModeContext:
@@ -812,10 +846,33 @@ class _RawModeContext:
                 pass
         else:
             import termios
-            import tty
 
-            self._old_settings = termios.tcgetattr(sys.stdin)
-            tty.setraw(sys.stdin.fileno())
+            fd = sys.stdin.fileno()
+            self._old_settings = termios.tcgetattr(fd)
+            new = termios.tcgetattr(fd)
+            # Input flags: disable CR→NL translation and XON/XOFF flow control,
+            # strip high bit, and break signal generation.
+            new[0] &= ~(
+                termios.BRKINT | termios.ICRNL | termios.INPCK
+                | termios.ISTRIP | termios.IXON
+            )
+            # Output flags: KEEP OPOST so that \n → \r\n translation still
+            # works.  tty.setraw() clears OPOST which causes "staircase"
+            # output on Linux/macOS — every newline only moves down without
+            # returning the cursor to column 0.
+            # new[1] is intentionally left untouched.
+            # Control flags: set 8-bit chars
+            new[2] &= ~(termios.CSIZE | termios.PARENB)
+            new[2] |= termios.CS8
+            # Local flags: disable echo, canonical mode, extended processing,
+            # and signal generation from keys (Ctrl-C, Ctrl-Z).
+            new[3] &= ~(
+                termios.ECHO | termios.ICANON | termios.IEXTEN | termios.ISIG
+            )
+            # Special characters: read returns after 1 byte, no timeout.
+            new[6][termios.VMIN] = 1
+            new[6][termios.VTIME] = 0
+            termios.tcsetattr(fd, termios.TCSAFLUSH, new)
         return self
 
     def __exit__(self, *_: Any) -> None:
@@ -829,7 +886,7 @@ class _RawModeContext:
         elif self._old_settings is not None:
             import termios
 
-            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self._old_settings)
+            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self._old_settings)
 
 
 # ---------------------------------------------------------------------------
@@ -1051,7 +1108,7 @@ def _handle_input(
     def on_tool_result(tool_name: str, output: str, is_error: bool) -> None:
         # 计算并显示工具执行时间
         elapsed = ""
-        if hasattr(state, 'tool_start_time'):
+        if state.tool_start_time is not None:
             elapsed_secs = time.monotonic() - state.tool_start_time
             if elapsed_secs > 1:
                 elapsed = f" ({elapsed_secs:.1f}s)"
@@ -1288,7 +1345,12 @@ def run_tty_app(
             request=request,
             resolve=lambda r: None,
         )
-        _render_screen(args, state)
+        # Signal the main thread's throttled renderer to show the approval UI.
+        # Do NOT call _render_screen() here — we're on the agent thread and
+        # writing to stdout concurrently with the main thread would corrupt
+        # the terminal display.  request() only sets a pending flag; the main
+        # event loop's next flush() will do the actual render safely.
+        rerender()
         approval_event.clear()
         approval_event.wait()
         result = approval_result.copy()
@@ -1314,8 +1376,12 @@ def run_tty_app(
 
     # On Unix, listen for SIGWINCH so terminal resizes are picked up
     # immediately rather than waiting for the 0.5s cache TTL.
+    # signal.signal() can only be called from the main thread.
     _prev_sigwinch = None
-    if sys.platform != "win32":
+    if (
+        sys.platform != "win32"
+        and threading.current_thread() is threading.main_thread()
+    ):
         import signal as _signal
 
         from minicode.tui.chrome import invalidate_terminal_size_cache
@@ -1324,7 +1390,11 @@ def run_tty_app(
             invalidate_terminal_size_cache()
             throttled.request()
 
-        _prev_sigwinch = _signal.signal(_signal.SIGWINCH, _on_sigwinch)
+        try:
+            _prev_sigwinch = _signal.signal(_signal.SIGWINCH, _on_sigwinch)
+        except (OSError, ValueError):
+            # Couldn't set signal handler (e.g. not main thread despite check)
+            _prev_sigwinch = None
 
     try:
         _render_screen(args, state)
@@ -1365,21 +1435,29 @@ def run_tty_app(
                 else:
                     import select
 
-                    ready, _, _ = select.select([sys.stdin], [], [], 0.05)
+                    _fd = sys.stdin.fileno()
+                    ready, _, _ = select.select([_fd], [], [], 0.05)
                     if not ready:
                         # Flush any deferred renders during idle
                         throttled.flush()
                         continue
-                    chunk = ""
+                    # Use os.read() to bypass Python's TextIOWrapper/
+                    # BufferedReader which can block on partial UTF-8
+                    # sequences in raw mode.
+                    _raw = os.read(_fd, 4096)
+                    if not _raw:
+                        should_exit = True
+                        continue
+                    # Drain any remaining bytes without blocking
                     while True:
-                        ready2, _, _ = select.select([sys.stdin], [], [], 0)
+                        ready2, _, _ = select.select([_fd], [], [], 0)
                         if not ready2:
                             break
-                        ch = sys.stdin.read(1)
-                        if not ch:
-                            should_exit = True
+                        _more = os.read(_fd, 4096)
+                        if not _more:
                             break
-                        chunk += ch
+                        _raw += _more
+                    chunk = _raw.decode("utf-8", errors="replace")
 
                 if not chunk:
                     continue
@@ -1477,8 +1555,11 @@ def _handle_event(
         raise SystemExit(0)
 
     # ---------- Pending approval mode ----------
-    if state.pending_approval:
-        _handle_pending_approval_event(state, event, rerender, approval_event, approval_result)
+    # Capture locally to avoid TOCTOU — the agent thread may clear
+    # state.pending_approval between our check and the handler's use.
+    pending = state.pending_approval
+    if pending is not None:
+        _handle_pending_approval_event(state, pending, event, rerender, approval_event, approval_result)
         return
 
     # ---------- Normal mode ----------
@@ -1492,14 +1573,18 @@ def _handle_event(
 
 def _handle_pending_approval_event(
     state: ScreenState,
+    pending: Any,
     event: ParsedInputEvent,
     rerender: Callable[[], None],
     approval_event: threading.Event,
     approval_result: dict[str, Any],
 ) -> None:
-    """Handle input events while a permission approval is pending."""
-    pending = state.pending_approval
+    """Handle input events while a permission approval is pending.
     
+    ``pending`` is captured by the caller to avoid TOCTOU races with the
+    agent thread (which may set ``state.pending_approval = None`` after an
+    approval event is signalled).
+    """
     if pending.feedback_mode:
         _handle_feedback_mode_event(state, event, rerender, approval_event, approval_result)
         return
@@ -1600,40 +1685,6 @@ def _handle_pending_approval_wheel(
         return True
     return False
 
-
-def _handle_feedback_mode_event(
-    state: ScreenState,
-    event: ParsedInputEvent,
-    rerender: Callable[[], None],
-    approval_event: threading.Event,
-    approval_result: dict[str, Any],
-) -> None:
-    """Handle input while user is typing feedback for rejection."""
-    pending = state.pending_approval
-    
-    if isinstance(event, TextEvent) and not event.ctrl:
-        if event.text == "\x1b":  # Escape
-            pending.feedback_mode = False
-            pending.feedback_input = ""
-            rerender()
-            return
-        
-        if event.text == "\r":  # Enter
-            approval_result.clear()
-            approval_result["decision"] = "deny_with_feedback"
-            approval_result["feedback"] = pending.feedback_input
-            approval_event.set()
-            return
-        
-        if event.text in ("\x7f", "\x08"):  # Backspace
-            if pending.feedback_input:
-                pending.feedback_input = pending.feedback_input[:-1]
-                rerender()
-            return
-        
-        if len(event.text) == 1:
-            pending.feedback_input += event.text
-            rerender()
 
 
 def _confirm_pending_choice(
@@ -1912,8 +1963,8 @@ def _handle_normal_mode_text(
         
         return False
     
-    # Regular text input
-    if not event.ctrl and len(event.text) == 1:
+    # Regular text input (accept any non-empty text, including multi-byte CJK/emoji)
+    if not event.ctrl and event.text:
         state.input = state.input[:state.cursor_offset] + event.text + state.input[state.cursor_offset:]
         state.cursor_offset += len(event.text)
         state.selected_slash_index = 0

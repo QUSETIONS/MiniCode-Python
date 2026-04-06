@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from typing import Callable
+
 from minicode.context_manager import ContextManager, estimate_message_tokens
 from minicode.logging_config import get_logger
+from minicode.permissions import PermissionManager
 from minicode.tooling import ToolContext, ToolRegistry
-from minicode.types import ChatMessage, ModelAdapter
+from minicode.types import AgentStep, ChatMessage, ModelAdapter
 
 logger = get_logger("agent_loop")
 
@@ -82,13 +85,13 @@ def run_agent_turn(
     tools: ToolRegistry,
     messages: list[ChatMessage],
     cwd: str,
-    permissions=None,
-    max_steps: int = 50,  # 设置合理的默认上限
-    on_tool_start=None,
-    on_tool_result=None,
-    on_assistant_message=None,
-    on_progress_message=None,
-    context_manager: ContextManager | None = None,  # 新增：上下文管理器
+    permissions: PermissionManager | None = None,
+    max_steps: int = 50,
+    on_tool_start: Callable[[str, dict], None] | None = None,
+    on_tool_result: Callable[[str, str, bool], None] | None = None,
+    on_assistant_message: Callable[[str], None] | None = None,
+    on_progress_message: Callable[[str], None] | None = None,
+    context_manager: ContextManager | None = None,
 ) -> list[ChatMessage]:
     current_messages = list(messages)
     saw_tool_result = False
@@ -105,7 +108,7 @@ def run_agent_turn(
                    stats.total_tokens, stats.usage_percentage, stats.messages_count)
         
         # 如果需要压缩，自动执行
-        if context_manager.should_compact():
+        if context_manager.should_auto_compact():
             logger.warning("Context near limit, auto-compacting...")
             current_messages = context_manager.compact_messages()
             if on_assistant_message:
@@ -113,10 +116,30 @@ def run_agent_turn(
 
     while max_steps is None or step < max_steps:
         step += 1
+        next_step: AgentStep
         try:
             next_step = model.next(current_messages)
+        except KeyboardInterrupt:
+            raise  # Let Ctrl-C propagate
+        except ConnectionError as error:
+            fallback = f"Network error (connection failed or dropped): {error}"
+            logger.error("Model API connection error: %s", error)
+            if on_assistant_message:
+                on_assistant_message(fallback)
+            current_messages.append({"role": "assistant", "content": fallback})
+            return current_messages
+        except TimeoutError as error:
+            fallback = f"Model API timeout: {error}"
+            logger.error("Model API timeout: %s", error)
+            if on_assistant_message:
+                on_assistant_message(fallback)
+            current_messages.append({"role": "assistant", "content": fallback})
+            return current_messages
         except Exception as error:
-            fallback = f"Model API error: {error}"
+            # Catch-all for unexpected errors (rate limit, auth, server 5xx, etc.)
+            error_type = type(error).__name__
+            fallback = f"Model API error ({error_type}): {error}"
+            logger.error("Model API error (%s): %s", error_type, error)
             if on_assistant_message:
                 on_assistant_message(fallback)
             current_messages.append({"role": "assistant", "content": fallback})

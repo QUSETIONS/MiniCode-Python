@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import stat
 import sys
+import tempfile
 from pathlib import Path
 
 from minicode.config import (
@@ -93,9 +94,33 @@ def _install_launcher_script() -> str | None:
         ])
         launcher_command = "minicode-py"
 
+    # 路径安全检查
+    resolved = str(target_bin_dir.resolve())
+    if '..' in str(target_bin_dir) or '~' in str(target_bin_dir):
+        print("⚠️  安装路径包含不安全字符，跳过安装。")
+        return None
+
+    if launcher_path.exists():
+        answer = _read_input(f"启动器 {launcher_path} 已存在，是否覆盖？(y/N)", "N")
+        if answer.lower() != "y":
+            print("跳过启动器安装。")
+            return str(launcher_path), launcher_command, str(target_bin_dir)
+
     try:
         target_bin_dir.mkdir(parents=True, exist_ok=True)
-        launcher_path.write_text(launcher_script, encoding="utf-8")
+        
+        # 原子写入
+        fd, tmp_path = tempfile.mkstemp(dir=str(target_bin_dir), suffix=".tmp")
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                f.write(launcher_script)
+            os.replace(tmp_path, str(launcher_path))
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
 
         # Make executable on Unix-like systems
         if sys.platform != "win32":
@@ -148,8 +173,9 @@ def main() -> None:
     )
     
     saved_auth_token = current_env.get("ANTHROPIC_AUTH_TOKEN", "")
+    token_status = _mask_secret(saved_auth_token)
     token_input = _read_input(
-        f"ANTHROPIC_AUTH_TOKEN",
+        f"ANTHROPIC_AUTH_TOKEN {token_status}",
         None,
     )
     auth_token = token_input or saved_auth_token

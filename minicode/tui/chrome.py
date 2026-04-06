@@ -84,7 +84,13 @@ def _cached_terminal_size() -> tuple[int, int]:
     if _ts_cache is None or (now - _ts_cache_time) > _TS_TTL:
         try:
             ts = os.get_terminal_size()
-            _ts_cache = (ts.columns, ts.lines)
+            cols, rows = ts.columns, ts.lines
+            # Some terminals (SSH, freshly created tmux panes) may report
+            # (0, 0).  Fall back to a reasonable default in that case.
+            if cols <= 0 or rows <= 0:
+                _ts_cache = (100, 40)
+            else:
+                _ts_cache = (cols, rows)
         except (AttributeError, ValueError, OSError):
             _ts_cache = (100, 40)
         _ts_cache_time = now
@@ -408,9 +414,11 @@ def render_status_line(status: str | None) -> str:
 
 
 def render_tool_panel(
-    active_tool: str | None, recent_tools: list[dict[str, str]], background_tasks: list[dict[str, Any]] = []
+    active_tool: str | None, recent_tools: list[dict[str, str]], background_tasks: list[dict[str, Any]] | None = None
 ) -> str:
     """Include background task support with icons."""
+    if background_tasks is None:
+        background_tasks = []
     parts: list[str] = []
     if active_tool:
         parts.append(f"{ICON_RUNNING} {YELLOW}{BOLD}running{RESET} {BRIGHT_YELLOW}{active_tool}{RESET}")
@@ -429,9 +437,11 @@ def render_tool_panel(
 
 
 def render_footer_bar(
-    status: str | None, tools_enabled: bool, skills_enabled: bool, background_tasks: list[dict[str, Any]] = []
+    status: str | None, tools_enabled: bool, skills_enabled: bool, background_tasks: list[dict[str, Any]] | None = None
 ) -> str:
     """Stylish single-line footer with icons."""
+    if background_tasks is None:
+        background_tasks = []
     width, _ = _cached_terminal_size()
     left = render_status_line(status)
 

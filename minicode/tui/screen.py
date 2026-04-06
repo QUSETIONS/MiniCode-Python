@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 
 ENTER_ALT_SCREEN = "\u001b[?1049h"
@@ -10,6 +11,9 @@ ERASE_SCREEN_AND_HOME = "\u001b[2J\u001b[H"
 # activate mouse events, then upgrade the encoding to SGR.
 ENABLE_MOUSE_TRACKING = "\u001b[?1000h\u001b[?1006h"
 DISABLE_MOUSE_TRACKING = "\u001b[?1006l\u001b[?1000l"
+
+# Terminal types that do not support alternate screen or mouse tracking.
+_DUMB_TERMS = frozenset({"dumb", "linux", ""})
 
 
 # ---------------------------------------------------------------------------
@@ -86,13 +90,24 @@ def show_cursor() -> None:
     sys.stdout.flush()
 
 
+def _is_dumb_terminal() -> bool:
+    """Return True if the terminal likely doesn't support escape sequences."""
+    return os.environ.get("TERM", "") in _DUMB_TERMS
+
+
 def enter_alternate_screen() -> None:
     _enable_windows_vt_processing()
+    if _is_dumb_terminal():
+        # Dumb terminals (e.g. 'linux' console, 'dumb', piped output)
+        # don't support alternate screen or mouse tracking.
+        return
     sys.stdout.write(DISABLE_MOUSE_TRACKING + ENTER_ALT_SCREEN + ERASE_SCREEN_AND_HOME + ENABLE_MOUSE_TRACKING)
     sys.stdout.flush()
 
 
 def exit_alternate_screen() -> None:
+    if _is_dumb_terminal():
+        return
     sys.stdout.write(DISABLE_MOUSE_TRACKING + EXIT_ALT_SCREEN)
     sys.stdout.flush()
 
