@@ -1457,269 +1457,485 @@ def _handle_event(
     approval_event: threading.Event,
     approval_result: dict[str, Any],
 ) -> None:
-    """Process a single parsed input event."""
-
+    """Process a single parsed input event.
+    
+    Routes the event to the appropriate handler based on current state:
+    - Ctrl+C: Exit immediately
+    - Pending approval: Handle permission dialog input
+    - Normal mode: Handle input, navigation, and commands
+    
+    Args:
+        args: Application arguments (tools, model, permissions)
+        state: Current screen state
+        event: Parsed input event from terminal
+        rerender: Function to trigger screen redraw
+        approval_event: Threading event for approval synchronization
+        approval_result: Dict to store approval decision
+    """
     # ---------- Ctrl+C → exit ----------
     if isinstance(event, TextEvent) and event.ctrl and event.text == "c":
         raise SystemExit(0)
 
     # ---------- Pending approval mode ----------
     if state.pending_approval:
-        pending = state.pending_approval
-
-        if pending.feedback_mode:
-            _handle_feedback_mode_event(state, event, rerender, approval_event, approval_result)
-            return
-
-        # Permission approval key handling
-        if isinstance(event, KeyEvent):
-            if event.name == "escape":
-                approval_result.clear()
-                approval_result["decision"] = "deny_once"
-                approval_event.set()
-                rerender()
-                return
-            if event.name == "return":
-                choices = pending.request.get("choices", [])
-                if choices and 0 <= pending.selected_choice_index < len(choices):
-                    choice = choices[pending.selected_choice_index]
-                    decision = choice.get("decision", "allow_once")
-                    if decision == "deny_with_feedback":
-                        pending.feedback_mode = True
-                        pending.feedback_input = ""
-                        rerender()
-                        return
-                    approval_result.clear()
-                    approval_result["decision"] = decision
-                    approval_event.set()
-                else:
-                    approval_result.clear()
-                    approval_result["decision"] = "allow_once"
-                    approval_event.set()
-                rerender()
-                return
-            if event.name == "up":
-                if _move_pending_approval_selection(state, -1):
-                    rerender()
-                return
-            if event.name == "down":
-                if _move_pending_approval_selection(state, 1):
-                    rerender()
-                return
-            if event.name == "pageup":
-                if _scroll_pending_approval_by(state, -5):
-                    rerender()
-                return
-            if event.name == "pagedown":
-                if _scroll_pending_approval_by(state, 5):
-                    rerender()
-                return
-
-        if isinstance(event, TextEvent) and not event.ctrl:
-            ch = event.text
-            # 'v' to toggle expand
-            if ch == "v":
-                if _toggle_pending_approval_expand(state):
-                    rerender()
-                return
-            # Digit keys to select choices
-            choices = pending.request.get("choices", [])
-            for i, choice in enumerate(choices):
-                if ch == choice.get("key"):
-                    decision = choice.get("decision", "allow_once")
-                    if decision == "deny_with_feedback":
-                        pending.feedback_mode = True
-                        pending.feedback_input = ""
-                        rerender()
-                        return
-                    approval_result.clear()
-                    approval_result["decision"] = decision
-                    approval_event.set()
-                    rerender()
-                    return
-
-        if isinstance(event, WheelEvent):
-            delta = 3 if event.direction == "up" else -3
-            if _scroll_pending_approval_by(state, delta):
-                rerender()
+        _handle_pending_approval_event(state, event, rerender, approval_event, approval_result)
         return
 
     # ---------- Normal mode ----------
+    _handle_normal_mode_event(args, state, event, rerender)
 
-    visible_commands = _get_visible_commands(state.input)
 
-    # Return → submit input or select slash command
-    if isinstance(event, KeyEvent) and event.name == "return":
-        if visible_commands and 0 <= state.selected_slash_index < len(visible_commands):
-            selected = visible_commands[state.selected_slash_index]
-            usage = getattr(selected, "usage", str(selected))
-            state.input = usage
-            state.cursor_offset = len(state.input)
-            state.selected_slash_index = 0
-            rerender()
+# ---------------------------------------------------------------------------
+# Pending approval event handlers
+# ---------------------------------------------------------------------------
+
+
+def _handle_pending_approval_event(
+    state: ScreenState,
+    event: ParsedInputEvent,
+    rerender: Callable[[], None],
+    approval_event: threading.Event,
+    approval_result: dict[str, Any],
+) -> None:
+    """Handle input events while a permission approval is pending."""
+    pending = state.pending_approval
+    
+    if pending.feedback_mode:
+        _handle_feedback_mode_event(state, event, rerender, approval_event, approval_result)
+        return
+    
+    if isinstance(event, KeyEvent):
+        if _handle_pending_approval_key(state, event, rerender, approval_event, approval_result):
+            return
+    
+    if isinstance(event, TextEvent) and not event.ctrl:
+        if _handle_pending_approval_text(state, event, rerender, approval_event, approval_result):
+            return
+    
+    if isinstance(event, WheelEvent):
+        if _handle_pending_approval_wheel(state, event, rerender):
             return
 
-        submitted = state.input
-        state.input = ""
-        state.cursor_offset = 0
+
+def _handle_pending_approval_key(
+    state: ScreenState,
+    event: KeyEvent,
+    rerender: Callable[[], None],
+    approval_event: threading.Event,
+    approval_result: dict[str, Any],
+) -> bool:
+    """Handle key events during pending approval. Returns True if handled."""
+    pending = state.pending_approval
+    
+    if event.name == "escape":
+        approval_result.clear()
+        approval_result["decision"] = "deny_once"
+        approval_event.set()
+        rerender()
+        return True
+    
+    if event.name == "return":
+        _confirm_pending_choice(state, rerender, approval_event, approval_result)
+        return True
+    
+    if event.name == "up" and _move_pending_approval_selection(state, -1):
+        rerender()
+        return True
+    
+    if event.name == "down" and _move_pending_approval_selection(state, 1):
+        rerender()
+        return True
+    
+    if event.name == "pageup" and _scroll_pending_approval_by(state, -5):
+        rerender()
+        return True
+    
+    if event.name == "pagedown" and _scroll_pending_approval_by(state, 5):
+        rerender()
+        return True
+    
+    # Digit keys for choices
+    choices = pending.request.get("choices", [])
+    for choice in choices:
+        if event.text == choice.get("key"):
+            _select_pending_choice(state, choice, rerender, approval_event, approval_result)
+            return True
+    
+    return False
+
+
+def _handle_pending_approval_text(
+    state: ScreenState,
+    event: TextEvent,
+    rerender: Callable[[], None],
+    approval_event: threading.Event,
+    approval_result: dict[str, Any],
+) -> bool:
+    """Handle text events during pending approval. Returns True if handled."""
+    pending = state.pending_approval
+    
+    if event.text == "v" and _toggle_pending_approval_expand(state):
+        rerender()
+        return True
+    
+    # Check digit keys for choices
+    choices = pending.request.get("choices", [])
+    for choice in choices:
+        if event.text == choice.get("key"):
+            _select_pending_choice(state, choice, rerender, approval_event, approval_result)
+            return True
+    
+    return False
+
+
+def _handle_pending_approval_wheel(
+    state: ScreenState,
+    event: WheelEvent,
+    rerender: Callable[[], None],
+) -> bool:
+    """Handle wheel events during pending approval for scrolling. Returns True if handled."""
+    delta = 3 if event.direction == "up" else -3
+    if _scroll_pending_approval_by(state, delta):
+        rerender()
+        return True
+    return False
+
+
+def _handle_feedback_mode_event(
+    state: ScreenState,
+    event: ParsedInputEvent,
+    rerender: Callable[[], None],
+    approval_event: threading.Event,
+    approval_result: dict[str, Any],
+) -> None:
+    """Handle input while user is typing feedback for rejection."""
+    pending = state.pending_approval
+    
+    if isinstance(event, TextEvent) and not event.ctrl:
+        if event.text == "\x1b":  # Escape
+            pending.feedback_mode = False
+            pending.feedback_input = ""
+            rerender()
+            return
+        
+        if event.text == "\r":  # Enter
+            approval_result.clear()
+            approval_result["decision"] = "deny_with_feedback"
+            approval_result["feedback"] = pending.feedback_input
+            approval_event.set()
+            return
+        
+        if event.text in ("\x7f", "\x08"):  # Backspace
+            if pending.feedback_input:
+                pending.feedback_input = pending.feedback_input[:-1]
+                rerender()
+            return
+        
+        if len(event.text) == 1:
+            pending.feedback_input += event.text
+            rerender()
+
+
+def _confirm_pending_choice(
+    state: ScreenState,
+    rerender: Callable[[], None],
+    approval_event: threading.Event,
+    approval_result: dict[str, Any],
+) -> None:
+    """Confirm the selected permission choice."""
+    pending = state.pending_approval
+    choices = pending.request.get("choices", [])
+    
+    if choices and 0 <= pending.selected_choice_index < len(choices):
+        choice = choices[pending.selected_choice_index]
+        _select_pending_choice(state, choice, rerender, approval_event, approval_result)
+    else:
+        approval_result.clear()
+        approval_result["decision"] = "allow_once"
+        approval_event.set()
+        rerender()
+
+
+def _select_pending_choice(
+    state: ScreenState,
+    choice: dict,
+    rerender: Callable[[], None],
+    approval_event: threading.Event,
+    approval_result: dict[str, Any],
+) -> None:
+    """Select a permission choice and resolve."""
+    pending = state.pending_approval
+    decision = choice.get("decision", "allow_once")
+    
+    if decision == "deny_with_feedback":
+        pending.feedback_mode = True
+        pending.feedback_input = ""
+        rerender()
+        return
+    
+    approval_result.clear()
+    approval_result["decision"] = decision
+    approval_event.set()
+    rerender()
+
+
+# ---------------------------------------------------------------------------
+# Normal mode event handlers
+# ---------------------------------------------------------------------------
+
+
+def _handle_normal_mode_event(
+    args: TtyAppArgs,
+    state: ScreenState,
+    event: ParsedInputEvent,
+    rerender: Callable[[], None],
+) -> None:
+    """Handle input events in normal mode (no pending approval)."""
+    visible_commands = _get_visible_commands(state.input)
+    
+    if isinstance(event, KeyEvent):
+        if _handle_normal_mode_key(args, state, event, visible_commands, rerender):
+            return
+    elif isinstance(event, TextEvent):
+        if _handle_normal_mode_text(args, state, event, visible_commands, rerender):
+            return
+    elif isinstance(event, WheelEvent):
+        if _handle_normal_mode_wheel(args, state, event, rerender):
+            return
+
+
+def _handle_normal_mode_key(
+    args: TtyAppArgs,
+    state: ScreenState,
+    event: KeyEvent,
+    visible_commands: list,
+    rerender: Callable[[], None],
+) -> bool:
+    """Handle key events in normal mode. Returns True if handled."""
+    # Return → submit input or select slash command
+    if event.name == "return":
+        _handle_normal_mode_return(args, state, visible_commands, rerender)
+        return True
+    
+    # Tab → autocomplete slash command
+    if event.name == "tab" and visible_commands:
+        _handle_normal_mode_tab(state, visible_commands, rerender)
+        return True
+    
+    # Navigation and editing keys
+    if _handle_normal_mode_navigation(state, event, rerender):
+        return True
+    
+    # Ctrl shortcuts (P, N handled in text handler)
+    # PageUp/PageDown → scroll transcript
+    if event.name == "pageup" and _scroll_transcript_by(args, state, 8):
+        rerender()
+        return True
+    
+    if event.name == "pagedown" and _scroll_transcript_by(args, state, -8):
+        rerender()
+        return True
+    
+    # Up/Down arrows (history or command selection)
+    if event.name == "up":
+        _handle_up_arrow(args, state, visible_commands, rerender)
+        return True
+    
+    if event.name == "down":
+        _handle_down_arrow(args, state, visible_commands, rerender)
+        return True
+    
+    return False
+
+
+def _handle_normal_mode_return(
+    args: TtyAppArgs,
+    state: ScreenState,
+    visible_commands: list,
+    rerender: Callable[[], None],
+) -> None:
+    """Handle Return key in normal mode."""
+    if visible_commands and 0 <= state.selected_slash_index < len(visible_commands):
+        selected = visible_commands[state.selected_slash_index]
+        usage = getattr(selected, "usage", str(selected))
+        state.input = usage
+        state.cursor_offset = len(state.input)
         state.selected_slash_index = 0
         rerender()
-        if _handle_input(args, state, rerender, submitted):
-            raise SystemExit(0)
+        return
+    
+    submitted = state.input
+    state.input = ""
+    state.cursor_offset = 0
+    state.selected_slash_index = 0
+    rerender()
+    if _handle_input(args, state, rerender, submitted):
+        raise SystemExit(0)
+    rerender()
+
+
+def _handle_normal_mode_tab(
+    state: ScreenState,
+    visible_commands: list,
+    rerender: Callable[[], None],
+) -> None:
+    """Handle Tab key for slash command autocompletion."""
+    selected = visible_commands[min(state.selected_slash_index, len(visible_commands) - 1)]
+    usage = getattr(selected, "usage", str(selected))
+    state.input = usage + " "
+    state.cursor_offset = len(state.input)
+    state.selected_slash_index = 0
+    rerender()
+
+
+def _handle_normal_mode_navigation(
+    state: ScreenState,
+    event: KeyEvent,
+    rerender: Callable[[], None],
+) -> bool:
+    """Handle navigation and editing keys. Returns True if handled."""
+    if event.name == "backspace" and state.cursor_offset > 0:
+        state.input = state.input[:state.cursor_offset - 1] + state.input[state.cursor_offset:]
+        state.cursor_offset -= 1
+        state.selected_slash_index = 0
         rerender()
-        return
-
-    # Tab → autocomplete slash command
-    if isinstance(event, KeyEvent) and event.name == "tab":
-        if visible_commands:
-            selected = visible_commands[min(state.selected_slash_index, len(visible_commands) - 1)]
-            usage = getattr(selected, "usage", str(selected))
-            state.input = usage + " "
-            state.cursor_offset = len(state.input)
-            state.selected_slash_index = 0
-            rerender()
-        return
-
-    # Backspace
-    if isinstance(event, KeyEvent) and event.name == "backspace":
-        if state.cursor_offset > 0:
-            state.input = state.input[: state.cursor_offset - 1] + state.input[state.cursor_offset :]
-            state.cursor_offset -= 1
-            state.selected_slash_index = 0
-            rerender()
-        return
-
-    # Delete
-    if isinstance(event, KeyEvent) and event.name == "delete":
-        if state.cursor_offset < len(state.input):
-            state.input = state.input[: state.cursor_offset] + state.input[state.cursor_offset + 1 :]
-            state.selected_slash_index = 0
-            rerender()
-        return
-
-    # Home
-    if isinstance(event, KeyEvent) and event.name == "home":
+        return True
+    
+    if event.name == "delete" and state.cursor_offset < len(state.input):
+        state.input = state.input[:state.cursor_offset] + state.input[state.cursor_offset + 1:]
+        state.selected_slash_index = 0
+        rerender()
+        return True
+    
+    if event.name == "home":
         state.cursor_offset = 0
         rerender()
-        return
-
-    # End
-    if isinstance(event, KeyEvent) and event.name == "end":
+        return True
+    
+    if event.name == "end":
         state.cursor_offset = len(state.input)
         rerender()
-        return
-
-    # Mouse wheel → scroll transcript
-    if isinstance(event, WheelEvent):
-        delta = 3 if event.direction == "up" else -3
-        if _scroll_transcript_by(args, state, delta):
-            rerender()
-        return
-
-    # Ctrl-P → history up
-    if isinstance(event, TextEvent) and event.ctrl and event.text == "p":
-        if _history_up(state):
-            rerender()
-        return
-
-    # Ctrl-N → history down
-    if isinstance(event, TextEvent) and event.ctrl and event.text == "n":
-        if _history_down(state):
-            rerender()
-        return
-
-    # Up arrow
-    if isinstance(event, KeyEvent) and event.name == "up":
-        if visible_commands:
-            state.selected_slash_index = (state.selected_slash_index - 1 + len(visible_commands)) % len(visible_commands)
-            rerender()
-        elif event.meta:
-            if _scroll_transcript_by(args, state, 1):
-                rerender()
-        elif _history_up(state):
-            rerender()
-        return
-
-    # Down arrow
-    if isinstance(event, KeyEvent) and event.name == "down":
-        if visible_commands:
-            state.selected_slash_index = (state.selected_slash_index + 1) % len(visible_commands)
-            rerender()
-        elif event.meta:
-            if _scroll_transcript_by(args, state, -1):
-                rerender()
-        elif _history_down(state):
-            rerender()
-        return
-
-    # PageUp → scroll transcript
-    if isinstance(event, KeyEvent) and event.name == "pageup":
-        if _scroll_transcript_by(args, state, 8):
-            rerender()
-        return
-
-    # PageDown → scroll transcript
-    if isinstance(event, KeyEvent) and event.name == "pagedown":
-        if _scroll_transcript_by(args, state, -8):
-            rerender()
-        return
-
-    # Left arrow
-    if isinstance(event, KeyEvent) and event.name == "left":
+        return True
+    
+    if event.name == "left":
         state.cursor_offset = max(0, state.cursor_offset - 1)
         rerender()
-        return
-
-    # Right arrow
-    if isinstance(event, KeyEvent) and event.name == "right":
+        return True
+    
+    if event.name == "right":
         state.cursor_offset = min(len(state.input), state.cursor_offset + 1)
         rerender()
-        return
-
-    # Ctrl-U → clear line
-    if isinstance(event, TextEvent) and event.ctrl and event.text == "u":
+        return True
+    
+    if event.name == "escape":
         state.input = ""
         state.cursor_offset = 0
         state.selected_slash_index = 0
         rerender()
-        return
+        return True
+    
+    return False
 
-    # Ctrl-A → home / jump to top
-    if isinstance(event, TextEvent) and event.ctrl and event.text == "a":
-        if not state.input:
-            if _jump_transcript_to_edge(args, state, "top"):
+
+def _handle_up_arrow(
+    args: TtyAppArgs,
+    state: ScreenState,
+    visible_commands: list,
+    rerender: Callable[[], None],
+) -> None:
+    """Handle Up arrow key."""
+    if visible_commands:
+        state.selected_slash_index = (state.selected_slash_index - 1 + len(visible_commands)) % len(visible_commands)
+        rerender()
+    elif _history_up(state):
+        rerender()
+
+
+def _handle_down_arrow(
+    args: TtyAppArgs,
+    state: ScreenState,
+    visible_commands: list,
+    rerender: Callable[[], None],
+) -> None:
+    """Handle Down arrow key."""
+    if visible_commands:
+        state.selected_slash_index = (state.selected_slash_index + 1) % len(visible_commands)
+        rerender()
+    elif _history_down(state):
+        rerender()
+
+
+def _handle_normal_mode_text(
+    args: TtyAppArgs,
+    state: ScreenState,
+    event: TextEvent,
+    visible_commands: list,
+    rerender: Callable[[], None],
+) -> bool:
+    """Handle text events in normal mode. Returns True if handled."""
+    # Ctrl shortcuts
+    if event.ctrl:
+        if event.text == "u":  # Ctrl-U → clear line
+            state.input = ""
+            state.cursor_offset = 0
+            state.selected_slash_index = 0
+            rerender()
+            return True
+        
+        if event.text == "a":  # Ctrl-A → home / jump to top
+            if not state.input:
+                if _jump_transcript_to_edge(args, state, "top"):
+                    rerender()
+                return True
+            state.cursor_offset = 0
+            rerender()
+            return True
+        
+        if event.text == "e":  # Ctrl-E → end / jump to bottom
+            if not state.input:
+                if _jump_transcript_to_edge(args, state, "bottom"):
+                    rerender()
+                return True
+            state.cursor_offset = len(state.input)
+            rerender()
+            return True
+        
+        if event.text == "p":  # Ctrl-P → history up
+            if _history_up(state):
                 rerender()
-            return
-        state.cursor_offset = 0
-        rerender()
-        return
-
-    # Ctrl-E → end / jump to bottom
-    if isinstance(event, TextEvent) and event.ctrl and event.text == "e":
-        if not state.input:
-            if _jump_transcript_to_edge(args, state, "bottom"):
+            return True
+        
+        if event.text == "n":  # Ctrl-N → history down
+            if _history_down(state):
                 rerender()
-            return
-        state.cursor_offset = len(state.input)
-        rerender()
-        return
-
-    # Escape → clear input
-    if isinstance(event, KeyEvent) and event.name == "escape":
-        state.input = ""
-        state.cursor_offset = 0
-        state.selected_slash_index = 0
-        rerender()
-        return
-
+            return True
+        
+        return False
+    
     # Regular text input
-    if isinstance(event, TextEvent) and not event.ctrl:
-        state.input = state.input[: state.cursor_offset] + event.text + state.input[state.cursor_offset :]
+    if not event.ctrl and len(event.text) == 1:
+        state.input = state.input[:state.cursor_offset] + event.text + state.input[state.cursor_offset:]
         state.cursor_offset += len(event.text)
         state.selected_slash_index = 0
         state.history_index = len(state.history)
         rerender()
-        return
+        return True
+    
+    return False
+
+
+def _handle_normal_mode_wheel(
+    args: TtyAppArgs,
+    state: ScreenState,
+    event: WheelEvent,
+    rerender: Callable[[], None],
+) -> bool:
+    """Handle wheel events in normal mode for scrolling. Returns True if handled."""
+    delta = 3 if event.direction == "up" else -3
+    if _scroll_transcript_by(args, state, delta):
+        rerender()
+        return True
+    return False
 
 
 # ---------------------------------------------------------------------------
