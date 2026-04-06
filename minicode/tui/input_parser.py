@@ -6,7 +6,7 @@ from typing import Union, Literal
 # Pre-compiled regexes for escape sequence parsing
 _SGR_MOUSE_RE = re.compile(r'^\x1b\[<(\d+);(\d+);(\d+)([Mm])')
 _CSI_CURSOR_RE = re.compile(r'^\x1b\[(?:1;(\d+))?([A-DF-H])')
-_CSI_TILDE_RE = re.compile(r'^\x1b\[(\d+)~')
+_CSI_TILDE_RE = re.compile(r'^\x1b\[(\d+)(?:;(\d+))?~')
 _SS3_RE = re.compile(r'^\x1bO([A-DF-H])')
 _ESC_CHAR_RE = re.compile(r'^\x1b([^\x1b\[O])')
 
@@ -134,16 +134,20 @@ def parse_escape_sequence(chunk: str) -> tuple[ParsedInputEvent | None, int]:
         }
         return KeyEvent(name=name_map[key_char], ctrl=ctrl, meta=meta), csi_cursor_match.end()
 
-    # CSI tilde: ESC[N~
+    # CSI tilde: ESC[N~ or ESC[N;M~ (with modifier)
     csi_tilde_match = _CSI_TILDE_RE.match(chunk)
     if csi_tilde_match:
         n = int(csi_tilde_match.group(1))
+        mod_str = csi_tilde_match.group(2)
+        mod = int(mod_str) if mod_str else 1
+        ctrl = bool((mod - 1) & 4)
+        meta = bool((mod - 1) & 2)
         # 1=home,3=delete,4=end,5=pageup,6=pagedown,7=home,8=end
         tilde_map: dict[int, str] = {
             1: 'home', 3: 'delete', 4: 'end', 5: 'pageup', 6: 'pagedown', 7: 'home', 8: 'end'
         }
         if n in tilde_map:
-            return KeyEvent(name=tilde_map[n], ctrl=False, meta=False), csi_tilde_match.end()
+            return KeyEvent(name=tilde_map[n], ctrl=ctrl, meta=meta), csi_tilde_match.end()
         return None, csi_tilde_match.end()
 
     # SS3: ESC O A/B/C/D/H/F

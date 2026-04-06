@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import logging
 import os
-import random
 import sys
 import threading
 import time
@@ -78,6 +77,7 @@ from minicode.tui.screen import (
 )
 from minicode.tui.transcript import (
     _render_transcript_lines,
+    get_transcript_max_scroll_offset,
     get_transcript_window_size,
     render_transcript,
 )
@@ -362,26 +362,16 @@ def _schedule_tool_auto_collapse(
 
 
 def _get_contextual_help(state: ScreenState, args: TtyAppArgs) -> str | None:
-    """根据当前状态提供上下文相关的帮助提示"""
-    # 空闲状态 - 显示快速提示
+    """根据当前状态提供上下文相关的帮助提示（纯文本，不含 emoji）。"""
     if not state.is_busy and not state.pending_approval:
-        tips = [
-            "💡 Tip: Use /skills to see available workflows",
-            "💡 Tip: Try '帮我分析这个项目' to get started",
-            "💡 Tip: Use Tab to autocomplete commands",
-            "💡 Tip: Type /help for all commands",
-            "💡 Tip: Use Ctrl+R to search history",
-        ]
-        return random.choice(tips)
-    
-    # 工具运行中 - 显示相关提示
+        return None  # 保持状态栏简洁
+
     if state.is_busy and state.active_tool:
-        return f"⏳ Running {state.active_tool}... Press Ctrl+C to cancel"
-    
-    # 权限审批中
+        return f"Running {state.active_tool}... (Ctrl+C to cancel)"
+
     if state.pending_approval:
-        return "🔒 Permission required. Use arrow keys and Enter to choose"
-    
+        return "Approval required. Use arrow keys and Enter to choose."
+
     return None
 
 
@@ -443,23 +433,52 @@ def _extract_path_from_tool_input(tool_input: Any) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-_HEADER_LINES_ESTIMATE = 11  # banner panel: top border + title + divider + 6 body lines + bottom border
-_PROMPT_LINES_ESTIMATE = 7   # prompt panel: top border + title + divider + 3 body + bottom border
 _FOOTER_LINES = 1
-_GAPS = 3
-_TRANSCRIPT_FRAME_LINES = 4  # top/bottom border + title + empty
+
+# Cache for chrome overhead so we only re-measure when state changes
+_chrome_overhead_cache: dict[str, tuple[tuple, int]] = {}
+
+
+def _count_rendered_lines(s: str) -> int:
+    """Count screen lines in a rendered string (split on \\n)."""
+    return s.count("\n") + 1
+
+
+def _get_chrome_overhead(args: TtyAppArgs, state: ScreenState) -> int:
+    """Measure the actual line count of header + prompt panels (cached).
+
+    Accounts for compact mode (small terminal): uses single-\\n separators
+    instead of double-\\n, saving 2 lines.
+    """
+    compact = _is_compact_terminal()
+    # sep "\n\n" adds 2 blank lines between panels; "\n" adds 1.
+    # There are 2 separators (header→transcript, transcript→prompt).
+    gaps = 2 if compact else 4
+    cache_key = (
+        args.cwd,
+        getattr(args, "model", None),
+        state.input,
+        bool(state.pending_approval),
+        compact,
+    )
+    cached = _chrome_overhead_cache.get("key")
+    if cached is not None and cached[0] == cache_key:
+        return cached[1]
+
+    header_lines = _count_rendered_lines(_render_header_panel(args, state))
+    prompt_lines = _count_rendered_lines(_render_prompt_panel(state))
+    overhead = header_lines + prompt_lines + _FOOTER_LINES + gaps
+    _chrome_overhead_cache["key"] = (cache_key, overhead)
+    return overhead
+
 
 def _get_transcript_body_lines(args: TtyAppArgs, state: ScreenState) -> int:
     _, rows = _get_terminal_size()
     rows = max(24, rows)
-    # Use cached estimates instead of re-rendering header/prompt just to count lines
-    chrome_overhead = (
-        _HEADER_LINES_ESTIMATE
-        + _PROMPT_LINES_ESTIMATE
-        + _FOOTER_LINES
-        + _GAPS
-        + _TRANSCRIPT_FRAME_LINES
-    )
+    # Subtract the actual rendered chrome (header + prompt + footer + gaps)
+    # plus 4 lines for the transcript panel frame (top border, title, divider, bottom border)
+    transcript_frame = 4
+    chrome_overhead = _get_chrome_overhead(args, state) + transcript_frame
     return max(6, rows - chrome_overhead)
 
 
@@ -559,12 +578,24 @@ def _get_visible_commands(input_text: str) -> list[Any]:
 _banner_cache: dict[str, tuple[tuple, str]] = {"key": ((), "")}
 
 
+_COMPACT_ROWS_THRESHOLD = 35  # Use compact UI when terminal rows < this value
+
+
+def _is_compact_terminal() -> bool:
+    """Return True when the terminal is too short for the full UI chrome."""
+    _, rows = _get_terminal_size()
+    return rows < _COMPACT_ROWS_THRESHOLD
+
+
 def _render_header_panel(args: TtyAppArgs, state: ScreenState) -> str:
     """Render the top banner panel with model info, cwd, and session stats.
     
     The result is cached to avoid re-rendering when stats haven't changed.
+    Uses compact single-line mode when the terminal has fewer than
+    _COMPACT_ROWS_THRESHOLD rows so that the transcript area has more space.
     """
     stats = _get_session_stats(args, state)
+    compact = _is_compact_terminal()
     cache_key = (
         args.cwd,
         id(args.runtime),
@@ -573,6 +604,7 @@ def _render_header_panel(args: TtyAppArgs, state: ScreenState) -> str:
         stats.get("skillCount"),
         stats.get("mcpCount"),
         _cached_terminal_size(),
+        compact,
     )
     cached = _banner_cache.get("key")
     if cached and cached[0] == cache_key:
@@ -582,6 +614,7 @@ def _render_header_panel(args: TtyAppArgs, state: ScreenState) -> str:
         args.cwd,
         args.permissions.get_summary(),
         stats,
+        compact=compact,
     )
     _banner_cache["key"] = (cache_key, result)
     return result
@@ -617,8 +650,9 @@ def _render_footer_cached(
 
 
 def _render_prompt_panel(state: ScreenState) -> str:
+    compact = _is_compact_terminal()
     commands = _get_visible_commands(state.input)
-    prompt_body = render_input_prompt(state.input, state.cursor_offset)
+    prompt_body = render_input_prompt(state.input, state.cursor_offset, compact=compact)
     if commands:
         prompt_body += "\n" + render_slash_menu(
             commands,
@@ -629,18 +663,17 @@ def _render_prompt_panel(state: ScreenState) -> str:
 
 def _render_screen(args: TtyAppArgs, state: ScreenState) -> None:
     background_tasks = list_background_tasks()
-
-    # 获取上下文帮助
-    contextual_help = _get_contextual_help(state, args)
+    compact = _is_compact_terminal()
+    sep = "\n" if compact else "\n\n"
 
     # Build the entire frame into a buffer, then write once
     buf: list[str] = []
     # CSI H + CSI J  (cursor home + erase to end) – avoids full clear flicker
-    buf.append("\u001b[H\u001b[J")
+    buf.append("\x1b[H\x1b[J")
 
     # Header
     buf.append(_render_header_panel(args, state))
-    buf.append("\n\n")
+    buf.append(sep)
 
     has_skills = len(args.tools.get_skills()) > 0
 
@@ -656,14 +689,14 @@ def _render_screen(args: TtyAppArgs, state: ScreenState) -> None:
                 feedback_input=state.pending_approval.feedback_input,
             )
         )
-        buf.append("\n\n")
+        buf.append(sep)
         buf.append(
             render_panel(
                 "activity",
                 render_tool_panel(state.active_tool, state.recent_tools, background_tasks),
             )
         )
-        buf.append("\n\n")
+        buf.append(sep)
         buf.append(_render_footer_cached(state.status, True, has_skills, background_tasks))
         sys.stdout.write("".join(buf))
         sys.stdout.flush()
@@ -688,19 +721,20 @@ def _render_screen(args: TtyAppArgs, state: ScreenState) -> None:
             min_body_lines=body_lines,
         )
     )
-    buf.append("\n\n")
+    buf.append(sep)
 
     # Prompt
     buf.append(_render_prompt_panel(state))
-    buf.append("\n\n")
+    buf.append(sep)
 
     # Footer (cached)
     buf.append(_render_footer_cached(state.status, True, has_skills, background_tasks))
-    
-    # 上下文帮助行
+
+    # Contextual hint (only when busy or awaiting approval — no idle spam)
+    contextual_help = _get_contextual_help(state, args)
     if contextual_help:
         buf.append(f"\n{SUBTLE}{contextual_help}{RESET}")
-    
+
     sys.stdout.write("".join(buf))
     sys.stdout.flush()
 
@@ -926,7 +960,7 @@ def _execute_tool_shortcut(
         output = result.output if result.ok else f"ERROR: {result.output}"
         _update_tool_entry(state, entry_id, "success" if result.ok else "error", output)
         _collapse_tool_entry(state, entry_id, _summarize_collapsed_tool_body(output))
-        state.transcript_scroll_offset = 0
+        # Don't reset scroll offset — respect user's manual scroll position
     finally:
         state.is_busy = False
         state.active_tool = None
@@ -981,6 +1015,31 @@ def _handle_input(
                 f"{t.name}: {t.description}" for t in args.tools.list()
             ),
         )
+        return False
+
+    # /debug — show scroll diagnostics
+    if input_text == "/debug":
+        from minicode.tui.transcript import _compute_total_lines, get_transcript_max_scroll_offset
+        cols, rows = _get_terminal_size()
+        compact = _is_compact_terminal()
+        body_lines = _get_transcript_body_lines(args, state)
+        total_lines = _compute_total_lines(state.transcript)
+        max_scroll = get_transcript_max_scroll_offset(state.transcript, body_lines)
+        chrome = _get_chrome_overhead(args, state)
+        lines = [
+            "=== Scroll Debug ===",
+            f"Terminal: {cols}x{rows}  compact={compact}",
+            f"Chrome overhead: {chrome} lines",
+            f"Transcript frame: 4 lines",
+            f"Body window: {body_lines} lines",
+            f"Transcript total: {total_lines} lines",
+            f"Scroll offset: {state.transcript_scroll_offset}/{max_scroll}",
+            f"Mouse tracking: ESC[?1000h ESC[?1003h ESC[?1006h",
+            "",
+            "Try scrolling now. If scroll_offset changes, mouse events work.",
+            "Use PageUp/PageDown or Ctrl+A/E as keyboard alternatives.",
+        ]
+        _push_transcript_entry(state, kind="assistant", body="\n".join(lines))
         return False
 
     # Local commands
@@ -1044,12 +1103,12 @@ def _handle_input(
 
     def on_assistant_message(content: str) -> None:
         _push_transcript_entry(state, kind="assistant", body=content)
-        state.transcript_scroll_offset = 0
+        # Don't reset scroll offset — respect user's manual scroll position
         rerender()
 
     def on_progress_message(content: str) -> None:
         _push_transcript_entry(state, kind="progress", body=content)
-        state.transcript_scroll_offset = 0
+        # Don't reset scroll offset — respect user's manual scroll position
         rerender()
 
     def on_tool_start(tool_name: str, tool_input: Any) -> None:
@@ -1102,7 +1161,7 @@ def _handle_input(
             )
 
         pending_tool_entries[tool_name].append(entry_id)
-        state.transcript_scroll_offset = 0
+        # Don't reset scroll offset — respect user's manual scroll position
         rerender()
 
     def on_tool_result(tool_name: str, output: str, is_error: bool) -> None:
@@ -1153,18 +1212,18 @@ def _handle_input(
                     "status": "error" if is_error else "success",
                 })
                 
-                # 错误恢复引导
+                # Error recovery hints (plain text, no emoji)
                 display_output = output
                 if is_error:
                     suggestions = []
                     output_lower = output.lower()
                     if "not found" in output_lower or "no such file" in output_lower:
-                        suggestions.append("💡 File not found. Try /ls to see available files")
+                        suggestions.append("Hint: file not found — use /ls to list files")
                     elif "permission" in output_lower or "denied" in output_lower:
-                        suggestions.append("💡 Permission denied. Check file access rights")
+                        suggestions.append("Hint: permission denied — check file access rights")
                     elif "syntax" in output_lower or "error" in output_lower:
-                        suggestions.append("💡 Error occurred. Review the output and fix issues")
-                    
+                        suggestions.append("Hint: error occurred — review output and fix issues")
+
                     if suggestions:
                         display_output = f"ERROR: {output}\n\n" + "\n".join(suggestions)
                     else:
@@ -1189,7 +1248,7 @@ def _handle_input(
             state.status = f"{remaining} tool(s) still running..."
         else:
             state.status = None
-        state.transcript_scroll_offset = 0
+        # Don't reset scroll offset — respect user's manual scroll position
         rerender()
 
     args.permissions.begin_turn()
@@ -1468,11 +1527,7 @@ def run_tty_app(
                 for event in parsed.events:
                     try:
                         _handle_event(args, state, event, rerender, approval_event, approval_result)
-                        if state.input == "/exit" or (
-                            isinstance(event, KeyEvent)
-                            and event.name == "c"
-                            and event.ctrl
-                        ):
+                        if state.input == "/exit":
                             raise SystemExit(0)
                     except SystemExit:
                         should_exit = True
@@ -1551,6 +1606,10 @@ def _handle_event(
         approval_result: Dict to store approval decision
     """
     # ---------- Ctrl+C → exit ----------
+    # \x03 is parsed as KeyEvent(name='c', ctrl=True) by parse_input_chunk
+    # (CTRL_CHAR_TO_NAME maps \x03 → 'c', produces KeyEvent not TextEvent)
+    if isinstance(event, KeyEvent) and event.ctrl and event.name == "c":
+        raise SystemExit(0)
     if isinstance(event, TextEvent) and event.ctrl and event.text == "c":
         raise SystemExit(0)
 
@@ -1787,6 +1846,17 @@ def _handle_normal_mode_key(
         rerender()
         return True
     
+    # Alt+Up / Alt+Down → scroll transcript (keyboard alternative to mouse wheel)
+    if event.name == "up" and event.meta:
+        if _scroll_transcript_by(args, state, 3):
+            rerender()
+        return True
+    
+    if event.name == "down" and event.meta:
+        if _scroll_transcript_by(args, state, -3):
+            rerender()
+        return True
+    
     # Up/Down arrows (history or command selection)
     if event.name == "up":
         _handle_up_arrow(args, state, visible_commands, rerender)
@@ -1809,11 +1879,14 @@ def _handle_normal_mode_return(
     if visible_commands and 0 <= state.selected_slash_index < len(visible_commands):
         selected = visible_commands[state.selected_slash_index]
         usage = getattr(selected, "usage", str(selected))
-        state.input = usage
-        state.cursor_offset = len(state.input)
-        state.selected_slash_index = 0
-        rerender()
-        return
+        # Only auto-fill if the current input doesn't already exactly match the
+        # selected command. If it already matches, fall through and submit.
+        if state.input.strip() != usage:
+            state.input = usage
+            state.cursor_offset = len(state.input)
+            state.selected_slash_index = 0
+            rerender()
+            return
     
     submitted = state.input
     state.input = ""

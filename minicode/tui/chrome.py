@@ -7,33 +7,37 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-# ANSI color constants
-RESET = "\u001b[0m"
-DIM = "\u001b[2m"
-CYAN = "\u001b[36m"
-GREEN = "\u001b[32m"
-YELLOW = "\u001b[33m"
-RED = "\u001b[31m"
-BLUE = "\u001b[34m"
-MAGENTA = "\u001b[35m"
-BOLD = "\u001b[1m"
-REVERSE = "\u001b[7m"
-ITALIC = "\u001b[3m"
-UNDERLINE = "\u001b[4m"
-BRIGHT_GREEN = "\u001b[92m"
-BRIGHT_RED = "\u001b[91m"
-BRIGHT_CYAN = "\u001b[96m"
-BRIGHT_YELLOW = "\u001b[93m"
-BRIGHT_BLUE = "\u001b[94m"
-BRIGHT_MAGENTA = "\u001b[95m"
-BRIGHT_WHITE = "\u001b[97m"
-# Extended 256-color palette for richer visuals
-BORDER = "\u001b[38;5;39m"       # brighter blue border
-BORDER_DIM = "\u001b[38;5;24m"   # subtle dark blue for secondary borders
-ACCENT = "\u001b[38;5;214m"      # warm orange accent
-ACCENT2 = "\u001b[38;5;141m"     # soft purple accent
-SUBTLE = "\u001b[38;5;243m"      # gray for subtle text
-HIGHLIGHT_BG = "\u001b[48;5;236m"  # dark bg highlight for selections
+from .theme import theme
+
+# ---------------------------------------------------------------------------
+# Re-export legacy ANSI constants (kept for backward compatibility)
+# ---------------------------------------------------------------------------
+RESET = "\x1b[0m"
+DIM = "\x1b[2m"
+CYAN = "\x1b[36m"
+GREEN = "\x1b[32m"
+YELLOW = "\x1b[33m"
+RED = "\x1b[31m"
+BLUE = "\x1b[34m"
+MAGENTA = "\x1b[35m"
+BOLD = "\x1b[1m"
+REVERSE = "\x1b[7m"
+ITALIC = "\x1b[3m"
+UNDERLINE = "\x1b[4m"
+BRIGHT_GREEN = "\x1b[92m"
+BRIGHT_RED = "\x1b[91m"
+BRIGHT_CYAN = "\x1b[96m"
+BRIGHT_YELLOW = "\x1b[93m"
+BRIGHT_BLUE = "\x1b[94m"
+BRIGHT_MAGENTA = "\x1b[95m"
+BRIGHT_WHITE = "\x1b[97m"
+# Extended 256-color palette
+BORDER = "\x1b[38;5;39m"
+BORDER_DIM = "\x1b[38;5;24m"
+ACCENT = "\x1b[38;5;214m"
+ACCENT2 = "\x1b[38;5;141m"
+SUBTLE = "\x1b[38;5;243m"
+HIGHLIGHT_BG = "\x1b[48;5;236m"
 
 # ---------------------------------------------------------------------------
 # Unicode decorative characters
@@ -60,8 +64,8 @@ ICON_DIVIDER = "\u2500"    # ─
 ICON_DOT = "\u00B7"        # ·
 ICON_ARROW = "\u25B8"      # ▸
 
-# Pre-compiled regex for ANSI stripping (avoid re-compiling every call)
-_ANSI_RE = re.compile(r"\u001b\[[0-9;]*m")
+# Pre-compiled regex for ANSI stripping
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def strip_ansi(text: str) -> str:
@@ -70,7 +74,7 @@ def strip_ansi(text: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Cached terminal size (avoids repeated os.get_terminal_size syscalls)
+# Cached terminal size
 # ---------------------------------------------------------------------------
 _ts_cache: tuple[int, int] | None = None
 _ts_cache_time: float = 0.0
@@ -85,8 +89,6 @@ def _cached_terminal_size() -> tuple[int, int]:
         try:
             ts = os.get_terminal_size()
             cols, rows = ts.columns, ts.lines
-            # Some terminals (SSH, freshly created tmux panes) may report
-            # (0, 0).  Fall back to a reasonable default in that case.
             if cols <= 0 or rows <= 0:
                 _ts_cache = (100, 40)
             else:
@@ -98,26 +100,22 @@ def _cached_terminal_size() -> tuple[int, int]:
 
 
 def invalidate_terminal_size_cache() -> None:
-    """Force the next ``_cached_terminal_size`` call to re-query the OS.
-
-    Called from the SIGWINCH handler on Unix so that a terminal resize
-    is picked up immediately instead of waiting for the TTL to expire.
-    """
+    """Force the next ``_cached_terminal_size`` call to re-query the OS."""
     global _ts_cache
     _ts_cache = None
 
 
 # ---------------------------------------------------------------------------
-# Width computation — optimized hot path
+# Width computation
 # ---------------------------------------------------------------------------
 
-# Build a fast lookup set for wide character ranges
-def _build_wide_char_set() -> frozenset[int]:
-    """Pre-compute the set of codepoint ranges that are double-width."""
-    # We use ranges for lookup instead of a set of all codepoints
-    return frozenset()  # placeholder — we use range checks below
+_WIDE_CHAR_PATTERN = re.compile(
+    r'[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF'
+    r'\uF900-\uFAFF\uFE10-\uFE19\uFE30-\uFE6F\uFF00-\uFF60\uFFE0-\uFFE6'
+    r'\U0001F300-\U0001FAF6\U00020000-\U0003FFFD]'
+)
 
-# Optimized: inline the range checks but skip the per-char function call overhead
+
 def char_display_width(char: str) -> int:
     """CJK/Emoji width detection (return 2 for wide chars, 1 otherwise)."""
     if not char:
@@ -141,24 +139,15 @@ def char_display_width(char: str) -> int:
     return 1
 
 
-# Pre-compiled regex for wide character detection (CJK + Emoji)
-_WIDE_CHAR_PATTERN = re.compile(
-    r'[\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF\uAC00-\uD7AF'
-    r'\uF900-\uFAFF\uFE10-\uFE19\uFE30-\uFE6F\uFF00-\uFF60\uFFE0-\uFFE6'
-    r'\U0001F300-\U0001FAF6\U00020000-\U0003FFFD]'
-)
-
-
 @lru_cache(maxsize=2048)
 def _stripped_display_width(stripped: str) -> int:
     """Width of a string that is already ANSI-stripped. Cached for hot paths."""
-    # Fast path: count wide characters using regex
     wide_chars = len(_WIDE_CHAR_PATTERN.findall(stripped))
     return len(stripped) + wide_chars
 
 
 def string_display_width(text: str) -> int:
-    """Sum of char_display_width for stripped text. Uses LRU cache on stripped content."""
+    """Sum of char_display_width for stripped text."""
     stripped = _ANSI_RE.sub("", text)
     return _stripped_display_width(stripped)
 
@@ -183,7 +172,6 @@ def truncate_plain(text: str, width: int) -> str:
         cw = char_display_width(char)
         if w + cw > limit:
             res += "..."
-            # Keep any trailing ANSI codes to avoid leaking style
             i += 1
             while i < len(text):
                 m = _ANSI_RE.match(text, i)
@@ -237,21 +225,20 @@ def truncate_path_middle(path: str, width: int) -> str:
 
 def color_badge(label: str, value: str, color: str, icon: str = "") -> str:
     """Render a styled badge: icon [label] value."""
+    t = theme()
     icon_part = f"{color}{icon} " if icon else ""
-    return f"{icon_part}{color}{DIM}[{label}]{RESET} {BOLD}{value}{RESET}"
+    return f"{icon_part}{color}{t.dim}[{label}]{t.reset} {t.bold}{value}{t.reset}"
 
 
-def border_line(kind: str, width: int, accent: bool = False) -> str:
-    """Unicode box drawing: ╭─╮ or ╰─╯ with optional accent color."""
-    color = ACCENT if accent else BORDER
+def border_line(kind: str, width: int, color: str = "") -> str:
+    """Unicode box drawing: ╭─╮ or ╰─╯."""
+    c = color or BORDER
     if kind == "top":
-        return f"{color}╭{'─' * (width - 2)}╮{RESET}"
+        return f"{c}╭{'─' * (width - 2)}╮{RESET}"
     elif kind == "bottom":
-        return f"{color}╰{'─' * (width - 2)}╯{RESET}"
-    elif kind == "divider":
-        return f"{color}├{'─' * (width - 2)}┤{RESET}"
+        return f"{c}╰{'─' * (width - 2)}╯{RESET}"
     else:
-        return f"{color}├{'─' * (width - 2)}┤{RESET}"
+        return f"{c}├{'─' * (width - 2)}┤{RESET}"
 
 
 def panel_row(left: str, width: int, right: str | None = None, border_color: str = "") -> str:
@@ -271,17 +258,15 @@ def panel_row(left: str, width: int, right: str | None = None, border_color: str
 
 
 def empty_panel_row(width: int) -> str:
-    """│          │"""
     return panel_row("", width)
 
 
 def wrap_panel_body_line(line: str, width: int) -> list[str]:
-    """Wrap long lines for panel, CJK aware. Uses finditer for ANSI positions."""
+    """Wrap long lines for panel, CJK aware."""
     inner_width = width - 4
     if string_display_width(line) <= inner_width:
         return [line]
 
-    # Pre-compute ANSI escape positions so we don't regex-match per character
     ansi_spans: list[tuple[int, int]] = []
     for m in _ANSI_RE.finditer(line):
         ansi_spans.append((m.start(), m.end()))
@@ -290,10 +275,9 @@ def wrap_panel_body_line(line: str, width: int) -> list[str]:
     current_line = ""
     current_w = 0
     i = 0
-    span_idx = 0  # pointer into ansi_spans
+    span_idx = 0
 
     while i < len(line):
-        # Check if current position is the start of a known ANSI escape
         if span_idx < len(ansi_spans) and i == ansi_spans[span_idx][0]:
             end = ansi_spans[span_idx][1]
             current_line += line[i:end]
@@ -318,7 +302,6 @@ def wrap_panel_body_line(line: str, width: int) -> list[str]:
     return lines
 
 
-# Panel-title icon mapping for automatic icon decoration
 _PANEL_ICONS: dict[str, str] = {
     "minicode": ICON_MINICODE,
     "session feed": ICON_MSG,
@@ -328,26 +311,48 @@ _PANEL_ICONS: dict[str, str] = {
 }
 
 
-def render_panel(title: str, body: str, right_title: str | None = None, min_body_lines: int = 0) -> str:
-    """Full panel with Unicode borders and decorative title icons."""
+def render_panel(
+    title: str,
+    body: str,
+    right_title: str | None = None,
+    min_body_lines: int = 0,
+    border_color: str = "",
+) -> str:
+    """Full panel with Unicode borders.
+
+    The border color defaults to the theme value for the given panel title
+    (workspace → header, session → session, prompt → input, etc.).
+    """
+    t = theme()
     width, _ = _cached_terminal_size()
     if width < 40:
         width = 40
 
-    # Pick icon for this panel title
+    # Pick border color from theme based on title
+    if not border_color:
+        title_lower = title.lower()
+        if "workspace" in title_lower or "minicode" in title_lower:
+            border_color = t.header
+        elif "session" in title_lower:
+            border_color = t.session
+        elif "prompt" in title_lower or "input" in title_lower:
+            border_color = t.input
+        elif "action" in title_lower or "approval" in title_lower:
+            border_color = t.approval
+        else:
+            border_color = BORDER
+
     icon = _PANEL_ICONS.get(title.lower(), "")
     icon_str = f"{ACCENT}{icon} {RESET}" if icon else ""
 
-    # Top border
-    res = [border_line("top", width)]
-    # Title row with icon
-    title_display = f"{icon_str}{BRIGHT_CYAN}{BOLD}{title}{RESET}"
-    right_display = f"{SUBTLE}{right_title}{RESET}" if right_title else None
-    res.append(panel_row(title_display, width, right_display))
-    # Thin divider under title
+    res = [border_line("top", width, border_color)]
+    title_display = f"{icon_str}{t.bold}{title}{t.reset}"
+    right_display = f"{t.subtle}{right_title}{t.reset}" if right_title else None
+    res.append(panel_row(title_display, width, right_display, border_color))
+
     inner = width - 4
     divider_line = f"{BORDER_DIM}{'╌' * inner}{RESET}"
-    res.append(panel_row(divider_line, width))
+    res.append(panel_row(divider_line, width, border_color=border_color))
 
     body_lines = body.splitlines() if body else []
     wrapped_lines: list[str] = []
@@ -358,88 +363,132 @@ def render_panel(title: str, body: str, right_title: str | None = None, min_body
         wrapped_lines.append("")
 
     for wl in wrapped_lines:
-        res.append(panel_row(wl, width))
-    res.append(border_line("bottom", width))
+        res.append(panel_row(wl, width, border_color=border_color))
+    res.append(border_line("bottom", width, border_color))
     return "\n".join(res)
 
 
-def render_banner(runtime: dict | None, cwd: str, permission_summary: list[str], session: dict[str, int]) -> str:
-    """Render banner with rich visual badges and icons."""
-    model = runtime.get("model", "not-configured") if runtime else "not-configured"
+# ---------------------------------------------------------------------------
+# Banner / header — aligned with Rust's build_header_lines
+# ---------------------------------------------------------------------------
+
+def render_banner(
+    runtime: dict | None,
+    cwd: str,
+    permission_summary: list[str],
+    session: dict[str, int],
+    compact: bool = False,
+) -> str:
+    """Render the workspace header panel.
+
+    Layout matches Rust's build_header_lines:
+      Line 1: project <cwd>   provider <host>   model <name>   auth <kind>
+      Line 2: session messages=N events=N tools=N skills=N mcp=N
+      Line 3: permissions info
+
+    When compact=True (small terminal), all info is compressed into one line.
+    """
+    t = theme()
+
+    model = runtime.get("model", "(unconfigured)") if runtime else "(unconfigured)"
+
+    # Provider hostname (strip scheme)
     provider = "offline"
     if runtime and runtime.get("baseUrl"):
-        provider = runtime["baseUrl"].replace("https://", "").replace("http://", "").split("/")[0]
+        provider = (
+            runtime["baseUrl"]
+            .replace("https://", "")
+            .replace("http://", "")
+            .split("/")[0]
+        )
 
-    cwd_path = Path(cwd)
-    folder_name = cwd_path.name or str(cwd_path)
+    # Auth kind
+    auth = "none"
+    if runtime:
+        if runtime.get("authToken"):
+            auth = "auth_token"
+        elif runtime.get("apiKey"):
+            auth = "api_key"
 
-    width, _ = _cached_terminal_size()
-
-    # Tagline with subtle styling
-    tagline = f"{SUBTLE}{ITALIC}Terminal coding assistant powered by AI{RESET}"
-
-    # Working directory with folder icon
-    path_display = truncate_path_middle(str(cwd), max(20, width - 10 - string_display_width(folder_name)))
-    cwd_line = f"{ICON_FOLDER} {BRIGHT_BLUE}{BOLD}{folder_name}{RESET} {SUBTLE}{path_display}{RESET}"
-
-    # Stats — split into two lines: provider/model and counters
     msg_count = session.get("messageCount", 0)
     evt_count = session.get("transcriptCount", 0)
     skill_count = session.get("skillCount", 0)
     mcp_count = session.get("mcpCount", 0)
 
-    config_line = (
-        f"{color_badge('provider', provider, CYAN, ICON_PROVIDER)}"
-        f"  {color_badge('model', model, GREEN, ICON_MODEL)}"
-    )
-    stats_line = (
-        f"{ACCENT}{ICON_MSG}{RESET} {BOLD}{msg_count}{RESET}{SUBTLE} msgs{RESET}"
-        f"  {ACCENT2}{ICON_EVENT}{RESET} {BOLD}{evt_count}{RESET}{SUBTLE} events{RESET}"
-        f"  {YELLOW}{ICON_SKILL}{RESET} {BOLD}{skill_count}{RESET}{SUBTLE} skills{RESET}"
-        f"  {MAGENTA}{ICON_MCP}{RESET} {BOLD}{mcp_count}{RESET}{SUBTLE} mcp{RESET}"
+    if compact:
+        # Single-line compact header for small terminals
+        import os as _os
+        cwd_short = _os.path.basename(cwd) or cwd
+        body = (
+            f"{t.header_label_info}{t.bold}project{t.reset} {cwd_short}"
+            f"  {t.header_label_info}{t.bold}model{t.reset} {model}"
+            f"  {t.header_label_session}{t.bold}msgs{t.reset} {msg_count}"
+        )
+        return render_panel("Workspace", body)
+
+    # Line 1 — project / provider / model / auth
+    line1 = (
+        f"{t.header_label_info}{t.bold}project{t.reset} {cwd}"
+        f"   {t.header_label_info}{t.bold}provider{t.reset} {provider}"
+        f"   {t.header_label_info}{t.bold}model{t.reset} {model}"
+        f"   {t.header_label_info}{t.bold}auth{t.reset} {auth}"
     )
 
-    # Permissions with lock icon
-    perm_line = f"{ICON_LOCK} {SUBTLE}{' │ '.join(permission_summary)}{RESET}"
+    # Line 2 — session stats
+    line2 = (
+        f"{t.header_label_session}{t.bold}session{t.reset}"
+        f" messages={msg_count}"
+        f" events={evt_count}"
+        f" skills={skill_count}"
+        f" mcp={mcp_count}"
+    )
 
-    body = "\n".join([tagline, "", cwd_line, config_line, stats_line, perm_line])
-    return render_panel("MiniCode", body, right_title=f"{SUBTLE}v0.1{RESET}")
+    body = "\n".join([line1, line2])
+    return render_panel("Workspace", body)
 
 
 def render_status_line(status: str | None) -> str:
-    """Render the status line with icon and formatting."""
+    """Render the status line."""
+    t = theme()
     if status:
-        return f"{ACCENT}{ICON_RUNNING}{RESET} {YELLOW}{BOLD}{status}{RESET}"
-    return f"{GREEN}{ICON_SUCCESS}{RESET} {DIM}Ready{RESET}"
+        return f"{t.tool}{t.bold}{ICON_RUNNING} {status}{t.reset}"
+    return f"{t.assistant}{ICON_SUCCESS} Ready{t.reset}"
 
 
 def render_tool_panel(
-    active_tool: str | None, recent_tools: list[dict[str, str]], background_tasks: list[dict[str, Any]] | None = None
+    active_tool: str | None,
+    recent_tools: list[dict[str, str]],
+    background_tasks: list[dict[str, Any]] | None = None,
 ) -> str:
-    """Include background task support with icons."""
+    """Render current tool activity summary."""
+    t = theme()
     if background_tasks is None:
         background_tasks = []
     parts: list[str] = []
     if active_tool:
-        parts.append(f"{ICON_RUNNING} {YELLOW}{BOLD}running{RESET} {BRIGHT_YELLOW}{active_tool}{RESET}")
+        parts.append(f"{ICON_RUNNING} {t.tool}{t.bold}running{t.reset} {active_tool}")
     for task in background_tasks:
         if task.get("status") == "running":
-            parts.append(f"{ICON_BG} {BRIGHT_CYAN}bg{RESET} {task.get('label', 'task')}")
+            parts.append(f"{ICON_BG} {t.progress}bg{t.reset} {task.get('label', 'task')}")
     if not parts and not recent_tools:
-        parts.append(f"{SUBTLE}{ICON_DOT} idle{RESET}")
+        parts.append(f"{t.subtle}{ICON_DOT} idle{t.reset}")
     else:
         for tool in recent_tools[-3:]:
             if tool.get("status") == "success":
-                parts.append(f"{GREEN}{ICON_SUCCESS} {tool.get('name', 'tool')}{RESET}")
+                parts.append(f"{t.assistant}{ICON_SUCCESS} {tool.get('name', 'tool')}{t.reset}")
             else:
-                parts.append(f"{RED}{ICON_ERROR} {tool.get('name', 'tool')}{RESET}")
-    return f"{ICON_TOOL} {DIM}tools{RESET}  " + f"  {SUBTLE}{ICON_DOT}{RESET}  ".join(parts)
+                parts.append(f"{t.tool_error}{ICON_ERROR} {tool.get('name', 'tool')}{t.reset}")
+    return f"{ICON_TOOL} {t.dim}tools{t.reset}  " + f"  {t.subtle}{ICON_DOT}{t.reset}  ".join(parts)
 
 
 def render_footer_bar(
-    status: str | None, tools_enabled: bool, skills_enabled: bool, background_tasks: list[dict[str, Any]] | None = None
+    status: str | None,
+    tools_enabled: bool,
+    skills_enabled: bool,
+    background_tasks: list[dict[str, Any]] | None = None,
 ) -> str:
-    """Stylish single-line footer with icons."""
+    """Single-line footer bar."""
+    t = theme()
     if background_tasks is None:
         background_tasks = []
     width, _ = _cached_terminal_size()
@@ -447,38 +496,46 @@ def render_footer_bar(
 
     bg_info = ""
     if background_tasks:
-        bg_info = f" {ICON_BG} {BRIGHT_CYAN}{len(background_tasks)} bg{RESET} {SUBTLE}│{RESET}"
+        bg_info = f" {ICON_BG} {t.progress}{len(background_tasks)} bg{t.reset} {t.subtle}│{t.reset}"
 
-    tools_indicator = f"{GREEN}{ICON_SUCCESS}{RESET}" if tools_enabled else f"{RED}{ICON_ERROR}{RESET}"
-    skills_indicator = f"{GREEN}{ICON_SUCCESS}{RESET}" if skills_enabled else f"{RED}{ICON_ERROR}{RESET}"
+    tools_indicator = f"{t.assistant}{ICON_SUCCESS}{t.reset}" if tools_enabled else f"{t.tool_error}{ICON_ERROR}{t.reset}"
+    skills_indicator = f"{t.assistant}{ICON_SUCCESS}{t.reset}" if skills_enabled else f"{t.tool_error}{ICON_ERROR}{t.reset}"
 
     right = (
-        f"{bg_info} {ICON_TOOL} {SUBTLE}tools{RESET} {tools_indicator}"
-        f" {SUBTLE}│{RESET} {ICON_SKILL} {SUBTLE}skills{RESET} {skills_indicator}"
+        f"{bg_info} {ICON_TOOL} {t.subtle}tools{t.reset} {tools_indicator}"
+        f" {t.subtle}│{t.reset} {ICON_SKILL} {t.subtle}skills{t.reset} {skills_indicator}"
     )
     gap = max(1, width - string_display_width(left) - string_display_width(right))
     return f"{left}{' ' * gap}{right}"
 
 
 def render_slash_menu(commands: list[Any], selected_index: int) -> str:
-    """With icons, highlight, and padded usage."""
+    """Render slash command menu with highlight."""
+    t = theme()
     if not commands:
-        return f"{SUBTLE}no commands{RESET}"
+        return f"{t.subtle}no commands{t.reset}"
     width, _ = _cached_terminal_size()
-    rows = [f"{ACCENT}{ICON_ARROW}{RESET} {DIM}commands{RESET}"]
+    rows = [f"{ACCENT}{ICON_ARROW}{RESET} {t.dim}commands{t.reset}"]
     for i, cmd in enumerate(commands):
         usage = pad_plain(getattr(cmd, "usage", str(cmd)), 14)
         desc = getattr(cmd, "description", "")
         if i == selected_index:
-            line = f"  {HIGHLIGHT_BG}{BRIGHT_CYAN}{ICON_ARROW}{RESET}{HIGHLIGHT_BG} {BRIGHT_WHITE}{BOLD}{usage}{RESET}{HIGHLIGHT_BG} {desc} {RESET}"
+            line = (
+                f"  {t.command_highlight_bg}{BRIGHT_CYAN}{ICON_ARROW}{RESET}"
+                f"{t.command_highlight_bg} {BRIGHT_WHITE}{t.bold}{usage}{RESET}"
+                f"{t.command_highlight_bg} {desc} {RESET}"
+            )
         else:
-            line = f"   {SUBTLE}{ICON_DOT}{RESET} {usage} {SUBTLE}{desc}{RESET}"
+            line = f"   {t.subtle}{ICON_DOT}{t.reset} {usage} {t.subtle}{desc}{t.reset}"
         rows.append(truncate_plain(line, width))
     return "\n".join(rows)
 
 
+# ---------------------------------------------------------------------------
+# Diff colorization
+# ---------------------------------------------------------------------------
+
 def classify_diff_line(line: str) -> str:
-    """Returns 'meta'|'add'|'remove'|'context'."""
     if line.startswith(("+++", "---", "@@")):
         return "meta"
     if line.startswith("+"):
@@ -489,7 +546,6 @@ def classify_diff_line(line: str) -> str:
 
 
 def compute_changed_range(removed: str, added: str) -> tuple[int, int] | None:
-    """Word-level emphasis ranges."""
     if not removed or not added:
         return None
     p = 0
@@ -502,7 +558,6 @@ def compute_changed_range(removed: str, added: str) -> tuple[int, int] | None:
 
 
 def apply_word_emphasis(content: str, color: str, emphasis_range: tuple[int, int] | None = None) -> str:
-    """Apply color and word-level emphasis."""
     if not emphasis_range:
         return f"{color}{content}{RESET}"
     s, e = emphasis_range
@@ -510,7 +565,7 @@ def apply_word_emphasis(content: str, color: str, emphasis_range: tuple[int, int
 
 
 def colorize_unified_diff_block(block: str) -> str:
-    """Full diff with word-level highlighting and look-ahead pairing."""
+    """Full diff with word-level highlighting."""
     lines = block.splitlines()
     res: list[str] = []
     i = 0
@@ -520,7 +575,6 @@ def colorize_unified_diff_block(block: str) -> str:
             res.append(f"{CYAN}{line}{RESET}")
             i += 1
             continue
-        # Collect consecutive removal/addition blocks for pairing
         if line.startswith("-"):
             removals: list[str] = []
             while i < len(lines) and lines[i].startswith("-"):
@@ -530,16 +584,13 @@ def colorize_unified_diff_block(block: str) -> str:
             while i < len(lines) and lines[i].startswith("+"):
                 additions.append(lines[i][1:])
                 i += 1
-            # Pair removals with additions for word-level emphasis
             paired = min(len(removals), len(additions))
             for j in range(paired):
                 emphasis = compute_changed_range(removals[j], additions[j])
                 res.append("-" + apply_word_emphasis(removals[j], RED, emphasis))
                 res.append("+" + apply_word_emphasis(additions[j], GREEN, emphasis))
-            # Remaining unpaired removals
             for j in range(paired, len(removals)):
                 res.append(f"{RED}-{removals[j]}{RESET}")
-            # Remaining unpaired additions
             for j in range(paired, len(additions)):
                 res.append(f"{GREEN}+{additions[j]}{RESET}")
             continue
@@ -553,23 +604,25 @@ def colorize_unified_diff_block(block: str) -> str:
 
 
 def _looks_like_diff_block(detail: str) -> bool:
-    """Check if a detail string looks like a unified diff block."""
-    return (
-        "\n" in detail
-        and ("--- a/" in detail or "+++ b/" in detail or "@@ " in detail)
+    return "\n" in detail and (
+        "--- a/" in detail or "+++ b/" in detail or "@@ " in detail
     )
 
 
 def colorize_edit_permission_details(details: list[str]) -> list[str]:
-    """Colorize diff blocks in permission details."""
     return [
         colorize_unified_diff_block(d) if _looks_like_diff_block(d) else d
         for d in details
     ]
 
 
-def get_permission_prompt_max_scroll_offset(request: dict[str, Any], expanded: bool = False) -> int:
-    """Calculate max scroll offset for permission details."""
+# ---------------------------------------------------------------------------
+# Permission prompt
+# ---------------------------------------------------------------------------
+
+def get_permission_prompt_max_scroll_offset(
+    request: dict[str, Any], expanded: bool = False
+) -> int:
     if not expanded:
         return 0
     flat = flatten_detail_lines(request.get("details", []))
@@ -579,18 +632,15 @@ def get_permission_prompt_max_scroll_offset(request: dict[str, Any], expanded: b
 
 
 def flatten_detail_lines(details: list[str]) -> list[str]:
-    """Flatten a list of detail strings (which may contain newlines) into individual lines."""
     result: list[str] = []
     for detail in details:
         result.extend(detail.split("\n"))
     return result
 
 
-def slice_visible_details(flat_lines: list[str], scroll_offset: int, max_visible: int | None = None) -> tuple[list[str], int]:
-    """Return the visible slice of detail lines and total count.
-    
-    If max_visible is None, uses terminal height minus chrome to calculate.
-    """
+def slice_visible_details(
+    flat_lines: list[str], scroll_offset: int, max_visible: int | None = None
+) -> tuple[list[str], int]:
     if max_visible is None:
         _, rows = _cached_terminal_size()
         max_visible = max(4, rows - 20)
@@ -607,36 +657,46 @@ def render_permission_prompt(
     feedback_mode: bool = False,
     feedback_input: str = "",
 ) -> str:
-    """FULL interactive permission prompt with enhanced visuals."""
+    """Interactive permission prompt with Morandi theme."""
+    t = theme()
     lines: list[str] = []
     if feedback_mode:
-        lines.extend(
-            [
-                f"{BRIGHT_YELLOW}{ICON_PROMPT} Provide reason for rejection:{RESET}",
-                f"  {GREEN}{ICON_PROMPT}{RESET} {feedback_input}_",
-                "",
-                f"{SUBTLE}  Press Enter to send, Esc to cancel.{RESET}",
-            ]
-        )
+        lines.extend([
+            f"{t.progress}{t.bold}{ICON_PROMPT} Provide reason for rejection:{t.reset}",
+            f"  {t.assistant}{ICON_PROMPT}{t.reset} {feedback_input}_",
+            "",
+            f"{t.subtle}  Press Enter to send, Esc to cancel.{t.reset}",
+        ])
     else:
         lines.extend([request.get("summary", "Permission Request"), ""])
         details = request.get("details", [])
         if details:
             flat = flatten_detail_lines(details)
             if not expanded:
-                lines.append(f"{SUBTLE}  {ICON_ARROW} {len(flat)} lines hidden {SUBTLE}│{RESET} {DIM}press 'v' to expand │ Ctrl+O toggle{RESET}")
+                lines.append(
+                    f"{t.subtle}  {ICON_ARROW} {len(flat)} lines hidden "
+                    f"{t.subtle}│{t.reset} {t.dim}press 'v' to expand │ Ctrl+O toggle{t.reset}"
+                )
             else:
                 colorized = colorize_edit_permission_details(flat)
                 visible, total = slice_visible_details(colorized, scroll_offset)
                 lines.extend(visible)
                 if total > len(visible):
-                    lines.append(f"{SUBTLE}  {ICON_DIVIDER * 3} scroll {scroll_offset+1}/{total} (Wheel/PgUp/PgDn) {ICON_DIVIDER * 3}{RESET}")
+                    lines.append(
+                        f"{t.subtle}  {ICON_DIVIDER * 3} scroll "
+                        f"{scroll_offset + 1}/{total} (Wheel/PgUp/PgDn) "
+                        f"{ICON_DIVIDER * 3}{t.reset}"
+                    )
             lines.append("")
         for i, choice in enumerate(request.get("choices", [])):
             label = choice.get("label", "")
             key = choice.get("key", "")
             if i == selected_choice_index:
-                lines.append(f"  {HIGHLIGHT_BG}{BRIGHT_CYAN}{ICON_ARROW}{RESET}{HIGHLIGHT_BG} {BRIGHT_WHITE}{BOLD}{label}{RESET}{HIGHLIGHT_BG} {SUBTLE}({key}){RESET}")
+                lines.append(
+                    f"  {t.command_highlight_bg}{BRIGHT_CYAN}{ICON_ARROW}{RESET}"
+                    f"{t.command_highlight_bg} {BRIGHT_WHITE}{t.bold}{label}{RESET}"
+                    f"{t.command_highlight_bg} {t.subtle}({key}){RESET}"
+                )
             else:
-                lines.append(f"    {SUBTLE}{ICON_DOT}{RESET} {label} {SUBTLE}({key}){RESET}")
+                lines.append(f"    {t.subtle}{ICON_DOT}{t.reset} {label} {t.subtle}({key}){t.reset}")
     return render_panel("Action Required", "\n".join(lines), right_title="Permission")
