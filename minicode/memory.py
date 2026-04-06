@@ -191,9 +191,19 @@ class MemoryPaths:
 class MemoryManager:
     """Manages layered memory system."""
     
-    def __init__(self, workspace: str):
-        self.workspace = workspace
-        self.paths = MemoryPaths.for_workspace(workspace)
+    def __init__(
+        self,
+        workspace: str | Path | None = None,
+        *,
+        project_root: str | Path | None = None,
+    ):
+        # Backward compatibility: older call sites pass `project_root=...`.
+        resolved_workspace = workspace if workspace is not None else project_root
+        if resolved_workspace is None:
+            resolved_workspace = Path.cwd()
+
+        self.workspace = str(resolved_workspace)
+        self.paths = MemoryPaths.for_workspace(self.workspace)
         self.memories: dict[MemoryScope, MemoryFile] = {
             MemoryScope.USER: MemoryFile(scope=MemoryScope.USER),
             MemoryScope.PROJECT: MemoryFile(scope=MemoryScope.PROJECT),
