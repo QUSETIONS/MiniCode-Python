@@ -6,11 +6,16 @@ import sys
 ENTER_ALT_SCREEN = "\u001b[?1049h"
 EXIT_ALT_SCREEN = "\u001b[?1049l"
 ERASE_SCREEN_AND_HOME = "\u001b[2J\u001b[H"
-# Use SGR extended mouse mode (?1006) for coordinates > 223 and better
-# cross-platform compatibility.  We still enable basic tracking (?1000) to
-# activate mouse events, then upgrade the encoding to SGR.
-ENABLE_MOUSE_TRACKING = "\u001b[?1000h\u001b[?1006h"
-DISABLE_MOUSE_TRACKING = "\u001b[?1006l\u001b[?1000l"
+# Mouse tracking sequence breakdown:
+#   ?1000h  — basic X10 mouse reporting (button press/release)
+#   ?1002h  — button-event tracking (only reports while button pressed, can interfere)
+#   ?1003h  — any-event tracking (reports all mouse events including scroll without button)
+#   ?1006h  — SGR extended encoding (supports coordinates > 223, required for modern terminals)
+# Strategy: use ?1000h (basic) + ?1003h (any-event for reliable scroll) + ?1006h (SGR format)
+# This matches the TypeScript mini-code version behavior (?1000h + ?1006h) but adds
+# ?1003h for better SSH/remote terminal scroll wheel support.
+ENABLE_MOUSE_TRACKING = "\u001b[?1000h\u001b[?1003h\u001b[?1006h"
+DISABLE_MOUSE_TRACKING = "\u001b[?1006l\u001b[?1003l\u001b[?1000l"
 
 # Terminal types that do not support alternate screen or mouse tracking.
 _DUMB_TERMS = frozenset({"dumb", "linux", ""})

@@ -25,6 +25,7 @@ from minicode.tui.screen import (
     hide_cursor,
     show_cursor,
 )
+from minicode.tui.theme import ColorTheme, theme
 from minicode.tui.transcript import (
     format_transcript_text,
     get_transcript_max_scroll_offset,
@@ -60,6 +61,9 @@ __all__ = [
     "parse_input_chunk",
     # markdown
     "render_markdownish",
+    # theme
+    "ColorTheme",
+    "theme",
     # transcript
     "format_transcript_text",
     "get_transcript_max_scroll_offset",

@@ -1,22 +1,22 @@
 from __future__ import annotations
 
-from functools import lru_cache
-
 from .chrome import (
     _cached_terminal_size,
-    RESET, DIM, CYAN, GREEN, YELLOW, RED, MAGENTA, BOLD, BLUE,
-    BRIGHT_CYAN, BRIGHT_GREEN, BRIGHT_YELLOW, BRIGHT_MAGENTA, BRIGHT_RED,
-    ACCENT, ACCENT2, SUBTLE, ITALIC,
-    ICON_USER, ICON_ASSISTANT, ICON_TOOL, ICON_PROGRESS,
-    ICON_SUCCESS, ICON_ERROR, ICON_RUNNING, ICON_DIVIDER, ICON_DOT,
+    RESET, DIM, BOLD,
+    ICON_DIVIDER, ICON_DOT,
 )
 from .markdown import render_markdownish
+from .theme import theme
 from .types import TranscriptEntry
 
 # Pre-build the separator string once (immutable)
-_SEPARATOR = f"  {SUBTLE}{ICON_DOT} {ICON_DIVIDER * 3} {ICON_DOT}{RESET}"
+_SEPARATOR = f"  {DIM}{ICON_DOT} {ICON_DIVIDER * 3} {ICON_DOT}{RESET}"
 _SEPARATOR_LINES = ["", _SEPARATOR, ""]
-_SEPARATOR_LINE_COUNT = 3  # empty, separator, empty
+_SEPARATOR_LINE_COUNT = 3
+
+# Tool output preview limits (match Rust TOOL_PREVIEW_LINES / TOOL_PREVIEW_CHARS)
+_TOOL_PREVIEW_LINES = 6
+_TOOL_PREVIEW_CHARS = 180
 
 
 def _indent_block(text: str, prefix: str = "  ") -> str:
@@ -43,41 +43,84 @@ def preview_tool_body(tool_name: str, body: str) -> str:
 
 
 def _render_transcript_entry(entry: TranscriptEntry) -> str:
-    """Render a single TranscriptEntry with icons and rich styling."""
+    """Render a single TranscriptEntry with Morandi theme colors.
+
+    Tool entries follow the Rust [展开]/[收起] toggle pattern:
+    - expanded=False → show preview lines + [展开] label
+    - expanded=True  → show full output + [收起] label
+    The ``collapsed`` / ``collapsePhase`` fields drive the display:
+      collapsed=True  → entry was auto-collapsed after completion
+      collapsePhase   → animation step (kept for compat, treated as collapsed)
+    """
+    t = theme()
+
     if entry.kind == "user":
-        label = f"{BRIGHT_CYAN}{ICON_USER}{RESET} {CYAN}{BOLD}you{RESET}"
+        label = f"{t.user}{t.bold}▌ you{t.reset}"
         return f"{label}\n{_indent_block(entry.body)}"
 
     if entry.kind == "assistant":
-        label = f"{BRIGHT_GREEN}{ICON_ASSISTANT}{RESET} {GREEN}{BOLD}assistant{RESET}"
+        label = f"{t.assistant}{t.bold}▌ assistant{t.reset}"
         return f"{label}\n{_indent_block(render_markdownish(entry.body))}"
 
     if entry.kind == "progress":
-        label = f"{ACCENT}{ICON_PROGRESS}{RESET} {YELLOW}{BOLD}progress{RESET}"
+        label = f"{t.progress}{t.bold}▌ progress{t.reset}"
         return f"{label}\n{_indent_block(render_markdownish(entry.body))}"
 
     if entry.kind == "tool":
+        # Status indicator
         if entry.status == "running":
-            status_label = f"{BRIGHT_YELLOW}{ICON_RUNNING} running{RESET}"
+            status_label = f"{t.tool}{ICON_DOT} running{t.reset}"
         elif entry.status == "success":
-            status_label = f"{GREEN}{ICON_SUCCESS} ok{RESET}"
+            status_label = f"{t.assistant}ok{t.reset}"
         else:
-            status_label = f"{BRIGHT_RED}{ICON_ERROR} err{RESET}"
+            status_label = f"{t.tool_error}err{t.reset}"
 
-        tool_name_display = f"{BRIGHT_MAGENTA}{entry.toolName}{RESET}"
-        label = f"{ACCENT2}{ICON_TOOL}{RESET} {MAGENTA}{BOLD}tool{RESET} {tool_name_display} {status_label}"
+        tool_name_display = f"{t.tool}{t.bold}{entry.toolName}{t.reset}"
+
+        # Determine expand/collapse toggle text
+        body_lines = entry.body.split("\n") if entry.body else []
+        total_lines = len(body_lines)
+        collapsible_by_lines = total_lines > _TOOL_PREVIEW_LINES
+        collapsible_by_chars = any(
+            len(ln) > _TOOL_PREVIEW_CHARS
+            for ln in body_lines[:_TOOL_PREVIEW_LINES]
+        )
+        can_toggle = collapsible_by_lines or collapsible_by_chars
+
+        is_collapsed = entry.collapsed or entry.collapsePhase is not None
+
+        if can_toggle:
+            toggle_text = (
+                f"  {t.expandable}{t.bold}[收起]{t.reset}"
+                if not is_collapsed
+                else f"  {t.expandable}{t.bold}[展开]{t.reset}"
+            )
+        else:
+            toggle_text = ""
+
+        label = (
+            f"{t.tool}{t.bold}▌ tool{t.reset} {tool_name_display}"
+            f" {status_label}{toggle_text}"
+        )
 
         if entry.status == "running":
             body = entry.body
-        elif entry.collapsed:
-            body = f"{SUBTLE}{ITALIC}{entry.collapsedSummary or 'output collapsed'}{RESET}"
-        elif entry.collapsePhase:
-            dots = f"{ACCENT}{ICON_DOT}{RESET}" * (entry.collapsePhase or 0)
-            body = f"{SUBTLE}collapsing{dots}{RESET}"
+        elif is_collapsed:
+            summary = entry.collapsedSummary or "output collapsed"
+            body = f"{t.subtle}{t.italic}{summary}{t.reset}"
         else:
-            body = preview_tool_body(
-                entry.toolName or "", render_markdownish(entry.body)
-            )
+            # Show preview (matches Rust's collapsed_preview_len = TOOL_PREVIEW_LINES)
+            if collapsible_by_lines:
+                preview = "\n".join(body_lines[:_TOOL_PREVIEW_LINES])
+                hidden = total_lines - _TOOL_PREVIEW_LINES
+                body = (
+                    preview_tool_body(entry.toolName or "", render_markdownish(preview))
+                    + f"\n{t.subtle}  ... {hidden} more lines{t.reset}"
+                )
+            else:
+                body = preview_tool_body(
+                    entry.toolName or "", render_markdownish(entry.body)
+                )
 
         return f"{label}\n{_indent_block(body)}"
 
@@ -85,7 +128,6 @@ def _render_transcript_entry(entry: TranscriptEntry) -> str:
 
 
 def get_transcript_window_size(window_size: int | None = None) -> int:
-    """Calculate the number of lines to display in the transcript window."""
     if window_size is not None:
         return max(4, window_size)
     _, rows = _cached_terminal_size()
@@ -95,11 +137,9 @@ def get_transcript_window_size(window_size: int | None = None) -> int:
 # ---------------------------------------------------------------------------
 # Per-entry rendering cache
 # ---------------------------------------------------------------------------
-# Uses object id + content fingerprint for fast cache lookup.
-# Cache is periodically pruned to avoid unbounded growth.
 
 _entry_cache: dict[int, tuple[tuple, list[str]]] = {}
-_CACHE_MAX_SIZE = 500  # prune when exceeding this
+_CACHE_MAX_SIZE = 500
 
 
 def _get_entry_lines(entry: TranscriptEntry) -> list[str]:
@@ -120,7 +160,6 @@ def _get_entry_lines(entry: TranscriptEntry) -> list[str]:
 
     lines = _render_transcript_entry(entry).split("\n")
 
-    # Prune cache if too large (remove oldest half)
     if len(_entry_cache) > _CACHE_MAX_SIZE:
         keys = list(_entry_cache.keys())
         for k in keys[: len(keys) // 2]:
@@ -131,14 +170,13 @@ def _get_entry_lines(entry: TranscriptEntry) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Per-entry line count cache (lightweight — avoids full render for counting)
+# Per-entry line count cache
 # ---------------------------------------------------------------------------
 
 _line_count_cache: dict[int, tuple[tuple, int]] = {}
 
 
 def _get_entry_line_count(entry: TranscriptEntry) -> int:
-    """Get the number of rendered lines for an entry (uses cache, avoids full render if possible)."""
     state = (
         entry.kind,
         entry.body,
@@ -150,19 +188,16 @@ def _get_entry_line_count(entry: TranscriptEntry) -> int:
     )
     entry_id = id(entry)
 
-    # Check line-count cache first
     cached_lc = _line_count_cache.get(entry_id)
     if cached_lc is not None and cached_lc[0] == state:
         return cached_lc[1]
 
-    # Check full render cache — if we already have rendered lines, just count
     cached_full = _entry_cache.get(entry_id)
     if cached_full is not None and cached_full[0] == state:
         count = len(cached_full[1])
         _line_count_cache[entry_id] = (state, count)
         return count
 
-    # Fall back to full render (will also populate _entry_cache)
     lines = _get_entry_lines(entry)
     count = len(lines)
     _line_count_cache[entry_id] = (state, count)
@@ -170,11 +205,10 @@ def _get_entry_line_count(entry: TranscriptEntry) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Windowed transcript rendering — O(visible) instead of O(N)
+# Windowed transcript rendering — O(visible)
 # ---------------------------------------------------------------------------
 
 def _compute_total_lines(entries: list[TranscriptEntry]) -> int:
-    """Compute total line count across all entries including separators."""
     if not entries:
         return 0
     total = 0
@@ -190,7 +224,6 @@ def _render_visible_window(
     start_line: int,
     end_line: int,
 ) -> list[str]:
-    """Only render entries that intersect with the visible [start_line, end_line) range."""
     if not entries:
         return []
 
@@ -198,12 +231,10 @@ def _render_visible_window(
     current_line = 0
 
     for i, entry in enumerate(entries):
-        # Separator before entry (except the first)
         if i > 0:
             sep_start = current_line
             sep_end = current_line + _SEPARATOR_LINE_COUNT
             if sep_start < end_line and sep_end > start_line:
-                # This separator is visible (at least partially)
                 vis_start = max(0, start_line - sep_start)
                 vis_end = min(_SEPARATOR_LINE_COUNT, end_line - sep_start)
                 result.extend(_SEPARATOR_LINES[vis_start:vis_end])
@@ -211,13 +242,11 @@ def _render_visible_window(
             if current_line >= end_line:
                 break
 
-        # Entry lines
         entry_line_count = _get_entry_line_count(entry)
         entry_start = current_line
         entry_end = current_line + entry_line_count
 
         if entry_start < end_line and entry_end > start_line:
-            # This entry is visible (at least partially) — now render it
             lines = _get_entry_lines(entry)
             vis_start = max(0, start_line - entry_start)
             vis_end = min(entry_line_count, end_line - entry_start)
@@ -233,7 +262,6 @@ def _render_visible_window(
 def get_transcript_max_scroll_offset(
     entries: list[TranscriptEntry], window_size: int | None = None
 ) -> int:
-    """Calculate the maximum possible scroll offset. O(N) in entry count but NOT in line rendering."""
     if not entries:
         return 0
     total = _compute_total_lines(entries)
@@ -244,7 +272,8 @@ def get_transcript_max_scroll_offset(
 def render_transcript(
     entries: list[TranscriptEntry], scroll_offset: int, window_size: int | None = None
 ) -> str:
-    """Render a windowed view of the transcript. Only renders visible entries — O(visible)."""
+    """Render a windowed view of the transcript. O(visible)."""
+    t = theme()
     if not entries:
         return ""
 
@@ -253,29 +282,33 @@ def render_transcript(
     max_offset = max(0, total_lines - ws)
     offset = max(0, min(scroll_offset, max_offset))
 
-    # Calculate the visible line range (scroll_offset=0 means bottom)
-    end = total_lines - offset
-    start = max(0, end - ws)
+    if offset == 0:
+        # No scroll indicator needed — use full window
+        end = total_lines
+        start = max(0, end - ws)
+        visible_lines = _render_visible_window(entries, start, end)
+        return "\n".join(visible_lines)
 
+    # Reserve 1 line for the scroll indicator so the panel stays within bounds
+    content_ws = max(1, ws - 1)
+    end = total_lines - offset
+    start = max(0, end - content_ws)
     visible_lines = _render_visible_window(entries, start, end)
     body = "\n".join(visible_lines)
 
-    if offset == 0:
-        return body
-
-    return f"{body}\n\n{SUBTLE}  {ICON_DIVIDER * 2} scroll {offset}/{max_offset} {ICON_DIVIDER * 2}{RESET}"
+    return (
+        f"{body}\n"
+        f"{t.subtle}  {ICON_DIVIDER * 2} scroll {offset}/{max_offset} "
+        f"(PgUp/PgDn or scroll){ICON_DIVIDER * 2}{t.reset}"
+    )
 
 
 # ---------------------------------------------------------------------------
-# Legacy full-render API (kept for backward compat, e.g. tty_app imports)
+# Legacy full-render API (backward compat)
 # ---------------------------------------------------------------------------
 
 def _render_transcript_lines(entries: list[TranscriptEntry]) -> list[str]:
-    """Render all entries into a list of lines with decorative separators.
-    
-    NOTE: This is kept for backward compatibility. Prefer render_transcript()
-    which uses windowed rendering.
-    """
+    """Render all entries into lines with separators. Kept for backward compat."""
     all_lines: list[str] = []
     for i, entry in enumerate(entries):
         if i > 0:
@@ -285,7 +318,7 @@ def _render_transcript_lines(entries: list[TranscriptEntry]) -> list[str]:
 
 
 def format_transcript_text(entries: list[TranscriptEntry]) -> str:
-    """Format transcript entries as plain text (no ANSI) for saving to file."""
+    """Format transcript entries as plain text (no ANSI) for file saving."""
     parts = []
     for entry in entries:
         label = "you" if entry.kind == "user" else entry.kind

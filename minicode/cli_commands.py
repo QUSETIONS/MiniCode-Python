@@ -40,6 +40,7 @@ SLASH_COMMANDS = [
     SlashCommand("/mcp", "/mcp", "Show configured MCP servers and connection state."),
     SlashCommand("/permissions", "/permissions", "Show mini-code permission storage path."),
     SlashCommand("/exit", "/exit", "Exit mini-code."),
+    SlashCommand("/debug", "/debug", "Show scroll and terminal diagnostics."),
     SlashCommand("/ls", "/ls [path]", "List files in a directory."),
     SlashCommand("/grep", "/grep <pattern>::[path]", "Search text in files."),
     SlashCommand("/read", "/read <path>", "Read a file directly."),
