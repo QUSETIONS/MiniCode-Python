@@ -101,6 +101,16 @@ minicode-py
 
 ---
 
+## 🔗 相关项目
+
+| 版本 | 仓库 | 说明 |
+|------|------|------|
+| **主仓库** | [LiuMengxuan04/MiniCode](https://github.com/LiuMengxuan04/MiniCode) | TypeScript 原版，项目主入口 |
+| **Rust 版** | [harkerhand/MiniCode-rs](https://github.com/harkerhand/MiniCode-rs) | Rust 高性能实现 |
+| **Python 版** | 本仓库 | 零依赖 Python 实现 |
+
+---
+
 ## 🎯 核心特性
 
 - **🖥️ 丰富的终端 UI** — 备用屏幕 TUI，面板、ANSI 样式、平滑滚动
@@ -272,6 +282,16 @@ source ~/.bashrc
 minicode-py
 ```
 </details>
+
+---
+
+## 🔗 Related Projects
+
+| Version | Repository | Description |
+|---------|-----------|-------------|
+| **Main repo** | [LiuMengxuan04/MiniCode](https://github.com/LiuMengxuan04/MiniCode) | TypeScript original, project entry point |
+| **Rust version** | [harkerhand/MiniCode-rs](https://github.com/harkerhand/MiniCode-rs) | High-performance Rust implementation |
+| **Python version** | This repo | Zero-dependency Python implementation |
 
 ---
 
