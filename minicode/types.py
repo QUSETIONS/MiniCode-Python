@@ -44,5 +44,5 @@ class AgentStep:
 
 
 class ModelAdapter(Protocol):
-    def next(self, messages: list[ChatMessage]) -> AgentStep: ...
+    def next(self, messages: list[ChatMessage], on_stream_chunk: Callable[[str], None] | None = None) -> AgentStep: ...
 

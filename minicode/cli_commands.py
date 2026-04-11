@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from minicode.poly_commands import create_builtin_commands, CommandRegistry
 from minicode.config import (
     CLAUDE_SETTINGS_PATH,
     MINI_CODE_MCP_PATH,
@@ -23,6 +22,7 @@ class SlashCommand:
 SLASH_COMMANDS = [
     SlashCommand("/help", "/help", "Show available slash commands."),
     SlashCommand("/tools", "/tools", "List tools available to the coding agent and tool shortcuts."),
+    SlashCommand("/state", "/state", "Show detailed application state and Store summary."),
     SlashCommand("/status", "/status", "Show application state summary and current model."),
     SlashCommand("/cost", "/cost [--detailed]", "Show API cost and usage report."),
     SlashCommand("/context", "/context", "Show context window usage."),
@@ -41,6 +41,7 @@ SLASH_COMMANDS = [
     SlashCommand("/permissions", "/permissions", "Show mini-code permission storage path."),
     SlashCommand("/exit", "/exit", "Exit mini-code."),
     SlashCommand("/debug", "/debug", "Show scroll and terminal diagnostics."),
+    SlashCommand("/user", "/user", "Show or manage user profile (preferences, coding style)."),
     SlashCommand("/ls", "/ls [path]", "List files in a directory."),
     SlashCommand("/grep", "/grep <pattern>::[path]", "Search text in files."),
     SlashCommand("/read", "/read <path>", "Read a file directly."),
@@ -75,6 +76,7 @@ def format_slash_commands() -> str:
         "📊 Status & Info": [
             ("/status", "Show application state summary"),
             ("/model", "Show or change current model"),
+            ("/user", "Show or manage user profile"),
             ("/cost", "Show API cost and usage report"),
             ("/context", "Show context window usage"),
             ("/tasks", "Show current task list"),
@@ -154,6 +156,13 @@ def try_handle_local_command(user_input: str, tools=None) -> str | None:
         from minicode.config import format_config_diagnostic
         return format_config_diagnostic()
 
+    if user_input == "/state":
+        try:
+            from minicode.state import handle_state_command
+            return handle_state_command()
+        except ImportError:
+            return "State system not available. Please ensure state.py exists."
+
     if user_input == "/memory":
         # Memory system display
         try:
@@ -217,12 +226,25 @@ def try_handle_local_command(user_input: str, tools=None) -> str | None:
             runtime = load_runtime_config()
         except Exception as error:  # noqa: BLE001
             return f"runtime not configured: {error}"
-        auth = "ANTHROPIC_AUTH_TOKEN" if runtime.get("authToken") else "ANTHROPIC_API_KEY"
+        from minicode.model_registry import detect_provider
+        provider = detect_provider(runtime["model"], runtime)
+        auth_methods = []
+        if runtime.get("authToken"):
+            auth_methods.append("ANTHROPIC_AUTH_TOKEN")
+        if runtime.get("apiKey"):
+            auth_methods.append("ANTHROPIC_API_KEY")
+        if runtime.get("openaiApiKey"):
+            auth_methods.append("OPENAI_API_KEY")
+        if runtime.get("openrouterApiKey"):
+            auth_methods.append("OPENROUTER_API_KEY")
+        if runtime.get("customApiKey"):
+            auth_methods.append("CUSTOM_API_KEY")
         return "\n".join(
             [
                 f"model: {runtime['model']}",
+                f"provider: {provider.value}",
                 f"baseUrl: {runtime['baseUrl']}",
-                f"auth: {auth}",
+                f"auth: {', '.join(auth_methods) or 'none'}",
                 f"mcp servers: {len(runtime.get('mcpServers', {}))}",
                 runtime["sourceSummary"],
             ]
@@ -231,15 +253,39 @@ def try_handle_local_command(user_input: str, tools=None) -> str | None:
     if user_input == "/model":
         try:
             runtime = load_runtime_config()
+            from minicode.model_registry import format_model_status
+            return format_model_status(runtime["model"], runtime)
         except Exception as error:  # noqa: BLE001
             return f"runtime not configured: {error}"
-        return f"current model: {runtime['model']}"
 
     if user_input.startswith("/model "):
-        model = user_input[len("/model ") :].strip()
-        if not model:
-            return "usage: /model <model-name>"
-        save_mini_code_settings({"model": model})
-        return f"saved model={model} to {MINI_CODE_SETTINGS_PATH}"
+        arg = user_input[len("/model "):].strip()
+        if not arg:
+            from minicode.model_registry import format_model_list
+            return format_model_list()
+        # Subcommands
+        if arg in ("status", "info"):
+            try:
+                runtime = load_runtime_config()
+                from minicode.model_registry import format_model_status
+                return format_model_status(runtime["model"], runtime)
+            except Exception as error:  # noqa: BLE001
+                return f"runtime not configured: {error}"
+        if arg in ("list", "ls"):
+            from minicode.model_registry import format_model_list
+            return format_model_list()
+        # Provider filter: /model anthropic, /model openrouter, etc.
+        from minicode.model_registry import Provider, format_model_list
+        for p in Provider:
+            if arg.lower() == p.value:
+                return format_model_list(provider=p)
+        # Otherwise: set model name
+        save_mini_code_settings({"model": arg})
+        return f"saved model={arg} to {MINI_CODE_SETTINGS_PATH}\nRestart MiniCode for the change to take effect."
+
+    if user_input == "/user" or user_input.startswith("/user "):
+        from minicode.user_profile import handle_user_command
+        args = user_input[len("/user"):].strip()
+        return handle_user_command(args)
 
     return None

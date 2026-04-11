@@ -19,7 +19,7 @@ def _latest_assistant_call(messages):
 
 
 class MockModelAdapter:
-    def next(self, messages):
+    def next(self, messages, on_stream_chunk=None):
         tool_message = _last_tool_message(messages)
         if tool_message and tool_message["role"] == "tool_result":
             last_call = _latest_assistant_call(messages)

@@ -51,12 +51,19 @@ def _list_skill_dirs(root: Path, source: str) -> list[LoadedSkill]:
         return []
     results: list[LoadedSkill] = []
     for entry in root.iterdir():
-        if not entry.is_dir():
+        try:
+            if not entry.is_dir():
+                continue
+        except OSError:
+            # Windows: untrusted mount points, broken symlinks, etc.
             continue
         skill_path = entry / "SKILL.md"
         if not skill_path.exists():
             continue
-        content = skill_path.read_text(encoding="utf-8")
+        try:
+            content = skill_path.read_text(encoding="utf-8")
+        except OSError:
+            continue
         results.append(
             LoadedSkill(
                 name=entry.name,

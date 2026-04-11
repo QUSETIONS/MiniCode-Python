@@ -12,7 +12,13 @@ MINI_CODE_SETTINGS_PATH = MINI_CODE_DIR / "settings.json"
 MINI_CODE_HISTORY_PATH = MINI_CODE_DIR / "history.json"
 MINI_CODE_PERMISSIONS_PATH = MINI_CODE_DIR / "permissions.json"
 MINI_CODE_MCP_PATH = MINI_CODE_DIR / "mcp.json"
+MINI_CODE_USER_PROFILE_PATH = MINI_CODE_DIR / "USER.md"
 CLAUDE_SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
+
+
+def project_user_profile_path(cwd: str | Path | None = None) -> Path:
+    """Return the project-level USER.md path."""
+    return Path(cwd or Path.cwd()) / ".mini-code" / "USER.md"
 
 # 已知的合法模型名称（用于拼写检查提示）
 KNOWN_MODELS = [
@@ -22,6 +28,22 @@ KNOWN_MODELS = [
     "gpt-4o",
     "gpt-4o-mini",
     "gpt-4-turbo",
+    "o1",
+    "o1-mini",
+    "o3-mini",
+    # OpenRouter popular models
+    "openrouter/auto",
+    "anthropic/claude-sonnet-4",
+    "anthropic/claude-opus-4",
+    "openai/gpt-4o",
+    "openai/gpt-4o-mini",
+    "google/gemini-2.5-pro",
+    "google/gemini-2.5-flash",
+    "meta-llama/llama-4-maverick",
+    "deepseek/deepseek-r1",
+    "deepseek/deepseek-chat",
+    "qwen/qwen3-235b-a22b",
+    "minimax/minimax-m1",
 ]
 
 
@@ -121,9 +143,40 @@ def load_runtime_config(cwd: str | Path | None = None) -> dict[str, Any]:
         or effective.get("model")
         or str(env.get("ANTHROPIC_MODEL", "")).strip()
     )
+
+    # --- Provider-specific base URLs ---
+    # Anthropic
     base_url = str(env.get("ANTHROPIC_BASE_URL", "")).strip() or "https://api.anthropic.com"
     auth_token = str(env.get("ANTHROPIC_AUTH_TOKEN", "")).strip() or None
     api_key = str(env.get("ANTHROPIC_API_KEY", "")).strip() or None
+
+    # OpenAI
+    openai_base_url = (
+        str(env.get("OPENAI_BASE_URL", "")).strip()
+        or str(env.get("OPENAI_API_BASE", "")).strip()
+        or effective.get("openaiBaseUrl", "")
+        or "https://api.openai.com"
+    )
+    openai_api_key = str(env.get("OPENAI_API_KEY", "")).strip() or effective.get("openaiApiKey", "")
+
+    # OpenRouter
+    openrouter_base_url = (
+        str(env.get("OPENROUTER_BASE_URL", "")).strip()
+        or "https://openrouter.ai/api"
+    )
+    openrouter_api_key = str(env.get("OPENROUTER_API_KEY", "")).strip()
+
+    # Custom endpoint
+    custom_base_url = (
+        str(env.get("CUSTOM_API_BASE_URL", "")).strip()
+        or effective.get("customBaseUrl", "")
+    )
+    custom_api_key = (
+        str(env.get("CUSTOM_API_KEY", "")).strip()
+        or effective.get("customApiKey", "")
+        or openai_api_key
+    )
+
     raw_max_output_tokens = (
         os.environ.get("MINI_CODE_MAX_OUTPUT_TOKENS")
         or effective.get("maxOutputTokens")
@@ -138,20 +191,50 @@ def load_runtime_config(cwd: str | Path | None = None) -> dict[str, Any]:
         except (TypeError, ValueError):
             max_output_tokens = None
 
+    # Validate: at least one auth method must be available
+    has_auth = any([
+        auth_token, api_key, openai_api_key, openrouter_api_key, custom_api_key,
+    ])
     if not model:
         raise RuntimeError("No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.")
-    if not auth_token and not api_key:
+    if not has_auth:
         raise RuntimeError(
-            "No auth configured. Set ANTHROPIC_AUTH_TOKEN or ANTHROPIC_API_KEY."
+            "No auth configured. Set one of: ANTHROPIC_API_KEY, OPENAI_API_KEY, "
+            "OPENROUTER_API_KEY, or CUSTOM_API_KEY."
         )
+
+    # --- User profile paths ---
+    global_user_profile = MINI_CODE_USER_PROFILE_PATH
+    proj_user_profile = project_user_profile_path(cwd)
+
+    # --- User preferences from settings (lightweight, not from USER.md) ---
+    user_preferences = effective.get("userPreferences", {})
+    response_language = (
+        str(env.get("MINI_CODE_LANGUAGE", "")).strip()
+        or user_preferences.get("language", "")
+    )
+    response_verbosity = (
+        str(env.get("MINI_CODE_VERBOSITY", "")).strip()
+        or user_preferences.get("verbosity", "")
+    )
 
     return {
         "model": model,
         "baseUrl": base_url,
         "authToken": auth_token,
         "apiKey": api_key,
+        "openaiBaseUrl": openai_base_url,
+        "openaiApiKey": openai_api_key,
+        "openrouterBaseUrl": openrouter_base_url,
+        "openrouterApiKey": openrouter_api_key,
+        "customBaseUrl": custom_base_url,
+        "customApiKey": custom_api_key,
         "maxOutputTokens": max_output_tokens,
         "mcpServers": effective.get("mcpServers", {}),
+        "globalUserProfilePath": str(global_user_profile),
+        "projectUserProfilePath": str(proj_user_profile),
+        "responseLanguage": response_language,
+        "responseVerbosity": response_verbosity,
         "sourceSummary": f"config: {MINI_CODE_SETTINGS_PATH} > {CLAUDE_SETTINGS_PATH} > process.env",
     }
 
@@ -228,8 +311,11 @@ def validate_config(cwd: str | Path | None = None) -> tuple[bool, list[str]]:
             help_msg = (
                 f"Error: {error_msg}\n\n"
                 "How to fix:\n"
-                "  1. Set API key: export ANTHROPIC_API_KEY=sk-ant-...\n"
-                "  2. Or edit ~/.mini-code/settings.json:\n"
+                "  1. Anthropic:  export ANTHROPIC_API_KEY=sk-ant-...\n"
+                "  2. OpenAI:     export OPENAI_API_KEY=sk-...\n"
+                "  3. OpenRouter: export OPENROUTER_API_KEY=sk-or-...\n"
+                "  4. Custom:     export CUSTOM_API_KEY=... + CUSTOM_API_BASE_URL=...\n"
+                "  5. Or edit ~/.mini-code/settings.json:\n"
                 '     {"env": {"ANTHROPIC_API_KEY": "sk-ant-..."}}\n'
             )
             errors.append(help_msg)
@@ -264,14 +350,52 @@ def format_config_diagnostic(cwd: str | Path | None = None) -> str:
     # 显示当前配置摘要
     try:
         config = load_runtime_config(cwd)
+        model_name = config.get('model', 'not set')
         lines.append("")
         lines.append("Current Configuration")
         lines.append("-" * 40)
-        lines.append(f"  Model: {config.get('model', 'not set')}")
+        lines.append(f"  Model: {model_name}")
+
+        # Show provider info
+        from minicode.model_registry import detect_provider, Provider
+        provider = detect_provider(model_name, config)
+        lines.append(f"  Provider: {provider.value}")
+
         lines.append(f"  Base URL: {config.get('baseUrl', 'not set')}")
-        auth_method = "ANTHROPIC_AUTH_TOKEN" if config.get("authToken") else ("ANTHROPIC_API_KEY" if config.get("apiKey") else "not set")
-        lines.append(f"  Auth: {auth_method}")
+        if config.get('openaiBaseUrl') and provider in (Provider.OPENAI, Provider.OPENROUTER, Provider.CUSTOM):
+            lines.append(f"  OpenAI Base URL: {config.get('openaiBaseUrl')}")
+        if config.get('openrouterApiKey'):
+            lines.append(f"  OpenRouter: configured")
+        if config.get('customBaseUrl'):
+            lines.append(f"  Custom Base URL: {config.get('customBaseUrl')}")
+
+        auth_methods = []
+        if config.get("authToken"):
+            auth_methods.append("ANTHROPIC_AUTH_TOKEN")
+        if config.get("apiKey"):
+            auth_methods.append("ANTHROPIC_API_KEY")
+        if config.get("openaiApiKey"):
+            auth_methods.append("OPENAI_API_KEY")
+        if config.get("openrouterApiKey"):
+            auth_methods.append("OPENROUTER_API_KEY")
+        if config.get("customApiKey"):
+            auth_methods.append("CUSTOM_API_KEY")
+        lines.append(f"  Auth: {', '.join(auth_methods) or 'none'}")
         lines.append(f"  MCP Servers: {len(config.get('mcpServers', {}))}")
+
+        # User profile info
+        global_profile_path = config.get('globalUserProfilePath', '')
+        project_profile_path = config.get('projectUserProfilePath', '')
+        if global_profile_path:
+            gp_exists = Path(global_profile_path).exists()
+            lines.append(f"  Global Profile: {global_profile_path} ({'exists' if gp_exists else 'not found'})")
+        if project_profile_path:
+            pp_exists = Path(project_profile_path).exists()
+            lines.append(f"  Project Profile: {project_profile_path} ({'exists' if pp_exists else 'not found'})")
+        if config.get('responseLanguage'):
+            lines.append(f"  Response Language: {config.get('responseLanguage')}")
+        if config.get('responseVerbosity'):
+            lines.append(f"  Response Verbosity: {config.get('responseVerbosity')}")
     except Exception:
         pass
     

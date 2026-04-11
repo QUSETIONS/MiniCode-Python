@@ -109,6 +109,15 @@ def build_system_prompt(
         "Do not choose subjective preferences such as colors, visual style, copy tone, or naming unless the user explicitly told you to decide yourself.",
         "When using read_file, pay attention to the header fields. If it says TRUNCATED: yes, continue reading with a larger offset before concluding that the file itself is cut off.",
         "If the user names a skill or clearly asks for a workflow that matches a listed skill, call load_skill before following it.",
+        "",
+        "## Sub-agent (task tool) usage guide",
+        "You have access to the 'task' tool which can spawn sub-agents for complex work. Use it when:",
+        "- You need to explore a large codebase without bloating the main context (agent_type='explore')",
+        "- You need thorough analysis of a codebase area before acting (agent_type='plan')",
+        "- You need to do multi-step work that benefits from isolation (agent_type='general')",
+        "Do NOT use the task tool for simple lookups — use read_file/grep_files directly.",
+        "Do NOT use the task tool just to avoid work — use it when it genuinely improves efficiency.",
+        "",
         "Structured response protocol:",
         "- When you are still working and will continue with more tool calls, start your text with <progress>.",
         "- Only when the task is actually complete and you are ready to hand control back, start your text with <final>.",
@@ -189,4 +198,25 @@ def build_system_prompt(
     if project_claude_md:
         parts.append(f"Project instructions from {cwd_path / 'CLAUDE.md'}:\n{project_claude_md}")
 
-    return "\n\n".join(parts)
+    # Inject user profile from USER.md
+    try:
+        from minicode.user_profile import UserProfileManager
+        profile_manager = UserProfileManager(cwd=cwd)
+        merged_profile = profile_manager.load_merged()
+        profile_section = profile_manager.to_prompt_section(merged_profile)
+        if profile_section:
+            parts.append(profile_section)
+    except Exception:
+        pass  # User profile is optional, don't fail if unavailable
+
+    result = "\n\n".join(parts)
+    
+    # Inject memory context if available
+    try:
+        from minicode.memory import MemoryManager, inject_memory_into_prompt
+        memory_manager = MemoryManager(workspace=cwd)
+        result = inject_memory_into_prompt(result, memory_manager)
+    except Exception:
+        pass  # Memory injection is optional, don't fail if unavailable
+    
+    return result

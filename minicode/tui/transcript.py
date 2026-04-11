@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from .chrome import (
     _cached_terminal_size,
@@ -45,25 +45,25 @@ def preview_tool_body(tool_name: str, body: str) -> str:
 def _render_transcript_entry(entry: TranscriptEntry) -> str:
     """Render a single TranscriptEntry with Morandi theme colors.
 
-    Tool entries follow the Rust [展开]/[收起] toggle pattern:
-    - expanded=False → show preview lines + [展开] label
-    - expanded=True  → show full output + [收起] label
+    Tool entries follow the Rust [灞曞紑]/[鏀惰捣] toggle pattern:
+    - expanded=False 鈫?show preview lines + [灞曞紑] label
+    - expanded=True  鈫?show full output + [鏀惰捣] label
     The ``collapsed`` / ``collapsePhase`` fields drive the display:
-      collapsed=True  → entry was auto-collapsed after completion
-      collapsePhase   → animation step (kept for compat, treated as collapsed)
+      collapsed=True  鈫?entry was auto-collapsed after completion
+      collapsePhase   鈫?animation step (kept for compat, treated as collapsed)
     """
     t = theme()
 
     if entry.kind == "user":
-        label = f"{t.user}{t.bold}▌ you{t.reset}"
+        label = f"{t.user}{t.bold}鈻?you{t.reset}"
         return f"{label}\n{_indent_block(entry.body)}"
 
     if entry.kind == "assistant":
-        label = f"{t.assistant}{t.bold}▌ assistant{t.reset}"
+        label = f"{t.assistant}{t.bold}鈻?assistant{t.reset}"
         return f"{label}\n{_indent_block(render_markdownish(entry.body))}"
 
     if entry.kind == "progress":
-        label = f"{t.progress}{t.bold}▌ progress{t.reset}"
+        label = f"{t.progress}{t.bold}鈻?progress{t.reset}"
         return f"{label}\n{_indent_block(render_markdownish(entry.body))}"
 
     if entry.kind == "tool":
@@ -85,26 +85,41 @@ def _render_transcript_entry(entry: TranscriptEntry) -> str:
             len(ln) > _TOOL_PREVIEW_CHARS
             for ln in body_lines[:_TOOL_PREVIEW_LINES]
         )
-        can_toggle = collapsible_by_lines or collapsible_by_chars
-
-        is_collapsed = entry.collapsed or entry.collapsePhase is not None
+        is_collapsed = entry.collapsed or entry.collapsePhase == 3
+        is_collapsing = entry.collapsePhase in (1, 2)
+        can_toggle = collapsible_by_lines or collapsible_by_chars or is_collapsing
 
         if can_toggle:
-            toggle_text = (
-                f"  {t.expandable}{t.bold}[收起]{t.reset}"
-                if not is_collapsed
-                else f"  {t.expandable}{t.bold}[展开]{t.reset}"
-            )
+            if is_collapsing:
+                toggle_text = f"  {t.expandable}{t.bold}[collapsing]{t.reset}"
+            else:
+                toggle_text = (
+                    f"  {t.expandable}{t.bold}[鏀惰捣]{t.reset}"
+                    if not is_collapsed
+                    else f"  {t.expandable}{t.bold}[灞曞紑]{t.reset}"
+                )
         else:
             toggle_text = ""
 
         label = (
-            f"{t.tool}{t.bold}▌ tool{t.reset} {tool_name_display}"
+            f"{t.tool}{t.bold}鈻?tool{t.reset} {tool_name_display}"
             f" {status_label}{toggle_text}"
         )
 
         if entry.status == "running":
             body = entry.body
+        elif is_collapsing:
+            if collapsible_by_lines:
+                preview = "\n".join(body_lines[:_TOOL_PREVIEW_LINES])
+                hidden = max(0, total_lines - _TOOL_PREVIEW_LINES)
+                body = (
+                    preview_tool_body(entry.toolName or "", render_markdownish(preview))
+                    + (f"\n{t.subtle}  ... {hidden} more lines{t.reset}" if hidden > 0 else "")
+                )
+            else:
+                body = preview_tool_body(
+                    entry.toolName or "", render_markdownish(entry.body)
+                )
         elif is_collapsed:
             summary = entry.collapsedSummary or "output collapsed"
             body = f"{t.subtle}{t.italic}{summary}{t.reset}"
@@ -135,15 +150,23 @@ def get_transcript_window_size(window_size: int | None = None) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Per-entry rendering cache
+# Per-entry rendering cache (content-hash based)
 # ---------------------------------------------------------------------------
 
-_entry_cache: dict[int, tuple[tuple, list[str]]] = {}
+# Use content hash as cache key instead of id(entry) for better stability.
+# This avoids issues when Python recycles object IDs for new entries.
+_entry_cache: dict[int, list[str]] = {}
+_line_count_cache: dict[int, int] = {}
 _CACHE_MAX_SIZE = 500
 
 
-def _get_entry_lines(entry: TranscriptEntry) -> list[str]:
-    state = (
+def _entry_state_hash(entry: TranscriptEntry) -> int:
+    """Compute a stable hash from entry state for cache key.
+    
+    Uses a tuple of all display-relevant fields, which is faster
+    than serializing and hashing the entire content.
+    """
+    return hash((
         entry.kind,
         entry.body,
         entry.status,
@@ -151,12 +174,15 @@ def _get_entry_lines(entry: TranscriptEntry) -> list[str]:
         entry.collapsePhase,
         entry.collapsedSummary,
         entry.toolName,
-    )
+    ))
 
-    entry_id = id(entry)
-    cached = _entry_cache.get(entry_id)
-    if cached is not None and cached[0] == state:
-        return cached[1]
+
+def _get_entry_lines(entry: TranscriptEntry) -> list[str]:
+    state_hash = _entry_state_hash(entry)
+    
+    cached = _entry_cache.get(state_hash)
+    if cached is not None:
+        return cached
 
     lines = _render_transcript_entry(entry).split("\n")
 
@@ -164,48 +190,35 @@ def _get_entry_lines(entry: TranscriptEntry) -> list[str]:
         keys = list(_entry_cache.keys())
         for k in keys[: len(keys) // 2]:
             del _entry_cache[k]
+            _line_count_cache.pop(k, None)
 
-    _entry_cache[entry_id] = (state, lines)
+    _entry_cache[state_hash] = lines
     return lines
 
 
-# ---------------------------------------------------------------------------
-# Per-entry line count cache
-# ---------------------------------------------------------------------------
-
-_line_count_cache: dict[int, tuple[tuple, int]] = {}
-
-
 def _get_entry_line_count(entry: TranscriptEntry) -> int:
-    state = (
-        entry.kind,
-        entry.body,
-        entry.status,
-        entry.collapsed,
-        entry.collapsePhase,
-        entry.collapsedSummary,
-        entry.toolName,
-    )
-    entry_id = id(entry)
+    state_hash = _entry_state_hash(entry)
 
-    cached_lc = _line_count_cache.get(entry_id)
-    if cached_lc is not None and cached_lc[0] == state:
-        return cached_lc[1]
+    cached_lc = _line_count_cache.get(state_hash)
+    if cached_lc is not None:
+        return cached_lc
 
-    cached_full = _entry_cache.get(entry_id)
-    if cached_full is not None and cached_full[0] == state:
-        count = len(cached_full[1])
-        _line_count_cache[entry_id] = (state, count)
+    # Check if we already have the full rendering cached
+    cached_full = _entry_cache.get(state_hash)
+    if cached_full is not None:
+        count = len(cached_full)
+        _line_count_cache[state_hash] = count
         return count
 
+    # Need to render to count lines
     lines = _get_entry_lines(entry)
     count = len(lines)
-    _line_count_cache[entry_id] = (state, count)
+    _line_count_cache[state_hash] = count
     return count
 
 
 # ---------------------------------------------------------------------------
-# Windowed transcript rendering — O(visible)
+# Windowed transcript rendering 鈥?O(visible)
 # ---------------------------------------------------------------------------
 
 def _compute_total_lines(entries: list[TranscriptEntry]) -> int:
@@ -283,7 +296,7 @@ def render_transcript(
     offset = max(0, min(scroll_offset, max_offset))
 
     if offset == 0:
-        # No scroll indicator needed — use full window
+        # No scroll indicator needed 鈥?use full window
         end = total_lines
         start = max(0, end - ws)
         visible_lines = _render_visible_window(entries, start, end)
@@ -328,3 +341,4 @@ def format_transcript_text(entries: list[TranscriptEntry]) -> str:
         indented = "\n".join("  " + line for line in entry.body.splitlines())
         parts.append(f"{label}\n{indented}")
     return "\n\n---\n\n".join(parts)
+

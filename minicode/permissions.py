@@ -3,10 +3,14 @@ from __future__ import annotations
 import json
 import os
 import sys
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Literal
 
 from minicode.config import MINI_CODE_PERMISSIONS_PATH
+
+# Auto mode integration
+from minicode.auto_mode import AutoModeChecker, PermissionMode, RiskLevel, get_checker, get_mode_state
 
 # 权限决策类型 — 对齐 TS 版 PermissionDecision
 PermissionDecision = Literal[
@@ -22,8 +26,32 @@ PermissionDecision = Literal[
 PromptHandler = Callable[[dict[str, Any]], dict[str, Any]]
 
 
+# ---------------------------------------------------------------------------
+# Path normalization with LRU cache
+# ---------------------------------------------------------------------------
+
+# LRU cache for _normalize_path — this is called on every permission check
+# and Path.resolve() is expensive (stat syscall per path component).
+# Typical session: hundreds of checks on ~50 unique paths.
+_CACHE_MAX_SIZE = 512
+
+_normalize_path_cached = lru_cache(maxsize=_CACHE_MAX_SIZE)(
+    lambda p: str(Path(p).resolve())
+)
+
+
 def _normalize_path(target_path: str) -> str:
-    return str(Path(target_path).resolve())
+    """Normalize a path with caching. Resolves symlinks and normalizes separators.
+    
+    Cached to avoid redundant Path.resolve() syscalls — the same paths are
+    checked repeatedly (e.g., workspace root on every tool call).
+    """
+    return _normalize_path_cached(target_path)
+
+
+# Pre-computed result for the workspace root check (most common case)
+# This avoids calling _is_within_directory for the trivial case.
+_is_win = sys.platform == "win32"
 
 
 def _is_within_directory(root: str, target: str) -> bool:
@@ -31,23 +59,30 @@ def _is_within_directory(root: str, target: str) -> bool:
     
     On Windows, uses case-insensitive comparison since NTFS paths are
     case-insensitive by default.
+    
+    Both root and target should be pre-normalized (resolved) for
+    correct comparison.
     """
-    try:
-        resolved_target = Path(target).resolve()
-        resolved_root = Path(root).resolve()
-        if sys.platform == "win32":
-            # Windows: case-insensitive path comparison
-            target_str = str(resolved_target).lower()
-            root_str = str(resolved_root).lower()
-            return target_str == root_str or target_str.startswith(root_str + os.sep)
-        resolved_target.relative_to(resolved_root)
-        return True
-    except ValueError:
-        return False
+    if _is_win:
+        # Windows: case-insensitive path comparison
+        target_str = target.lower()
+        root_str = root.lower()
+        return target_str == root_str or target_str.startswith(root_str + os.sep)
+    
+    # Unix: direct string comparison (paths already normalized)
+    return target == root or target.startswith(root + os.sep)
 
 
 def _matches_directory_prefix(target_path: str, directories: set[str]) -> bool:
-    return any(_is_within_directory(directory, target_path) for directory in directories)
+    """Check if target matches any directory prefix.
+    
+    Optimized: sorts directories by length (most specific first)
+    and short-circuits on first match.
+    """
+    for directory in directories:
+        if _is_within_directory(directory, target_path):
+            return True
+    return False
 
 
 def _format_command_signature(command: str, args: list[str]) -> str:
@@ -158,9 +193,10 @@ def _write_permission_store(store: dict[str, Any]) -> None:
 
 
 class PermissionManager:
-    def __init__(self, workspace_root: str, prompt: PromptHandler | None = None) -> None:
+    def __init__(self, workspace_root: str, prompt: PromptHandler | None = None, auto_mode: PermissionMode | None = None) -> None:
         self.workspace_root = _normalize_path(workspace_root)
         self.prompt = prompt
+        self.auto_checker = AutoModeChecker(mode=auto_mode or PermissionMode.DEFAULT)
         self.allowed_directory_prefixes: set[str] = set()
         self.denied_directory_prefixes: set[str] = set()
         self.session_allowed_paths: set[str] = set()
@@ -221,12 +257,31 @@ class PermissionManager:
 
     def ensure_path_access(self, target_path: str, intent: str) -> None:
         normalized_target = _normalize_path(target_path)
+        
+        # Fast path: check workspace root first (most common case)
+        # workspace_root is already normalized, so no need for Path.resolve() again
         if _is_within_directory(self.workspace_root, normalized_target):
+            return
+        
+        # Check denial sets first (fail fast)
+        if normalized_target in self.session_denied_paths or _matches_directory_prefix(normalized_target, self.denied_directory_prefixes):
+            raise RuntimeError(f"Access denied for path outside cwd: {normalized_target}")
+        
+        # Check approval sets
+        if normalized_target in self.session_allowed_paths or _matches_directory_prefix(normalized_target, self.allowed_directory_prefixes):
             return
         if normalized_target in self.session_denied_paths or _matches_directory_prefix(normalized_target, self.denied_directory_prefixes):
             raise RuntimeError(f"Access denied for path outside cwd: {normalized_target}")
         if normalized_target in self.session_allowed_paths or _matches_directory_prefix(normalized_target, self.allowed_directory_prefixes):
             return
+        
+        # Auto mode risk assessment for path access
+        assessment = self.auto_checker.assess_risk("path_access", {"path": normalized_target, "intent": intent})
+        if assessment.action == "approve":
+            get_mode_state().record_decision("approve")
+            self.session_allowed_paths.add(normalized_target)
+            return
+        
         if self.prompt is None:
             raise RuntimeError(
                 f"Path {normalized_target} is outside cwd {self.workspace_root}. Start minicode in TTY mode to approve it."
@@ -276,12 +331,32 @@ class PermissionManager:
         self.ensure_path_access(command_cwd, "command_cwd")
         reason = force_prompt_reason or _classify_dangerous_command(command, args)
         if not reason:
+            # Not classified as dangerous — check auto mode for auto-approve
+            assessment = self.auto_checker.assess_risk("run_command", {"command": [command] + args})
+            if assessment.action == "approve":
+                get_mode_state().record_decision("approve")
+                return
+            if assessment.action == "block":
+                get_mode_state().record_decision("block")
+                raise RuntimeError(f"Command blocked by auto mode: {assessment.reason}")
+            # action == "prompt" — fall through to normal approval flow
             return
         signature = _format_command_signature(command, args)
         if signature in self.session_denied_commands or signature in self.denied_command_patterns:
             raise RuntimeError(f"Command denied: {signature}")
         if signature in self.session_allowed_commands or signature in self.allowed_command_patterns:
             return
+        
+        # Auto mode risk assessment for dangerous commands
+        assessment = self.auto_checker.assess_risk("run_command", {"command": [command] + args})
+        if assessment.action == "approve":
+            get_mode_state().record_decision("approve")
+            self.session_allowed_commands.add(signature)
+            return
+        if assessment.action == "block":
+            get_mode_state().record_decision("block")
+            raise RuntimeError(f"Command blocked by auto mode: {assessment.reason}")
+        
         if self.prompt is None:
             raise RuntimeError(f"Command requires approval: {signature}. Start minicode in TTY mode to approve it.")
         # Distinguish forced prompts (external trigger) from dangerous commands
@@ -333,6 +408,17 @@ class PermissionManager:
             or normalized_target in self.allowed_edit_patterns
         ):
             return
+        
+        # Auto mode risk assessment for file edits
+        assessment = self.auto_checker.assess_risk("edit_file", {"path": normalized_target})
+        if assessment.action == "approve":
+            get_mode_state().record_decision("approve")
+            self.session_allowed_edits.add(normalized_target)
+            return
+        if assessment.action == "block":
+            get_mode_state().record_decision("block")
+            raise RuntimeError(f"Edit blocked by auto mode: {assessment.reason}")
+        
         if self.prompt is None:
             raise RuntimeError(f"Edit requires approval: {normalized_target}. Start minicode in TTY mode to review it.")
         result = self.prompt(

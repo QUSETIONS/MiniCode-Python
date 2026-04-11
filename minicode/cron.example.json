@@ -1,0 +1,22 @@
+{
+  "jobs": [
+    {
+      "name": "daily-review",
+      "schedule": "0 9 * * *",
+      "prompt": "Review recent code changes in the workspace and summarize key modifications",
+      "enabled": false
+    },
+    {
+      "name": "test-runner",
+      "schedule": "*/30 * * * *",
+      "prompt": "Run the test suite and report any failures",
+      "enabled": false
+    },
+    {
+      "name": "health-check",
+      "schedule": "0 */4 * * *",
+      "prompt": "Check project structure and report any obvious issues",
+      "enabled": false
+    }
+  ]
+}

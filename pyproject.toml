@@ -15,6 +15,9 @@ dev = ["pytest>=8.0.0"]
 
 [project.scripts]
 minicode-py = "minicode.main:main"
+minicode-gateway = "minicode.gateway:run_gateway"
+minicode-cron = "minicode.cron_runner:main"
+minicode-headless = "minicode.headless:main"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

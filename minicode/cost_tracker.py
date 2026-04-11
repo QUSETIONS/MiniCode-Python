@@ -54,6 +54,97 @@ MODEL_PRICING = {
         "cache_read": 5.0,
         "cache_write": 10.0,
     },
+    "o1": {
+        "input": 15.0,
+        "output": 60.0,
+        "cache_read": 7.50,
+        "cache_write": 15.0,
+    },
+    "o1-mini": {
+        "input": 3.0,
+        "output": 12.0,
+        "cache_read": 1.50,
+        "cache_write": 3.0,
+    },
+    "o3-mini": {
+        "input": 1.10,
+        "output": 4.40,
+        "cache_read": 0.55,
+        "cache_write": 1.10,
+    },
+    # OpenRouter models (pricing via OpenRouter, approximate)
+    "openrouter/auto": {
+        "input": 3.0,
+        "output": 15.0,
+        "cache_read": 0.30,
+        "cache_write": 3.75,
+    },
+    "anthropic/claude-sonnet-4": {
+        "input": 3.0,
+        "output": 15.0,
+        "cache_read": 0.30,
+        "cache_write": 3.75,
+    },
+    "anthropic/claude-opus-4": {
+        "input": 15.0,
+        "output": 75.0,
+        "cache_read": 1.50,
+        "cache_write": 18.75,
+    },
+    "openai/gpt-4o": {
+        "input": 2.50,
+        "output": 10.0,
+        "cache_read": 1.25,
+        "cache_write": 2.50,
+    },
+    "openai/gpt-4o-mini": {
+        "input": 0.15,
+        "output": 0.60,
+        "cache_read": 0.08,
+        "cache_write": 0.15,
+    },
+    "google/gemini-2.5-pro": {
+        "input": 1.25,
+        "output": 10.0,
+        "cache_read": 0.63,
+        "cache_write": 1.25,
+    },
+    "google/gemini-2.5-flash": {
+        "input": 0.15,
+        "output": 0.60,
+        "cache_read": 0.08,
+        "cache_write": 0.15,
+    },
+    "meta-llama/llama-4-maverick": {
+        "input": 0.20,
+        "output": 0.60,
+        "cache_read": 0.10,
+        "cache_write": 0.20,
+    },
+    "deepseek/deepseek-r1": {
+        "input": 0.55,
+        "output": 2.19,
+        "cache_read": 0.14,
+        "cache_write": 0.55,
+    },
+    "deepseek/deepseek-chat": {
+        "input": 0.14,
+        "output": 0.28,
+        "cache_read": 0.07,
+        "cache_write": 0.14,
+    },
+    "qwen/qwen3-235b-a22b": {
+        "input": 0.22,
+        "output": 0.88,
+        "cache_read": 0.11,
+        "cache_write": 0.22,
+    },
+    "minimax/minimax-m1": {
+        "input": 0.20,
+        "output": 0.80,
+        "cache_read": 0.10,
+        "cache_write": 0.20,
+    },
     # Default fallback
     "default": {
         "input": 3.0,
@@ -62,6 +153,38 @@ MODEL_PRICING = {
         "cache_write": 3.75,
     },
 }
+
+
+# ---------------------------------------------------------------------------
+# Cost calculation (standalone function for use outside CostTracker)
+# ---------------------------------------------------------------------------
+
+def calculate_cost(
+    model: str,
+    input_tokens: int = 0,
+    output_tokens: int = 0,
+    cache_read_tokens: int = 0,
+    cache_creation_tokens: int = 0,
+) -> float:
+    """Calculate cost for a single API call.
+    
+    Args:
+        model: Model name
+        input_tokens: Input token count
+        output_tokens: Output token count
+        cache_read_tokens: Cache read token count
+        cache_creation_tokens: Cache write token count
+    
+    Returns:
+        Cost in USD
+    """
+    pricing = MODEL_PRICING.get(model, MODEL_PRICING["default"])
+    return (
+        (input_tokens / 1_000_000) * pricing["input"]
+        + (output_tokens / 1_000_000) * pricing["output"]
+        + (cache_read_tokens / 1_000_000) * pricing["cache_read"]
+        + (cache_creation_tokens / 1_000_000) * pricing["cache_write"]
+    )
 
 
 # ---------------------------------------------------------------------------

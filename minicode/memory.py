@@ -7,18 +7,82 @@ Provides three-tier memory hierarchy:
 
 Memory is automatically injected into system prompts to give the agent
 context about past decisions, codebase patterns, and project conventions.
+
+Search uses TF-IDF relevance scoring for intelligent retrieval.
 """
 
 from __future__ import annotations
 
 import json
+import math
+import os
+import re
 import time
+from collections import Counter
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
 from minicode.config import MINI_CODE_DIR
+
+
+# ---------------------------------------------------------------------------
+# TF-IDF search utilities
+# ---------------------------------------------------------------------------
+
+# Tokenize text into lowercase words (alphanumeric + CJK)
+_WORD_RE = re.compile(r'[a-zA-Z0-9]+|[\u4e00-\u9fff]')
+
+
+def _tokenize(text: str) -> list[str]:
+    """Tokenize text into words for TF-IDF scoring."""
+    return [w.lower() for w in _WORD_RE.findall(text)]
+
+
+def _compute_tf(tokens: list[str]) -> dict[str, float]:
+    """Compute term frequency for a list of tokens."""
+    if not tokens:
+        return {}
+    counts = Counter(tokens)
+    total = len(tokens)
+    return {term: count / total for term, count in counts.items()}
+
+
+def _compute_idf(documents: list[list[str]]) -> dict[str, float]:
+    """Compute inverse document frequency across documents."""
+    n = len(documents)
+    if n == 0:
+        return {}
+    doc_freq: dict[str, int] = {}
+    for doc_tokens in documents:
+        seen = set(doc_tokens)
+        for term in seen:
+            doc_freq[term] = doc_freq.get(term, 0) + 1
+    return {
+        term: math.log((n + 1) / (df + 1)) + 1  # Smoothed IDF
+        for term, df in doc_freq.items()
+    }
+
+
+def _tfidf_score(
+    query_tokens: list[str],
+    doc_tokens: list[str],
+    idf: dict[str, float],
+) -> float:
+    """Compute TF-IDF cosine similarity between query and document."""
+    if not query_tokens or not doc_tokens:
+        return 0.0
+    
+    tf_doc = _compute_tf(doc_tokens)
+    
+    # Compute dot product (query terms only)
+    score = 0.0
+    for term in query_tokens:
+        if term in tf_doc and term in idf:
+            score += tf_doc[term] * idf[term]
+    
+    return score
 
 
 # ---------------------------------------------------------------------------
@@ -112,15 +176,69 @@ class MemoryFile:
         return [e for e in self.entries if e.category == category]
     
     def search(self, query: str) -> list[MemoryEntry]:
-        """Search entries by keyword."""
+        """Search entries by keyword with TF-IDF relevance scoring.
+        
+        Combines TF-IDF semantic relevance with usage frequency for
+        better result ranking than simple substring matching.
+        """
+        if not self.entries:
+            return []
+        
+        query_tokens = _tokenize(query)
+        if not query_tokens:
+            return []
+        
+        # Also do substring matching as fallback for partial matches
         query_lower = query.lower()
-        results = []
+        
+        # Pre-tokenize all entries for TF-IDF
+        entry_tokens = []
         for entry in self.entries:
-            if (query_lower in entry.content.lower() or
-                query_lower in entry.category.lower() or
-                any(query_lower in tag.lower() for tag in entry.tags)):
-                results.append(entry)
-        return results
+            text = f"{entry.content} {entry.category} {' '.join(entry.tags)}"
+            entry_tokens.append(_tokenize(text))
+        
+        # Compute IDF across all entries
+        idf = _compute_idf(entry_tokens)
+        
+        # Score each entry
+        scored: list[tuple[float, MemoryEntry]] = []
+        for i, entry in enumerate(self.entries):
+            # TF-IDF score
+            tfidf = _tfidf_score(query_tokens, entry_tokens[i], idf)
+            
+            # Substring match bonus (for partial keyword matches)
+            substring_score = 0.0
+            content_lower = entry.content.lower()
+            if query_lower in content_lower:
+                substring_score = 2.0  # Strong bonus for exact substring
+            elif any(q in content_lower for q in query_lower.split()):
+                substring_score = 1.0  # Partial match
+            
+            # Category/tag match bonus
+            tag_score = 0.0
+            if any(query_lower in tag.lower() for tag in entry.tags):
+                tag_score = 1.5
+            if query_lower in entry.category.lower():
+                tag_score += 1.0
+
+            match_score = tfidf + substring_score + tag_score
+            if match_score <= 0:
+                continue
+
+            # Usage frequency bonus (logarithmic to avoid dominating)
+            usage_bonus = math.log1p(entry.usage_count) * 0.3
+            
+            # Recency bonus (newer entries slightly preferred)
+            age_hours = (time.time() - entry.updated_at) / 3600
+            recency_bonus = 1.0 / (1.0 + age_hours / 24.0) * 0.5
+            
+            # Combine scores
+            total_score = match_score + usage_bonus + recency_bonus
+            scored.append((total_score, entry))
+        
+        # Sort by score (descending)
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [entry for _, entry in scored]
     
     def _enforce_limits(self) -> None:
         """Remove oldest entries if exceeding limits."""
@@ -330,8 +448,17 @@ class MemoryManager:
             return True
         return False
     
-    def search(self, query: str, scope: MemoryScope | None = None) -> list[MemoryEntry]:
-        """Search across memory scopes."""
+    def search(self, query: str, scope: MemoryScope | None = None, limit: int = 20) -> list[MemoryEntry]:
+        """Search across memory scopes with TF-IDF relevance ranking.
+        
+        Args:
+            query: Search query string
+            scope: Optional scope to limit search to
+            limit: Maximum results to return
+        
+        Returns:
+            Entries ranked by relevance (TF-IDF + usage + recency)
+        """
         results = []
         
         scopes_to_search = [scope] if scope else list(MemoryScope)
@@ -339,9 +466,17 @@ class MemoryManager:
         for s in scopes_to_search:
             results.extend(self.memories[s].search(query))
         
-        # Sort by usage count (most used first)
-        results.sort(key=lambda e: e.usage_count, reverse=True)
-        return results
+        # Results are already ranked by MemoryFile.search()
+        # Deduplicate by content (keep highest-scored)
+        seen_content: set[str] = set()
+        deduped = []
+        for entry in results:
+            content_key = entry.content[:100].strip().lower()
+            if content_key not in seen_content:
+                seen_content.add(content_key)
+                deduped.append(entry)
+        
+        return deduped[:limit]
     
     def get_relevant_context(
         self,
@@ -387,28 +522,47 @@ class MemoryManager:
         return "\n\n".join(parts)
     
     def _save_scope(self, scope: MemoryScope) -> None:
-        """Save memory to disk."""
+        """Save memory to disk (atomic write to prevent corruption)."""
         path = self._get_scope_path(scope)
         self._ensure_scope_path(scope)
         
-        # Save JSON metadata
+        # Save JSON metadata (atomic: write to temp, then replace)
         memory_json = path / "memory.json"
         data = {
             "scope": scope.value,
             "last_updated": time.time(),
             "entries": [e.to_dict() for e in self.memories[scope].entries],
         }
-        memory_json.write_text(
-            json.dumps(data, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        self._atomic_write(memory_json, json.dumps(data, indent=2, ensure_ascii=False))
         
-        # Also update MEMORY.md for human readability
+        # Also update MEMORY.md for human readability (atomic)
         memory_md = path / "MEMORY.md"
-        memory_md.write_text(
-            self.memories[scope].format_as_markdown(),
-            encoding="utf-8",
+        self._atomic_write(memory_md, self.memories[scope].format_as_markdown())
+    
+    @staticmethod
+    def _atomic_write(target: Path, content: str) -> None:
+        """Write content atomically: write to temp file, then os.replace().
+        
+        This prevents data corruption if the process is killed mid-write
+        or if multiple instances write to the same file concurrently.
+        """
+        import tempfile
+        tmp_fd, tmp_path = tempfile.mkstemp(
+            dir=str(target.parent),
+            prefix=f".{target.name}.",
+            suffix=".tmp",
         )
+        try:
+            with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+                f.write(content)
+            os.replace(tmp_path, str(target))
+        except BaseException:
+            # Clean up temp file on any failure
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
     
     def get_stats(self) -> dict[str, Any]:
         """Get memory statistics."""

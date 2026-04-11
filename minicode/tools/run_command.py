@@ -13,6 +13,29 @@ from minicode.workspace import resolve_tool_path
 # 命令执行超时（秒）- 5 分钟
 COMMAND_TIMEOUT = 300
 
+# 最大输出大小（字符）- 防止超大输出撑爆上下文
+MAX_OUTPUT_CHARS = 200_000
+
+
+def _truncate_large_output(output: str, max_chars: int = MAX_OUTPUT_CHARS) -> str:
+    """Truncate very large command output to prevent context bloat."""
+    if len(output) <= max_chars:
+        return output
+    
+    lines = output.split("\n")
+    total_lines = len(lines)
+    # Keep head (first 60%) and tail (last 40%)
+    head_lines = int(total_lines * 0.6)
+    tail_lines = total_lines - head_lines
+    if tail_lines > int(total_lines * 0.4):
+        tail_lines = int(total_lines * 0.4)
+        head_lines = total_lines - tail_lines
+    
+    head = "\n".join(lines[:head_lines])
+    tail = "\n".join(lines[-tail_lines:])
+    omitted = total_lines - head_lines - tail_lines
+    return f"{head}\n\n... [{omitted} lines omitted, output was {len(output):,} chars] ...\n\n{tail}"
+
 # Read-only commands that never need permission prompts.
 # Includes both Unix and Windows equivalents.
 READONLY_COMMANDS = {
@@ -172,7 +195,14 @@ def _validate(input_data: dict) -> dict:
     cwd = input_data.get("cwd")
     if cwd is not None and not isinstance(cwd, str):
         raise ValueError("cwd must be a string")
-    return {"command": command, "args": [str(arg) for arg in args], "cwd": cwd}
+    # Optional timeout (seconds), clamped to [1, 600]
+    timeout = input_data.get("timeout")
+    if timeout is not None:
+        try:
+            timeout = max(1, min(600, int(timeout)))
+        except (ValueError, TypeError):
+            timeout = None
+    return {"command": command, "args": [str(arg) for arg in args], "cwd": cwd, "timeout": timeout}
 
 
 def _run(input_data: dict, context) -> ToolResult:
@@ -238,7 +268,66 @@ def _run(input_data: dict, context) -> ToolResult:
             backgroundTask=background_task,
         )
 
+    if sys.platform != "win32":
+        try:
+            import pty
+            import select
+            
+            master_fd, slave_fd = pty.openpty()
+            effective_timeout = input_data.get("timeout") or COMMAND_TIMEOUT
+            
+            process = subprocess.Popen(
+                [command, *args],
+                cwd=effective_cwd,
+                env=os.environ.copy(),
+                stdin=slave_fd,
+                stdout=slave_fd,
+                stderr=slave_fd,
+                start_new_session=True,
+            )
+            
+            os.close(slave_fd)
+            output_bytes = bytearray()
+            timed_out = False
+            
+            try:
+                while True:
+                    r, _, _ = select.select([master_fd], [], [], effective_timeout)
+                    if not r:
+                        timed_out = True
+                        process.kill()
+                        process.wait()
+                        break
+                    
+                    try:
+                        data = os.read(master_fd, 4096)
+                        if not data:
+                            break
+                        output_bytes.extend(data)
+                    except OSError:
+                        # EIO happens when child closes the PTY or exits
+                        break
+            finally:
+                os.close(master_fd)
+                if not timed_out:
+                    process.wait()
+                
+            output_str = output_bytes.decode("utf-8", errors="replace").strip()
+            output_str = output_str.replace("\r\n", "\n")
+            output_str = _truncate_large_output(output_str)
+            
+            if timed_out:
+                return ToolResult(
+                    ok=False,
+                    output=f"Command timed out after {effective_timeout} seconds (process killed).\nPartial output:\n{output_str}",
+                )
+            return ToolResult(ok=process.returncode == 0, output=output_str)
+            
+        except ImportError:
+            pass  # Fallback to subprocess on systems without pty
+
     try:
+        effective_timeout = input_data.get("timeout") or COMMAND_TIMEOUT
         completed = subprocess.run(  # noqa: S603
             [command, *args],
             cwd=effective_cwd,
@@ -248,21 +337,28 @@ def _run(input_data: dict, context) -> ToolResult:
             encoding="utf-8",  # 显式指定 UTF-8
             errors="replace",   # 无法解码时替换字符而非报错
             check=False,
-            timeout=COMMAND_TIMEOUT,
+            timeout=effective_timeout,
         )
         output = "\n".join(part for part in [completed.stdout.strip(), completed.stderr.strip()] if part).strip()
+        output = _truncate_large_output(output)
         return ToolResult(ok=completed.returncode == 0, output=output)
     except subprocess.TimeoutExpired as e:
+        # Capture partial output from timeout
+        partial_stdout = (e.stdout or "").strip() if e.stdout else ""
+        partial_stderr = (e.stderr or "").strip() if e.stderr else ""
+        partial = "\n".join(part for part in [partial_stdout, partial_stderr] if part)
+        if partial:
+            partial = f"\nPartial output:\n{_truncate_large_output(partial)}"
         return ToolResult(
             ok=False,
-            output=f"Command timed out after {COMMAND_TIMEOUT} seconds. Command: {normalized_command} {' '.join(normalized_args)}",
+            output=f"Command timed out after {effective_timeout} seconds (process killed).{partial}",
         )
 
 
 run_command_tool = ToolDefinition(
     name="run_command",
-    description="Run a common development command from an allowlist.",
-    input_schema={"type": "object", "properties": {"command": {"type": "string"}, "args": {"type": "array"}, "cwd": {"type": "string"}}, "required": ["command"]},
+    description="Run a common development command from an allowlist. Supports optional timeout parameter (1-600 seconds).",
+    input_schema={"type": "object", "properties": {"command": {"type": "string", "description": "Command to run"}, "args": {"type": "array", "items": {"type": "string"}, "description": "Arguments"}, "cwd": {"type": "string", "description": "Working directory"}, "timeout": {"type": "integer", "description": "Timeout in seconds (1-600, default 300)"}}, "required": ["command"]},
     validator=_validate,
     run=_run,
 )

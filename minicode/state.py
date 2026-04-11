@@ -303,3 +303,29 @@ def set_idle() -> Callable[[AppState], AppState]:
         state.update_timestamp()
         return state
     return updater
+
+
+# ---------------------------------------------------------------------------
+# Global store singleton (merged from state_integration.py)
+# ---------------------------------------------------------------------------
+
+_global_store: Store[AppState] | None = None
+
+
+def get_global_store() -> Store[AppState]:
+    """Get or create the global store instance."""
+    global _global_store
+    if _global_store is None:
+        _global_store = create_app_store()
+    return _global_store
+
+
+def set_global_store(store: Store[AppState]) -> None:
+    """Set the global store instance."""
+    global _global_store
+    _global_store = store
+
+
+def handle_state_command() -> str:
+    """Handle /state slash command."""
+    return format_app_state_summary(get_global_store().get_state())

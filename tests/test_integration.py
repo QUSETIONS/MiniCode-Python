@@ -292,7 +292,7 @@ class TestAgentLoopIntegration:
 
         class InfiniteToolCallModel:
             """Model that always returns tool calls, never stops."""
-            def next(self, messages):
+            def next(self, messages, on_stream_chunk=None):
                 import time
                 return AgentStep(
                     type="tool_calls",
@@ -323,7 +323,7 @@ class TestAgentLoopIntegration:
         """Agent loop handles model API errors gracefully."""
 
         class ErrorModel:
-            def next(self, messages):
+            def next(self, messages, on_stream_chunk=None):
                 raise ConnectionError("Simulated network failure")
 
         system_messages.append({"role": "user", "content": "test error"})
@@ -345,7 +345,7 @@ class TestAgentLoopIntegration:
         """Agent loop handles timeout errors with specific message."""
 
         class TimeoutModel:
-            def next(self, messages):
+            def next(self, messages, on_stream_chunk=None):
                 raise TimeoutError("Request timed out after 60s")
 
         system_messages.append({"role": "user", "content": "test timeout"})

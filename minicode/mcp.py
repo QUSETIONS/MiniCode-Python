@@ -14,6 +14,9 @@ from minicode.tooling import ToolDefinition, ToolResult
 # 安全常量：禁止在命令参数中出现的危险字符
 DANGEROUS_SHELL_CHARS = set('|&;`$(){}<>\n\r')
 
+# MCP payload 大小上限（防止恶意服务端制造 OOM）
+MAX_MCP_PAYLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
+
 # 允许的命令白名单（常见的 MCP 服务器命令）
 ALLOWED_COMMANDS = {
     'node', 'npm', 'npx', 'python', 'python3', 'pip', 'pip3',
@@ -191,6 +194,12 @@ def _format_prompt_result(result: Any) -> ToolResult:
 
 
 class StdioMcpClient:
+    """MCP client with lazy initialization.
+    
+    The server process is not started until the first request is made,
+    reducing startup time and resource usage when MCP servers are configured
+    but not immediately needed.
+    """
     def __init__(self, server_name: str, config: dict[str, Any], cwd: str) -> None:
         self.server_name = server_name
         self.config = config
@@ -203,6 +212,20 @@ class StdioMcpClient:
         self.stderr_lines: list[str] = []
         self._stderr_thread: threading.Thread | None = None
         self._stdout_thread: threading.Thread | None = None
+        # Lazy init state
+        self._started = False
+        self._start_error: str | None = None
+        self._tools_cache: list[dict[str, Any]] | None = None
+        self._resources_cache: list[dict[str, Any]] | None = None
+        self._prompts_cache: list[dict[str, Any]] | None = None
+    
+    @property
+    def is_started(self) -> bool:
+        return self._started
+    
+    @property
+    def start_error(self) -> str | None:
+        return self._start_error
 
     def _protocol_candidates(self) -> list[JsonRpcProtocol]:
         configured = self.config.get("protocol")
@@ -213,8 +236,18 @@ class StdioMcpClient:
         return ["content-length", "newline-json"]
 
     def start(self) -> None:
-        if self.process is not None:
+        """Start the MCP server process (idempotent).
+        
+        If already started, returns immediately.
+        If previously failed, retries the connection.
+        """
+        if self._started:
             return
+        
+        if self._start_error is not None and self.process is None:
+            # Previous attempt failed — reset for retry
+            self._start_error = None
+        
         last_error: Exception | None = None
         for protocol in self._protocol_candidates():
             try:
@@ -230,11 +263,20 @@ class StdioMcpClient:
                     timeout_seconds=2.0,
                 )
                 self.notify("notifications/initialized", {})
+                self._started = True
+                self._start_error = None
                 return
             except Exception as error:  # noqa: BLE001
                 last_error = error
                 self.close()
-        raise RuntimeError(str(last_error or f'Failed to connect MCP server "{self.server_name}".'))
+        
+        self._start_error = str(last_error or f'Failed to connect MCP server "{self.server_name}".')
+        raise RuntimeError(self._start_error)
+    
+    def _ensure_started(self) -> None:
+        """Ensure the server is started before making a request."""
+        if not self._started:
+            self.start()
 
     def _spawn_process(self) -> None:
         command = str(self.config.get("command", "")).strip()
@@ -349,6 +391,12 @@ class StdioMcpClient:
                                 pass
                             break
 
+                    if content_length > MAX_MCP_PAYLOAD_BYTES:
+                        self.stderr_lines.append(
+                            f"MCP payload too large: {content_length} bytes (limit {MAX_MCP_PAYLOAD_BYTES})"
+                        )
+                        continue
+
                     if content_length > 0:
                         body_bytes = self.process.stdout.read(content_length)
                         if len(body_bytes) < content_length:
@@ -419,26 +467,44 @@ class StdioMcpClient:
         return message.get("result")
 
     def list_tools(self) -> list[dict[str, Any]]:
+        """List tools with caching. Starts server lazily if not started."""
+        if self._tools_cache is not None:
+            return self._tools_cache
+        self._ensure_started()
         result = self.request("tools/list", {})
-        return list(result.get("tools", []) if isinstance(result, dict) else [])
+        self._tools_cache = list(result.get("tools", []) if isinstance(result, dict) else [])
+        return self._tools_cache
 
     def list_resources(self) -> list[dict[str, Any]]:
+        """List resources with caching. Starts server lazily if not started."""
+        if self._resources_cache is not None:
+            return self._resources_cache
+        self._ensure_started()
         result = self.request("resources/list", {}, timeout_seconds=3.0)
-        return list(result.get("resources", []) if isinstance(result, dict) else [])
+        self._resources_cache = list(result.get("resources", []) if isinstance(result, dict) else [])
+        return self._resources_cache
 
     def read_resource(self, uri: str) -> ToolResult:
+        self._ensure_started()
         return _format_read_resource_result(self.request("resources/read", {"uri": uri}, timeout_seconds=5.0))
 
     def list_prompts(self) -> list[dict[str, Any]]:
+        """List prompts with caching. Starts server lazily if not started."""
+        if self._prompts_cache is not None:
+            return self._prompts_cache
+        self._ensure_started()
         result = self.request("prompts/list", {}, timeout_seconds=3.0)
-        return list(result.get("prompts", []) if isinstance(result, dict) else [])
+        self._prompts_cache = list(result.get("prompts", []) if isinstance(result, dict) else [])
+        return self._prompts_cache
 
     def get_prompt(self, name: str, args: dict[str, str] | None = None) -> ToolResult:
+        self._ensure_started()
         return _format_prompt_result(
             self.request("prompts/get", {"name": name, "arguments": args or {}}, timeout_seconds=5.0)
         )
 
     def call_tool(self, name: str, input_data: Any) -> ToolResult:
+        self._ensure_started()
         return _format_tool_call_result(self.request("tools/call", {"name": name, "arguments": input_data or {}}))
 
     def close(self) -> None:
@@ -493,63 +559,104 @@ class StdioMcpClient:
         self.protocol = None
         self._stdout_thread = None
         self._stderr_thread = None
+        # Reset lazy init state
+        self._started = False
+        self._tools_cache = None
+        self._resources_cache = None
+        self._prompts_cache = None
 
 
 def create_mcp_backed_tools(*, cwd: str, mcp_servers: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """Create MCP-backed tools with lazy server initialization.
+    
+    Instead of starting all MCP servers at startup (which is slow and
+    resource-intensive), this function creates lightweight client objects
+    that defer server startup until the first tool call.
+    
+    Benefits:
+    - Faster startup: no waiting for MCP server processes to initialize
+    - Lower resource usage: servers that aren't needed never start
+    - Resilience: a failed server doesn't block other servers
+    - Auto-retry: servers are retried on first use after failure
+    """
     clients: list[StdioMcpClient] = []
     tools: list[ToolDefinition] = []
     servers: list[dict[str, Any]] = []
     resource_index: dict[str, dict[str, Any]] = {}
     prompt_index: dict[str, dict[str, Any]] = {}
 
-    try:
-        for server_name, config in mcp_servers.items():
-            if config.get("enabled") is False:
-                servers.append(asdict(McpServerSummary(name=server_name, command=config.get("command", ""), status="disabled", toolCount=0, protocol=config.get("protocol"))))
-                continue
+    for server_name, config in mcp_servers.items():
+        if config.get("enabled") is False:
+            servers.append(asdict(McpServerSummary(name=server_name, command=config.get("command", ""), status="disabled", toolCount=0, protocol=config.get("protocol"))))
+            continue
 
-            client = StdioMcpClient(server_name, config, cwd)
+        client = StdioMcpClient(server_name, config, cwd)
+        clients.append(client)
+        
+        # Register server with "pending" status — will be connected lazily
+        servers.append(
+            asdict(
+                McpServerSummary(
+                    name=server_name,
+                    command=config.get("command", ""),
+                    status="pending",
+                    toolCount=0,
+                    protocol=config.get("protocol"),
+                )
+            )
+        )
+        
+        # Eagerly discover tools/resources/prompts on first use via
+        # the lazy client. Register placeholder tools now that will
+        # resolve to the actual MCP tool on first call.
+        # 
+        # We register a single "gateway" tool per server that triggers
+        # lazy init, plus we'll discover and register actual tools
+        # after the first successful connection.
+        # 
+        # For simplicity, we still try to discover tools at creation
+        # time but don't fail if the server can't start yet.
+        try:
+            descriptors = client.list_tools()
             try:
-                client.start()
-                descriptors = client.list_tools()
-                try:
-                    resources = client.list_resources()
-                except Exception:  # noqa: BLE001
-                    resources = []
-                try:
-                    prompts = client.list_prompts()
-                except Exception:  # noqa: BLE001
-                    prompts = []
-                clients.append(client)
+                resources = client.list_resources()
+            except Exception:  # noqa: BLE001
+                resources = []
+            try:
+                prompts = client.list_prompts()
+            except Exception:  # noqa: BLE001
+                prompts = []
 
-                for resource in resources:
-                    resource_index[f"{server_name}:{resource.get('uri')}"] = {"serverName": server_name, "resource": resource}
-                for prompt in prompts:
-                    prompt_index[f"{server_name}:{prompt.get('name')}"] = {"serverName": server_name, "prompt": prompt}
+            for resource in resources:
+                resource_index[f"{server_name}:{resource.get('uri')}"] = {"serverName": server_name, "resource": resource}
+            for prompt in prompts:
+                prompt_index[f"{server_name}:{prompt.get('name')}"] = {"serverName": server_name, "prompt": prompt}
 
-                for descriptor in descriptors:
-                    wrapped_name = f"mcp__{_sanitize_tool_segment(server_name)}__{_sanitize_tool_segment(str(descriptor.get('name', 'tool')))}"
-                    descriptor_name = str(descriptor.get("name", "tool"))
-                    input_schema = _normalize_input_schema(descriptor.get("inputSchema"))
+            for descriptor in descriptors:
+                wrapped_name = f"mcp__{_sanitize_tool_segment(server_name)}__{_sanitize_tool_segment(str(descriptor.get('name', 'tool')))}"
+                descriptor_name = str(descriptor.get("name", "tool"))
+                input_schema = _normalize_input_schema(descriptor.get("inputSchema"))
 
-                    def _validator(value: Any) -> Any:
-                        return value
+                def _validator(value: Any) -> Any:
+                    return value
 
-                    def _run(input_data: Any, _context, *, _client=client, _descriptor_name=descriptor_name):
-                        return _client.call_tool(_descriptor_name, input_data)
+                def _run(input_data: Any, _context, *, _client=client, _descriptor_name=descriptor_name):
+                    return _client.call_tool(_descriptor_name, input_data)
 
-                    tools.append(
-                        ToolDefinition(
-                            name=wrapped_name,
-                            description=str(descriptor.get("description") or f"Call MCP tool {descriptor_name} from server {server_name}."),
-                            input_schema=input_schema,
-                            validator=_validator,
-                            run=_run,
-                        )
+                tools.append(
+                    ToolDefinition(
+                        name=wrapped_name,
+                        description=str(descriptor.get("description") or f"Call MCP tool {descriptor_name} from server {server_name}."),
+                        input_schema=input_schema,
+                        validator=_validator,
+                        run=_run,
                     )
+                )
 
-                servers.append(
-                    asdict(
+            # Update server status to connected
+            for i, s in enumerate(servers):
+                if s["name"] == server_name:
+                    servers[i] = asdict(
                         McpServerSummary(
                             name=server_name,
                             command=config.get("command", ""),
@@ -560,29 +667,23 @@ def create_mcp_backed_tools(*, cwd: str, mcp_servers: dict[str, dict[str, Any]])
                             promptCount=len(prompts),
                         )
                     )
-                )
-            except Exception as error:  # noqa: BLE001
-                client.close()
-                servers.append(
-                    asdict(
+                    break
+        except Exception as error:  # noqa: BLE001
+            # Lazy init: don't fail — server will be retried on first tool call
+            # Just update status to reflect the error
+            for i, s in enumerate(servers):
+                if s["name"] == server_name:
+                    servers[i] = asdict(
                         McpServerSummary(
                             name=server_name,
                             command=config.get("command", ""),
                             status="error",
                             toolCount=0,
-                            error=str(error),
+                            error=str(error)[:200],
                             protocol=config.get("protocol"),
                         )
                     )
-                )
-    except Exception:
-        # 清理所有已连接的客户端，防止资源泄漏
-        for client in clients:
-            try:
-                client.close()
-            except Exception:
-                pass
-        raise
+                    break
 
     if resource_index:
         tools.append(

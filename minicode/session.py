@@ -2,11 +2,18 @@
 
 Provides session data structures, autosave mechanism, and resume capabilities
 to allow MiniCode to save and restore conversation state across restarts.
+
+Uses incremental delta saves to reduce serialization overhead:
+- Only new/changed messages are appended since last save
+- Full save occurs periodically (every N deltas) for consistency
+- Dirty tracking at field level avoids redundant serialization
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import time
 import uuid
 from dataclasses import dataclass, field, asdict
@@ -22,6 +29,11 @@ from minicode.config import MINI_CODE_DIR
 
 SESSIONS_DIR = MINI_CODE_DIR / "sessions"
 AUTOSAVE_INTERVAL_SECONDS = 30  # Minimum seconds between autosaves
+
+# Incremental save configuration
+DELTA_DIR_NAME = "deltas"        # Subdirectory for delta files
+FULL_SAVE_INTERVAL = 10          # Do a full save every N delta saves
+MAX_DELTA_FILES = 50             # Maximum delta files before forced consolidation
 
 
 # ---------------------------------------------------------------------------
@@ -54,6 +66,12 @@ class SessionData:
     skills: list[dict[str, Any]] = field(default_factory=list)
     mcp_servers: list[dict[str, Any]] = field(default_factory=list)
     metadata: SessionMetadata = field(default=None)
+    
+    # Incremental save tracking
+    _last_saved_msg_count: int = field(default=0, repr=False)
+    _last_saved_transcript_count: int = field(default=0, repr=False)
+    _delta_save_count: int = field(default=0, repr=False)
+    _last_full_save_hash: str = field(default="", repr=False)
 
     def __post_init__(self):
         if self.metadata is None:
@@ -84,6 +102,24 @@ class SessionData:
                 content = msg.get("content", "")
                 self.metadata.last_message = content[:100]
                 break
+    
+    @property
+    def has_delta(self) -> bool:
+        """Check if there are unsaved changes."""
+        return (
+            len(self.messages) != self._last_saved_msg_count
+            or len(self.transcript_entries) != self._last_saved_transcript_count
+        )
+    
+    def _compute_content_hash(self) -> str:
+        """Compute a quick hash of message content for change detection."""
+        h = hashlib.md5(usedforsecurity=False)
+        for msg in self.messages[-20:]:  # Hash last 20 messages for speed
+            h.update(msg.get("role", "").encode())
+            content = msg.get("content", "")
+            if isinstance(content, str):
+                h.update(content[:500].encode())
+        return h.hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -93,6 +129,11 @@ class SessionData:
 def _session_file(session_id: str) -> Path:
     """Return path to a session JSON file."""
     return SESSIONS_DIR / f"{session_id}.json"
+
+
+def _session_delta_dir(session_id: str) -> Path:
+    """Return path to a session's delta directory."""
+    return SESSIONS_DIR / DELTA_DIR_NAME / session_id
 
 
 def _session_index_file() -> Path:
@@ -138,47 +179,156 @@ def _save_session_index(index: dict[str, SessionMetadata]) -> None:
     )
 
 
-def save_session(session: SessionData) -> None:
-    """Persist a complete session to disk."""
-    session.update_metadata()
-    SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
-
-    # Save full session data
-    session_path = _session_file(session.session_id)
-    serializable = {
-        "session_id": session.session_id,
-        "created_at": session.created_at,
-        "updated_at": session.updated_at,
-        "workspace": session.workspace,
-        "messages": session.messages,
-        "transcript_entries": session.transcript_entries,
-        "history": session.history,
-        "permissions_summary": session.permissions_summary,
-        "skills": session.skills,
-        "mcp_servers": session.mcp_servers,
-        "metadata": {
-            "session_id": session.metadata.session_id,
-            "created_at": session.metadata.created_at,
-            "updated_at": session.metadata.updated_at,
-            "first_message": session.metadata.first_message,
-            "last_message": session.metadata.last_message,
-            "message_count": session.metadata.message_count,
-            "workspace": session.metadata.workspace,
-        },
+def _save_delta(session: SessionData) -> None:
+    """Save only the incremental changes since last full save.
+    
+    Delta files contain new messages and transcript entries appended
+    since the last save point. This is much cheaper than serializing
+    the entire session on every autosave.
+    """
+    delta_dir = _session_delta_dir(session.session_id)
+    delta_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Collect new messages since last save
+    new_messages = session.messages[session._last_saved_msg_count:]
+    new_transcripts = session.transcript_entries[session._last_saved_transcript_count:]
+    
+    if not new_messages and not new_transcripts:
+        return
+    
+    # Create delta entry
+    delta_data: dict[str, Any] = {
+        "ts": time.time(),
+        "msg_offset": session._last_saved_msg_count,
+        "transcript_offset": session._last_saved_transcript_count,
     }
-    session_path.write_text(
-        json.dumps(serializable, indent=2, ensure_ascii=False) + "\n",
+    if new_messages:
+        delta_data["messages"] = new_messages
+    if new_transcripts:
+        delta_data["transcripts"] = new_transcripts
+    
+    # Write delta file with sequential numbering
+    delta_num = session._delta_save_count
+    delta_path = delta_dir / f"delta_{delta_num:04d}.json"
+    delta_path.write_text(
+        json.dumps(delta_data, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
+    
+    # Update tracking
+    session._last_saved_msg_count = len(session.messages)
+    session._last_saved_transcript_count = len(session.transcript_entries)
+    session._delta_save_count += 1
 
-    # Update index
+
+def _consolidate_deltas(session: SessionData) -> None:
+    """Merge all delta files into the full session file and clean up.
+    
+    This is called periodically to prevent unbounded delta file growth
+    and to ensure the full session file stays consistent.
+    """
+    delta_dir = _session_delta_dir(session.session_id)
+    if not delta_dir.exists():
+        return
+    
+    # Deltas are already applied during load_session, so just clean up
+    for delta_file in sorted(delta_dir.glob("delta_*.json")):
+        try:
+            delta_file.unlink()
+        except OSError:
+            pass
+    
+    # Try to remove empty delta directory
+    try:
+        delta_dir.rmdir()
+        # Also try to remove parent if empty
+        parent = delta_dir.parent
+        if parent.name == DELTA_DIR_NAME and not any(parent.iterdir()):
+            parent.rmdir()
+    except OSError:
+        pass
+    
+    session._delta_save_count = 0
+
+
+def save_session(session: SessionData, force_full: bool = False) -> None:
+    """Persist session to disk with incremental delta support.
+    
+    Uses a hybrid strategy:
+    - Delta saves: Only append new messages/transcripts (fast, small I/O)
+    - Full saves: Serialize entire session (slower, but ensures consistency)
+    - Consolidation: Merge deltas into full file periodically
+    
+    Args:
+        session: The session to save
+        force_full: Force a full save (e.g., on explicit save command)
+    """
+    session.update_metadata()
+    SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Decide whether to do a full save or delta save
+    should_full_save = (
+        force_full
+        or session._delta_save_count == 0  # First save is always full
+        or session._delta_save_count >= FULL_SAVE_INTERVAL
+        or session._delta_save_count >= MAX_DELTA_FILES  # Safety cap
+    )
+    
+    if should_full_save:
+        # Full save: serialize everything
+        session_path = _session_file(session.session_id)
+        serializable = {
+            "session_id": session.session_id,
+            "created_at": session.created_at,
+            "updated_at": session.updated_at,
+            "workspace": session.workspace,
+            "messages": session.messages,
+            "transcript_entries": session.transcript_entries,
+            "history": session.history,
+            "permissions_summary": session.permissions_summary,
+            "skills": session.skills,
+            "mcp_servers": session.mcp_servers,
+            "metadata": {
+                "session_id": session.metadata.session_id,
+                "created_at": session.metadata.created_at,
+                "updated_at": session.metadata.updated_at,
+                "first_message": session.metadata.first_message,
+                "last_message": session.metadata.last_message,
+                "message_count": session.metadata.message_count,
+                "workspace": session.metadata.workspace,
+            },
+        }
+        session_path.write_text(
+            json.dumps(serializable, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        
+        # Reset delta tracking
+        session._last_saved_msg_count = len(session.messages)
+        session._last_saved_transcript_count = len(session.transcript_entries)
+        session._last_full_save_hash = session._compute_content_hash()
+        
+        # Consolidate and clean up delta files
+        _consolidate_deltas(session)
+    else:
+        # Delta save: only append new data
+        _save_delta(session)
+    
+    # Update index (always lightweight)
     index = _load_session_index()
     index[session.session_id] = session.metadata
     _save_session_index(index)
 
 
 def load_session(session_id: str) -> SessionData | None:
-    """Load a session from disk. Returns None if not found."""
+    """Load a session from disk, applying any pending deltas.
+    
+    Loading process:
+    1. Load the base session file
+    2. Scan for delta files
+    3. Apply deltas in order (append new messages/transcripts)
+    4. Update tracking counters
+    """
     session_path = _session_file(session_id)
     if not session_path.exists():
         return None
@@ -187,7 +337,7 @@ def load_session(session_id: str) -> SessionData | None:
         raw = session_path.read_text(encoding="utf-8")
         data = json.loads(raw)
         metadata = SessionMetadata(**data.get("metadata", {}))
-        return SessionData(
+        session = SessionData(
             session_id=data["session_id"],
             created_at=data["created_at"],
             updated_at=data["updated_at"],
@@ -200,6 +350,47 @@ def load_session(session_id: str) -> SessionData | None:
             mcp_servers=data.get("mcp_servers", []),
             metadata=metadata,
         )
+        
+        # Apply any pending deltas
+        delta_dir = _session_delta_dir(session_id)
+        if delta_dir.exists():
+            delta_files = sorted(delta_dir.glob("delta_*.json"))
+            for delta_path in delta_files:
+                try:
+                    delta_raw = delta_path.read_text(encoding="utf-8")
+                    delta = json.loads(delta_raw)
+                    
+                    # Append delta messages at the correct offset
+                    if "messages" in delta:
+                        offset = delta.get("msg_offset", len(session.messages))
+                        # Ensure we don't duplicate messages
+                        if offset >= len(session.messages):
+                            session.messages.extend(delta["messages"])
+                        elif offset + len(delta["messages"]) > len(session.messages):
+                            # Partial overlap — append only the new part
+                            overlap = len(session.messages) - offset
+                            session.messages.extend(delta["messages"][overlap:])
+                    
+                    # Append delta transcripts
+                    if "transcripts" in delta:
+                        t_offset = delta.get("transcript_offset", len(session.transcript_entries))
+                        if t_offset >= len(session.transcript_entries):
+                            session.transcript_entries.extend(delta["transcripts"])
+                        elif t_offset + len(delta["transcripts"]) > len(session.transcript_entries):
+                            overlap = len(session.transcript_entries) - t_offset
+                            session.transcript_entries.extend(delta["transcripts"][overlap:])
+                    
+                    session._delta_save_count += 1
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    # Skip corrupt delta files
+                    continue
+        
+        # Update tracking counters
+        session._last_saved_msg_count = len(session.messages)
+        session._last_saved_transcript_count = len(session.transcript_entries)
+        session._last_full_save_hash = session._compute_content_hash()
+        
+        return session
     except (json.JSONDecodeError, KeyError, TypeError):
         return None
 
@@ -272,13 +463,18 @@ def get_latest_session(workspace: str | None = None) -> SessionData | None:
 # ---------------------------------------------------------------------------
 
 class AutosaveManager:
-    """Manages automatic session saving with rate limiting."""
+    """Manages automatic session saving with rate limiting and delta support.
+    
+    Uses incremental saves for autosave (fast) and full saves for
+    explicit save commands (consistent).
+    """
 
     def __init__(self, session: SessionData, interval: int = AUTOSAVE_INTERVAL_SECONDS):
         self.session = session
         self.interval = interval
         self._last_save_time = time.time()  # Initialize to current time
         self._dirty = False
+        self._full_save_counter = 0
 
     def mark_dirty(self) -> None:
         """Mark session as needing save."""
@@ -292,19 +488,25 @@ class AutosaveManager:
         return elapsed >= self.interval
 
     def save_if_needed(self) -> bool:
-        """Save if dirty and interval elapsed. Returns True if saved."""
+        """Save if dirty and interval elapsed. Uses delta saves for speed.
+        
+        Returns True if saved.
+        """
         if self.should_save():
-            save_session(self.session)
+            # Use incremental delta save for autosave (fast)
+            save_session(self.session, force_full=False)
             self._last_save_time = time.time()
             self._dirty = False
+            self._full_save_counter += 1
             return True
         return False
 
     def force_save(self) -> None:
-        """Force immediate save regardless of interval."""
-        save_session(self.session)
+        """Force immediate full save regardless of interval."""
+        save_session(self.session, force_full=True)
         self._last_save_time = time.time()
         self._dirty = False
+        self._full_save_counter = 0
 
 
 # ---------------------------------------------------------------------------

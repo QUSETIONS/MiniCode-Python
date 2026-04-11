@@ -1,0 +1,124 @@
+# =============================================================================
+# MiniCode Python — Docker Compose
+# =============================================================================
+# Inspired by Hermes Agent's flexible deployment model.
+# Supports four modes:
+#   1. cli       — Interactive terminal session (default)
+#   2. gateway   — Web API + multi-platform bridge (Telegram/Discord/Slack)
+#   3. cron      — Scheduled task runner
+#   4. headless  — One-shot non-interactive execution
+#
+# Usage:
+#   docker compose run --rm cli
+#   docker compose run --rm -e ANTHROPIC_API_KEY=sk-ant-... cli
+#   docker compose up gateway
+#   docker compose run --rm headless "帮我分析这个项目的结构"
+# =============================================================================
+
+services:
+  # ===========================================================================
+  # Mode 1: Interactive CLI — the classic MiniCode experience
+  # ===========================================================================
+  cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: minicode-py:latest
+    container_name: minicode-cli
+    stdin_open: true        # docker -i
+    tty: true               # docker -t
+    init: true              # tini for proper signal handling
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
+      - MINI_CODE_LOG_LEVEL=${MINI_CODE_LOG_LEVEL:-WARNING}
+    volumes:
+      # Mount workspace (current directory by default)
+      - ${MINI_CODE_WORKSPACE:-.}:/workspace
+      # Persist user-level config, memory, skills across containers
+      - minicode-home:/home/minicode/.mini-code
+    working_dir: /workspace
+
+  # ===========================================================================
+  # Mode 2: Gateway — Web API for multi-platform access
+  # ===========================================================================
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: minicode-py:latest
+    container_name: minicode-gateway
+    init: true
+    ports:
+      - "${MINI_CODE_GATEWAY_PORT:-8080}:8080"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
+      - MINI_CODE_GATEWAY=1
+      - MINI_CODE_GATEWAY_PORT=8080
+      - MINI_CODE_GATEWAY_HOST=0.0.0.0
+      - MINI_CODE_LOG_LEVEL=${MINI_CODE_LOG_LEVEL:-INFO}
+      # Platform tokens (set in .env or environment)
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN:-}
+    volumes:
+      - ${MINI_CODE_WORKSPACE:-.}:/workspace
+      - minicode-home:/home/minicode/.mini-code
+    working_dir: /workspace
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ===========================================================================
+  # Mode 3: Cron — Scheduled task runner
+  # ===========================================================================
+  cron:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: minicode-py:latest
+    container_name: minicode-cron
+    init: true
+    entrypoint: ["python", "-m", "minicode.cron_runner"]
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
+      - MINI_CODE_CRON_CONFIG=/workspace/.mini-code/cron.json
+      - MINI_CODE_LOG_LEVEL=${MINI_CODE_LOG_LEVEL:-INFO}
+    volumes:
+      - ${MINI_CODE_WORKSPACE:-.}:/workspace
+      - minicode-home:/home/minicode/.mini-code
+    working_dir: /workspace
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Mode 4: Headless — One-shot non-interactive execution
+  # ===========================================================================
+  headless:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: minicode-py:latest
+    container_name: minicode-headless
+    init: true
+    entrypoint: ["python", "-m", "minicode.headless"]
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
+      - MINI_CODE_LOG_LEVEL=${MINI_CODE_LOG_LEVEL:-WARNING}
+    volumes:
+      - ${MINI_CODE_WORKSPACE:-.}:/workspace
+      - minicode-home:/home/minicode/.mini-code
+    working_dir: /workspace
+
+# =============================================================================
+# Named volumes — persist config, memory, and skills across containers
+# =============================================================================
+volumes:
+  minicode-home:
+    driver: local

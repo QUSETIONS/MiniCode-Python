@@ -6,13 +6,12 @@ import os
 from pathlib import Path
 
 from minicode.agent_loop import run_agent_turn
-from minicode.anthropic_adapter import AnthropicModelAdapter
 from minicode.cli_commands import find_matching_slash_commands, try_handle_local_command
 from minicode.config import load_runtime_config
 from minicode.history import load_history_entries, save_history_entries
 from minicode.local_tool_shortcuts import parse_local_tool_shortcut
 from minicode.manage_cli import maybe_handle_management_command
-from minicode.mock_model import MockModelAdapter
+from minicode.model_registry import create_model_adapter, detect_provider, format_model_status, format_model_list
 from minicode.permissions import PermissionManager
 from minicode.prompt import build_system_prompt
 from minicode.tools import create_default_tool_registry
@@ -188,10 +187,14 @@ def main() -> None:
     prompt_handler = _make_cli_permission_prompt() if sys.stdin.isatty() else None
     tools = create_default_tool_registry(cwd, runtime=runtime)
     permissions = PermissionManager(cwd, prompt=prompt_handler)
-    model = (
-        MockModelAdapter()
-        if runtime is None or os.environ.get("MINI_CODE_MODEL_MODE") == "mock"
-        else AnthropicModelAdapter(runtime, tools)
+    
+    # Use unified model registry for adapter creation
+    force_mock = runtime is None
+    model = create_model_adapter(
+        model=runtime.get("model", "") if runtime else "",
+        tools=tools,
+        runtime=runtime,
+        force_mock=force_mock,
     )
     
     # Initialize ContextManager for context window management
@@ -207,6 +210,25 @@ def main() -> None:
     from minicode.memory import MemoryManager
     memory_mgr = MemoryManager(project_root=Path(cwd))
     logger.info("Memory manager initialized")
+    
+    # Initialize UserProfileManager for user preferences
+    from minicode.user_profile import UserProfileManager
+    profile_manager = UserProfileManager(cwd=cwd)
+    merged_profile = profile_manager.load_merged()
+    logger.info("User profile manager initialized (global=%s, project=%s)",
+                profile_manager.global_path.exists(),
+                profile_manager.project_path.exists())
+    
+    # Initialize Store for global state management (inspired by Claude Code's Zustand store)
+    from minicode.state import create_app_store
+    app_store = create_app_store(
+        initial={
+            "session_id": args.session or "new",
+            "workspace": cwd,
+            "model": runtime.get("model", "mock") if runtime else "mock",
+        }
+    )
+    logger.info("Store initialized with session: %s", app_store.get_state().session_id)
     
     messages = [
         {
@@ -306,7 +328,9 @@ def main() -> None:
                     messages=messages,
                     cwd=cwd,
                     permissions=permissions,
+                    store=app_store,
                     context_manager=context_mgr,
+                    runtime=runtime,
                 )
                 permissions.end_turn()
                 

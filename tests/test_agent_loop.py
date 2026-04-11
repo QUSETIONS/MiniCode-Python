@@ -8,7 +8,7 @@ class ScriptedModel(ModelAdapter):
         self._steps = steps
         self.calls = 0
 
-    def next(self, messages: list[ChatMessage]) -> AgentStep:
+    def next(self, messages: list[ChatMessage], on_stream_chunk=None) -> AgentStep:
         step = self._steps[self.calls]
         self.calls += 1
         return step
