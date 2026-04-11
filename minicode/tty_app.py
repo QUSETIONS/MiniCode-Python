@@ -28,21 +28,10 @@ from minicode.cli_commands import (
     try_handle_local_command,
 )
 from minicode.cost_tracker import CostTracker
-from minicode.history import load_history_entries
 from minicode.local_tool_shortcuts import parse_local_tool_shortcut
 from minicode.permissions import PermissionManager
-from minicode.session import (
-    AutosaveManager,
-    SessionData,
-    create_new_session,
-    format_session_list,
-    format_session_resume,
-    get_latest_session,
-    list_sessions,
-    load_session,
-    save_session,
-)
-from minicode.state import Store, create_app_store
+from minicode.session import SessionData
+from minicode.state import Store
 from minicode.tooling import ToolRegistry
 from minicode.tui.chrome import (
     _cached_terminal_size,
@@ -76,6 +65,7 @@ from minicode.tui.navigation import _scroll_transcript_by, _jump_transcript_to_e
 from minicode.tui.tool_helpers import _is_file_edit_tool, _extract_path_from_tool_input, _summarize_collapsed_tool_body, _summarize_tool_input, _apply_tool_result_visual_state as _shared_apply_tool_result_visual_state, _mark_unfinished_tools as _shared_mark_unfinished_tools, _save_transcript as _shared_save_transcript
 from minicode.tui.tool_lifecycle import _push_transcript_entry, _update_tool_entry, _collapse_tool_entry, _finalize_dangling_running_tools, _schedule_tool_auto_collapse, _get_running_tool_entries
 from minicode.tui.event_flow import _handle_event as _handle_tty_event
+from minicode.tui.session_flow import handle_session_listing, load_or_create_session, build_tty_runtime_state, install_permission_prompt, finalize_tty_session
 from minicode.tui.renderer import _render_screen
 from minicode.tui.input_handler import _RawModeContext, _handle_input
 
@@ -170,109 +160,19 @@ def run_tty_app(
         list_sessions_only: If True, print session list and exit
     """
 
-    args = TtyAppArgs(
-        runtime=runtime,
-        tools=tools,
-        model=model,
-        messages=messages,
-        cwd=cwd,
-        permissions=permissions,
-    )
-
-    # Session initialization
-    session: SessionData | None = None
-    
-    if list_sessions_only:
-        sessions = list_sessions()
-        print(format_session_list(sessions))
+    if handle_session_listing(cwd, list_sessions_only):
         return messages
-    
-    if resume_session:
-        if resume_session == "latest":
-            session = get_latest_session(workspace=str(Path(cwd).resolve()))
-            if session:
-                print(format_session_resume(session))
-            else:
-                print("No previous session found for this workspace.")
-                session = create_new_session(workspace=str(Path(cwd).resolve()))
-        else:
-            session = load_session(resume_session)
-            if not session:
-                print(f"Session '{resume_session}' not found.")
-                return messages
-            print(format_session_resume(session))
-    else:
-        # Check for existing session in current workspace
-        session = get_latest_session(workspace=str(Path(cwd).resolve()))
-        if session:
-            print(f"Previous session found: {session.session_id[:8]}")
-            print("Use --resume to continue, or starting fresh session.")
-            session = None
-    
-    if not session:
-        session = create_new_session(workspace=str(Path(cwd).resolve()))
-    
-    # Initialize AppState store (Zustand-style)
-    app_state_store = create_app_store({
-        "session_id": session.session_id,
-        "workspace": cwd,
-        "model": runtime.get("model", "unknown") if runtime else "unknown",
-    })
-    
-    # Initialize CostTracker
-    cost_tracker = CostTracker()
 
-    state = ScreenState(
-        history=load_history_entries(),
-        session=session,
-        autosave=AutosaveManager(session),
-        app_state=app_state_store,
-        cost_tracker=cost_tracker,
-    )
-    state.history_index = len(state.history)
-
-    # Restore session state if resuming
-    if session.messages:
-        # Restore messages
-        args.messages.clear()
-        args.messages.extend(session.messages)
-        
-        # Restore transcript entries
-        for entry_data in session.transcript_entries:
-            entry = TranscriptEntry(**entry_data)
-            state.transcript.append(entry)
-        
-        print(f"Restored {len(session.messages)} messages, {len(state.transcript)} transcript entries.")
-
-    # Wire up permission prompt handler
-    approval_event = threading.Event()
-    approval_result: dict[str, Any] = {}
-
-    def _permission_prompt_handler(request: dict[str, Any]) -> dict[str, Any]:
-        nonlocal approval_result
-        state.pending_approval = PendingApproval(
-            request=request,
-            resolve=lambda r: None,
-        )
-        # Signal the main thread's throttled renderer to show the approval UI.
-        # Do NOT call _render_screen() here — we're on the agent thread and
-        # writing to stdout concurrently with the main thread would corrupt
-        # the terminal display.  request() only sets a pending flag; the main
-        # event loop's next flush() will do the actual render safely.
-        rerender()
-        approval_event.clear()
-        approval_event.wait()
-        result = approval_result.copy()
-        state.pending_approval = None
-        return result
-
-    permissions.prompt = _permission_prompt_handler
+    session = load_or_create_session(cwd, resume_session)
+    args, state = build_tty_runtime_state(runtime, tools, model, messages, cwd, permissions, session)
 
     # Throttled renderer: coalesces rapid rerender() calls to reduce flickering
     throttled = _ThrottledRenderer(lambda: _render_screen(args, state), min_interval=0.016)
 
     def rerender() -> None:
         throttled.request()
+
+    approval_event, approval_result, _ = install_permission_prompt(args, state, rerender)
 
     input_remainder = ""
     should_exit = False
@@ -403,35 +303,7 @@ def run_tty_app(
         show_cursor()
         exit_alternate_screen()
         
-        # Final session save
-        if state.session:
-            # Update session with current state
-            state.session.messages = list(args.messages)
-            state.session.transcript_entries = [
-                {
-                    "id": e.id,
-                    "kind": e.kind,
-                    "toolName": e.toolName,
-                    "status": e.status,
-                    "body": e.body,
-                    "collapsed": e.collapsed,
-                    "collapsedSummary": e.collapsedSummary,
-                    "collapsePhase": e.collapsePhase,
-                }
-                for e in state.transcript
-            ]
-            state.session.history = state.history
-            state.session.permissions_summary = args.permissions.get_summary()
-            state.session.skills = args.tools.get_skills()
-            state.session.mcp_servers = args.tools.get_mcp_servers()
-            
-            # Force save
-            if state.autosave:
-                state.autosave.force_save()
-            else:
-                save_session(state.session)
-            
-            print(f"\nSession saved: {state.session.session_id[:8]}")
+        finalize_tty_session(args, state)
 
     return args.messages
 
