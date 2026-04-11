@@ -20,6 +20,7 @@ from minicode.session import (
 )
 from minicode.state import create_app_store
 from minicode.tui.state import PendingApproval, ScreenState, TtyAppArgs
+from minicode.tui.tool_lifecycle import _bump_transcript_revision
 from minicode.tui.types import TranscriptEntry
 
 
@@ -93,6 +94,7 @@ def build_tty_runtime_state(
         args.messages.extend(session.messages)
         for entry_data in session.transcript_entries:
             state.transcript.append(TranscriptEntry(**entry_data))
+        _bump_transcript_revision(state)
         print(f"Restored {len(session.messages)} messages, {len(state.transcript)} transcript entries.")
 
     return args, state

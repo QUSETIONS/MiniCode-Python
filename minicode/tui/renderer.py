@@ -104,7 +104,7 @@ def _render_prompt_panel(state: ScreenState) -> str:
 
 def _compute_render_hash(args: TtyAppArgs, state: ScreenState) -> int:
     """Compute a hash of the current render state to detect if redraw is needed."""
-    transcript_len = len(state.transcript)
+    transcript_rev = state.transcript_revision
     scroll = state.transcript_scroll_offset
     input_hash = hash(state.input)
     cursor = state.cursor_offset
@@ -115,7 +115,7 @@ def _compute_render_hash(args: TtyAppArgs, state: ScreenState) -> int:
         state.pending_approval.selected_choice_index if state.pending_approval else 0,
     )) if state.pending_approval else 0
     term_size = _cached_terminal_size()
-    return hash((transcript_len, scroll, input_hash, cursor, status, approval, term_size))
+    return hash((transcript_rev, scroll, input_hash, cursor, status, approval, term_size))
 
 
 def _render_screen(args: TtyAppArgs, state: ScreenState) -> None:
@@ -179,7 +179,10 @@ def _render_screen(args: TtyAppArgs, state: ScreenState) -> None:
     body_lines = _get_transcript_body_lines(args, state)
     if transcript_snapshot:
         transcript_body = render_transcript(
-            transcript_snapshot, state.transcript_scroll_offset, body_lines
+            transcript_snapshot,
+            state.transcript_scroll_offset,
+            body_lines,
+            state.transcript_revision,
         )
     else:
         transcript_body = f"{render_status_line(None)}\n\nType /help for commands."

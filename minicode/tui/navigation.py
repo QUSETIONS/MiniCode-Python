@@ -33,6 +33,7 @@ def _get_max_transcript_scroll_offset(args: TtyAppArgs, state: ScreenState) -> i
     return get_transcript_max_scroll_offset(
         state.transcript,
         _get_transcript_body_lines(args, state),
+        state.transcript_revision,
     )
 
 

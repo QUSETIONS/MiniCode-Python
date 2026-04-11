@@ -11,7 +11,7 @@ from minicode.local_tool_shortcuts import parse_local_tool_shortcut
 from minicode.tui.navigation import _scroll_pending_approval_by, _toggle_pending_approval_expand, _move_pending_approval_selection, _scroll_transcript_by, _jump_transcript_to_edge, _history_up, _history_down, _get_visible_commands
 from minicode.tui.chrome import _cached_terminal_size
 from minicode.tui.tool_helpers import _summarize_tool_input, _is_file_edit_tool, _extract_path_from_tool_input, _summarize_collapsed_tool_body
-from minicode.tui.tool_lifecycle import _push_transcript_entry, _update_tool_entry, _collapse_tool_entry, _finalize_dangling_running_tools, _get_running_tool_entries, _schedule_tool_auto_collapse
+from minicode.tui.tool_lifecycle import _push_transcript_entry, _update_tool_entry, _update_transcript_entry, _append_to_transcript_entry, _collapse_tool_entry, _finalize_dangling_running_tools, _get_running_tool_entries, _schedule_tool_auto_collapse
 
 logger = logging.getLogger("minicode.input_handler")
 
@@ -373,10 +373,7 @@ def _handle_input(
         if active_stream_entry_id is None:
             active_stream_entry_id = _push_transcript_entry(state, kind="assistant", body=content)
         else:
-            for entry in state.transcript:
-                if entry.id == active_stream_entry_id:
-                    entry.body += content
-                    break
+            _append_to_transcript_entry(state, active_stream_entry_id, content)
         state.transcript_scroll_offset = 0
         rerender()
 
@@ -390,10 +387,7 @@ def _handle_input(
         if is_unsafe:
             logger.warning("Potentially unsafe output detected: %s", unsafe_reason)
         if active_stream_entry_id is not None:
-            for entry in state.transcript:
-                if entry.id == active_stream_entry_id:
-                    entry.body = content
-                    break
+            _update_transcript_entry(state, active_stream_entry_id, body=content)
             active_stream_entry_id = None
         else:
             _push_transcript_entry(state, kind="assistant", body=content)
@@ -403,11 +397,7 @@ def _handle_input(
     def on_progress_message(content: str) -> None:
         nonlocal active_stream_entry_id
         if active_stream_entry_id is not None:
-            for entry in state.transcript:
-                if entry.id == active_stream_entry_id:
-                    entry.kind = "progress"
-                    entry.body = content
-                    break
+            _update_transcript_entry(state, active_stream_entry_id, kind="progress", body=content)
             active_stream_entry_id = None
         else:
             _push_transcript_entry(state, kind="progress", body=content)

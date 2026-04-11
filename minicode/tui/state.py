@@ -50,6 +50,7 @@ class ScreenState:
     cursor_offset: int = 0
     transcript: list[TranscriptEntry] = field(default_factory=list)
     transcript_scroll_offset: int = 0
+    transcript_revision: int = 0
     selected_slash_index: int = 0
     status: str | None = None
     active_tool: str | None = None
