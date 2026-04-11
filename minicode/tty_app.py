@@ -47,12 +47,6 @@ from minicode.tui.input_parser import (
     WheelEvent,
     parse_input_chunk,
 )
-from minicode.tui.screen import (
-    enter_alternate_screen,
-    exit_alternate_screen,
-    hide_cursor,
-    show_cursor,
-)
 from minicode.tui.transcript import (
     _render_transcript_lines,
 )
@@ -65,6 +59,7 @@ from minicode.tui.navigation import _scroll_transcript_by, _jump_transcript_to_e
 from minicode.tui.tool_helpers import _is_file_edit_tool, _extract_path_from_tool_input, _summarize_collapsed_tool_body, _summarize_tool_input, _apply_tool_result_visual_state as _shared_apply_tool_result_visual_state, _mark_unfinished_tools as _shared_mark_unfinished_tools, _save_transcript as _shared_save_transcript
 from minicode.tui.tool_lifecycle import _push_transcript_entry, _update_tool_entry, _collapse_tool_entry, _finalize_dangling_running_tools, _schedule_tool_auto_collapse, _get_running_tool_entries
 from minicode.tui.event_flow import _handle_event as _handle_tty_event
+from minicode.tui.runtime_control import enter_tty_runtime, exit_tty_runtime, install_sigwinch_rerender
 from minicode.tui.session_flow import handle_session_listing, load_or_create_session, build_tty_runtime_state, install_permission_prompt, finalize_tty_session
 from minicode.tui.renderer import _render_screen
 from minicode.tui.input_handler import _RawModeContext, _handle_input
@@ -180,30 +175,12 @@ def run_tty_app(
     _autosave_counter = 0
     _AUTOSAVE_CHECK_INTERVAL = 100  # iterations (~2s at 20ms polling)
 
-    enter_alternate_screen()
-    hide_cursor()
+    enter_tty_runtime()
 
     # On Unix, listen for SIGWINCH so terminal resizes are picked up
     # immediately rather than waiting for the 0.5s cache TTL.
     # signal.signal() can only be called from the main thread.
-    _prev_sigwinch = None
-    if (
-        sys.platform != "win32"
-        and threading.current_thread() is threading.main_thread()
-    ):
-        import signal as _signal
-
-        from minicode.tui.chrome import invalidate_terminal_size_cache
-
-        def _on_sigwinch(_signum: int, _frame: Any) -> None:
-            invalidate_terminal_size_cache()
-            throttled.request()
-
-        try:
-            _prev_sigwinch = _signal.signal(_signal.SIGWINCH, _on_sigwinch)
-        except (OSError, ValueError):
-            # Couldn't set signal handler (e.g. not main thread despite check)
-            _prev_sigwinch = None
+    _prev_sigwinch = install_sigwinch_rerender(throttled)
 
     try:
         _render_screen(args, state)
@@ -295,13 +272,7 @@ def run_tty_app(
 
     finally:
         # Restore previous SIGWINCH handler on Unix
-        if _prev_sigwinch is not None and sys.platform != "win32":
-            import signal as _signal
-
-            _signal.signal(_signal.SIGWINCH, _prev_sigwinch)
-
-        show_cursor()
-        exit_alternate_screen()
+        exit_tty_runtime(_prev_sigwinch)
         
         finalize_tty_session(args, state)
 
