@@ -8,8 +8,10 @@ from minicode.tui.input_parser import KeyEvent, ParsedInputEvent, TextEvent, Whe
 from minicode.tui.state import ScreenState, TtyAppArgs
 from minicode.cli_commands import try_handle_local_command, find_matching_slash_commands
 from minicode.local_tool_shortcuts import parse_local_tool_shortcut
-from minicode.tui.state import _scroll_pending_approval_by, _toggle_pending_approval_expand, _move_pending_approval_selection, _scroll_transcript_by, _jump_transcript_to_edge, _history_up, _history_down, _get_visible_commands
+from minicode.tui.navigation import _scroll_pending_approval_by, _toggle_pending_approval_expand, _move_pending_approval_selection, _scroll_transcript_by, _jump_transcript_to_edge, _history_up, _history_down, _get_visible_commands
 from minicode.tui.chrome import _cached_terminal_size
+from minicode.tui.tool_helpers import _summarize_tool_input, _is_file_edit_tool, _extract_path_from_tool_input, _summarize_collapsed_tool_body
+from minicode.tui.tool_lifecycle import _push_transcript_entry, _update_tool_entry, _collapse_tool_entry, _finalize_dangling_running_tools, _get_running_tool_entries, _schedule_tool_auto_collapse
 
 logger = logging.getLogger("minicode.input_handler")
 

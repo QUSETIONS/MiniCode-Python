@@ -19,6 +19,9 @@ from minicode.tui.input import render_input_prompt
 from minicode.tui.screen import clear_screen, enter_alternate_screen, exit_alternate_screen, hide_cursor, show_cursor
 from minicode.tui.transcript import _render_transcript_lines, get_transcript_window_size, render_transcript
 from minicode.tui.state import TtyAppArgs, ScreenState
+from minicode.tui.navigation import _get_transcript_body_lines
+from minicode.tui.tool_helpers import _get_session_stats
+from minicode.tui.ui_hints import _get_contextual_help
 
 # Rendering — cached header & footer
 # ---------------------------------------------------------------------------
