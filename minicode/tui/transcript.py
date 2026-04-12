@@ -149,7 +149,8 @@ class TranscriptLayout:
 
 _entry_cache: dict[int, list[str]] = {}
 _line_count_cache: dict[int, int] = {}
-_layout_cache: dict[int, TranscriptLayout] = {}
+_LayoutCacheKey = tuple[int, int, int]
+_layout_cache: dict[_LayoutCacheKey, TranscriptLayout] = {}
 _CACHE_MAX_SIZE = 500
 _LAYOUT_CACHE_MAX_SIZE = 64
 
@@ -205,12 +206,22 @@ def _get_entry_line_count(entry: TranscriptEntry) -> int:
     return count
 
 
+def _layout_cache_key(
+    entries: list[TranscriptEntry],
+    revision: int | None,
+) -> _LayoutCacheKey | None:
+    if revision is None:
+        return None
+    return (id(entries), revision, len(entries))
+
+
 def _build_transcript_layout(
     entries: list[TranscriptEntry],
     revision: int | None,
 ) -> TranscriptLayout:
-    if revision is not None:
-        cached = _layout_cache.get(revision)
+    cache_key = _layout_cache_key(entries, revision)
+    if cache_key is not None:
+        cached = _layout_cache.get(cache_key)
         if cached is not None:
             return cached
 
@@ -233,11 +244,11 @@ def _build_transcript_layout(
         entry_line_counts=entry_line_counts,
     )
 
-    if revision is not None:
+    if cache_key is not None:
         if len(_layout_cache) >= _LAYOUT_CACHE_MAX_SIZE:
             for key in list(_layout_cache.keys())[: len(_layout_cache) // 2]:
                 del _layout_cache[key]
-        _layout_cache[revision] = layout
+        _layout_cache[cache_key] = layout
     return layout
 
 

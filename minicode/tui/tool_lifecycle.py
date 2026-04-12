@@ -35,13 +35,28 @@ def _update_transcript_entry(state: ScreenState, entry_id: int, **kwargs: Any) -
     return False
 
 
-def _append_to_transcript_entry(state: ScreenState, entry_id: int, extra_body: str) -> bool:
-    for entry in state.transcript:
+def _find_transcript_entry(
+    state: ScreenState,
+    entry_id: int,
+    *,
+    prefer_tail: bool = False,
+) -> TranscriptEntry | None:
+    entries = reversed(state.transcript) if prefer_tail else state.transcript
+    for entry in entries:
         if entry.id == entry_id:
-            entry.body += extra_body
-            _bump_transcript_revision(state)
-            return True
-    return False
+            return entry
+    return None
+
+
+def _append_to_transcript_entry(state: ScreenState, entry_id: int, extra_body: str) -> bool:
+    if not extra_body:
+        return False
+    entry = _find_transcript_entry(state, entry_id, prefer_tail=True)
+    if entry is None:
+        return False
+    entry.body += extra_body
+    _bump_transcript_revision(state)
+    return True
 
 
 def _mark_running_tools_as_error(state: ScreenState, message: str) -> None:
@@ -61,34 +76,57 @@ def _mark_running_tools_as_error(state: ScreenState, message: str) -> None:
         _bump_transcript_revision(state)
 
 
-def _update_tool_entry(state: ScreenState, entry_id: int, status: str, body: str) -> None:
-    for entry in state.transcript:
-        if entry.id == entry_id and entry.kind == "tool":
-            entry.status = status
-            entry.body = body
-            entry.collapsed = False
-            entry.collapsedSummary = None
-            entry.collapsePhase = None
-            _bump_transcript_revision(state)
-            return
+def _update_tool_entry(state: ScreenState, entry_id: int, status: str, body: str) -> bool:
+    entry = _find_transcript_entry(state, entry_id, prefer_tail=True)
+    if entry is None or entry.kind != "tool":
+        return False
+
+    changed = False
+    updates = {
+        "status": status,
+        "body": body,
+        "collapsed": False,
+        "collapsedSummary": None,
+        "collapsePhase": None,
+    }
+    for key, value in updates.items():
+        if getattr(entry, key) != value:
+            setattr(entry, key, value)
+            changed = True
+    if changed:
+        _bump_transcript_revision(state)
+    return changed
 
 
-def _set_tool_entry_collapse_phase(state: ScreenState, entry_id: int, phase: int) -> None:
-    for entry in state.transcript:
-        if entry.id == entry_id and entry.kind == "tool" and entry.status != "running":
-            entry.collapsePhase = phase
-            _bump_transcript_revision(state)
-            return
+def _set_tool_entry_collapse_phase(state: ScreenState, entry_id: int, phase: int) -> bool:
+    entry = _find_transcript_entry(state, entry_id, prefer_tail=True)
+    if entry is None or entry.kind != "tool" or entry.status == "running":
+        return False
+    if entry.collapsePhase == phase:
+        return False
+    entry.collapsePhase = phase
+    _bump_transcript_revision(state)
+    return True
 
 
-def _collapse_tool_entry(state: ScreenState, entry_id: int, summary: str) -> None:
-    for entry in state.transcript:
-        if entry.id == entry_id and entry.kind == "tool" and entry.status != "running":
-            entry.collapsePhase = None
-            entry.collapsed = True
-            entry.collapsedSummary = summary
-            _bump_transcript_revision(state)
-            return
+def _collapse_tool_entry(state: ScreenState, entry_id: int, summary: str) -> bool:
+    entry = _find_transcript_entry(state, entry_id, prefer_tail=True)
+    if entry is None or entry.kind != "tool" or entry.status == "running":
+        return False
+
+    changed = False
+    updates = {
+        "collapsePhase": None,
+        "collapsed": True,
+        "collapsedSummary": summary,
+    }
+    for key, value in updates.items():
+        if getattr(entry, key) != value:
+            setattr(entry, key, value)
+            changed = True
+    if changed:
+        _bump_transcript_revision(state)
+    return changed
 
 
 def _get_running_tool_entries(state: ScreenState) -> list[TranscriptEntry]:
@@ -106,7 +144,6 @@ def _finalize_dangling_running_tools(state: ScreenState) -> None:
         )
         _mark_running_tools_as_error(state, error_message)
         state.status = f"Previous turn ended with {len(running)} unfinished tool call(s)."
-        _bump_transcript_revision(state)
 
 
 def _schedule_tool_auto_collapse(

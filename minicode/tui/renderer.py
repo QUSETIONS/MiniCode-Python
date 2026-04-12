@@ -1,8 +1,8 @@
 from __future__ import annotations
 import sys
 import time
-from functools import lru_cache
 from typing import Any
+from minicode.background_tasks import list_background_tasks
 from minicode.tui.chrome import (
     _cached_terminal_size,
     render_banner,
@@ -16,11 +16,11 @@ from minicode.tui.chrome import (
     RESET,
 )
 from minicode.tui.input import render_input_prompt
-from minicode.tui.screen import clear_screen, enter_alternate_screen, exit_alternate_screen, hide_cursor, show_cursor
-from minicode.tui.transcript import _render_transcript_lines, get_transcript_window_size, render_transcript
+from minicode.tui.transcript import render_transcript
 from minicode.tui.state import TtyAppArgs, ScreenState
-from minicode.tui.navigation import _get_transcript_body_lines
+from minicode.tui.navigation import _get_transcript_body_lines, _get_visible_commands
 from minicode.tui.tool_helpers import _get_session_stats
+from minicode.tui.types import TranscriptEntry
 from minicode.tui.ui_hints import _get_contextual_help
 
 # Rendering — cached header & footer
@@ -32,6 +32,10 @@ _banner_cache: dict[str, tuple[tuple, str]] = {"key": ((), "")}
 # Incremental rendering: track last rendered state to avoid full redraw
 _last_render_hash: int = 0
 _last_render_time: float = 0.0
+_transcript_snapshot_cache: dict[
+    str,
+    tuple[tuple[int, int, int], list[TranscriptEntry]],
+] = {}
 
 
 def _render_header_panel(args: TtyAppArgs, state: ScreenState) -> str:
@@ -109,13 +113,42 @@ def _compute_render_hash(args: TtyAppArgs, state: ScreenState) -> int:
     input_hash = hash(state.input)
     cursor = state.cursor_offset
     status = hash(state.status)
-    approval = hash((
-        state.pending_approval is not None,
-        state.pending_approval.details_expanded if state.pending_approval else False,
-        state.pending_approval.selected_choice_index if state.pending_approval else 0,
-    )) if state.pending_approval else 0
+    approval = 0
+    if state.pending_approval:
+        approval = hash((
+            state.pending_approval.details_expanded,
+            state.pending_approval.details_scroll_offset,
+            state.pending_approval.selected_choice_index,
+            state.pending_approval.feedback_mode,
+            state.pending_approval.feedback_input,
+        ))
+    recent_tool_state = tuple(
+        (tool.get("name"), tool.get("status"))
+        for tool in state.recent_tools[-3:]
+    )
     term_size = _cached_terminal_size()
-    return hash((transcript_rev, scroll, input_hash, cursor, status, approval, term_size))
+    return hash((
+        transcript_rev,
+        scroll,
+        input_hash,
+        cursor,
+        status,
+        state.active_tool,
+        recent_tool_state,
+        approval,
+        term_size,
+    ))
+
+
+def _get_transcript_snapshot(state: ScreenState) -> list[TranscriptEntry]:
+    cache_key = (id(state.transcript), state.transcript_revision, len(state.transcript))
+    cached = _transcript_snapshot_cache.get("key")
+    if cached and cached[0] == cache_key:
+        return cached[1]
+
+    snapshot = list(state.transcript)
+    _transcript_snapshot_cache["key"] = (cache_key, snapshot)
+    return snapshot
 
 
 def _render_screen(args: TtyAppArgs, state: ScreenState) -> None:
@@ -175,7 +208,7 @@ def _render_screen(args: TtyAppArgs, state: ScreenState) -> None:
     # Transcript — snapshot the list to avoid IndexError from concurrent
     # agent-thread appends (CPython GIL makes list.append atomic but
     # iteration + append can still race on length vs slot access).
-    transcript_snapshot = list(state.transcript)
+    transcript_snapshot = _get_transcript_snapshot(state)
     body_lines = _get_transcript_body_lines(args, state)
     if transcript_snapshot:
         transcript_body = render_transcript(
