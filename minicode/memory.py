@@ -448,24 +448,48 @@ class MemoryManager:
             return True
         return False
     
-    def search(self, query: str, scope: MemoryScope | None = None, limit: int = 20) -> list[MemoryEntry]:
+    def search(
+        self,
+        query: str,
+        scope: MemoryScope | None = None,
+        limit: int = 20,
+        min_relevance: float = 0.1,
+    ) -> list[MemoryEntry]:
         """Search across memory scopes with TF-IDF relevance ranking.
-        
+
+        Combines TF-IDF semantic relevance with usage frequency for
+        better result ranking than simple substring matching.
+
         Args:
             query: Search query string
             scope: Optional scope to limit search to
             limit: Maximum results to return
-        
+            min_relevance: Minimum relevance score threshold (0.0-1.0)
+
         Returns:
             Entries ranked by relevance (TF-IDF + usage + recency)
         """
         results = []
-        
+
         scopes_to_search = [scope] if scope else list(MemoryScope)
-        
+
         for s in scopes_to_search:
             results.extend(self.memories[s].search(query))
-        
+
+        # Apply minimum relevance threshold
+        # (entries are already scored by MemoryFile.search)
+        if min_relevance > 0:
+            # Normalize scores to 0-1 range for threshold comparison
+            if results:
+                max_score = max(
+                    self._score_entry(e, _tokenize(query)) for e in results
+                )
+                if max_score > 0:
+                    results = [
+                        e for e in results
+                        if self._score_entry(e, _tokenize(query)) / max_score >= min_relevance
+                    ]
+
         # Results are already ranked by MemoryFile.search()
         # Deduplicate by content (keep highest-scored)
         seen_content: set[str] = set()
@@ -475,8 +499,45 @@ class MemoryManager:
             if content_key not in seen_content:
                 seen_content.add(content_key)
                 deduped.append(entry)
-        
+
         return deduped[:limit]
+
+    def _score_entry(self, entry: MemoryEntry, query_tokens: list[str]) -> float:
+        """Compute relevance score for a memory entry."""
+        if not query_tokens:
+            return 0.0
+
+        # TF-IDF score
+        entry_tokens = _tokenize(
+            f"{entry.content} {entry.category} {' '.join(entry.tags)}"
+        )
+        idf = _compute_idf([entry_tokens])  # Single doc IDF for comparison
+        tfidf = _tfidf_score(query_tokens, entry_tokens, idf)
+
+        # Substring match bonus
+        query_lower = " ".join(query_tokens).lower()
+        content_lower = entry.content.lower()
+        substring_score = 0.0
+        if query_lower in content_lower:
+            substring_score = 2.0
+        elif any(q in content_lower for q in query_tokens):
+            substring_score = 1.0
+
+        # Category/tag match bonus
+        tag_score = 0.0
+        if any(query_lower in tag.lower() for tag in entry.tags):
+            tag_score = 1.5
+        if query_lower in entry.category.lower():
+            tag_score += 1.0
+
+        # Usage frequency bonus
+        usage_bonus = math.log1p(entry.usage_count) * 0.3
+
+        # Recency bonus
+        age_hours = (time.time() - entry.updated_at) / 3600
+        recency_bonus = 1.0 / (1.0 + age_hours / 24.0) * 0.5
+
+        return tfidf + substring_score + tag_score + usage_bonus + recency_bonus
     
     def get_relevant_context(
         self,
