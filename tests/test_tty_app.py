@@ -1,4 +1,5 @@
 from minicode.tty_app import (
+    _ThrottledRenderer,
     _apply_tool_result_visual_state,
     _format_history,
     _mark_unfinished_tools,
@@ -7,8 +8,13 @@ from minicode.tty_app import (
     summarize_tool_output,
 )
 from minicode.permissions import PermissionManager
+from minicode.tui.runtime_control import _ThrottledRenderer as RuntimeThrottledRenderer
 from minicode.tui.transcript import format_transcript_text
 from minicode.tui.types import TranscriptEntry
+
+
+def test_tty_app_uses_runtime_control_throttled_renderer() -> None:
+    assert _ThrottledRenderer is RuntimeThrottledRenderer
 
 
 def test_summarize_tool_output_prefers_first_meaningful_line() -> None:

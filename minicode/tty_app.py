@@ -13,53 +13,28 @@ from __future__ import annotations
 
 import logging
 import os
-import random
 import sys
 import threading
 import time
-from collections import defaultdict
-from dataclasses import dataclass, field
-from functools import lru_cache
-from pathlib import Path
 from typing import Any, Callable
 
-from minicode.cli_commands import (
-    SLASH_COMMANDS,
-    try_handle_local_command,
-)
-from minicode.cost_tracker import CostTracker
-from minicode.local_tool_shortcuts import parse_local_tool_shortcut
 from minicode.permissions import PermissionManager
-from minicode.session import SessionData
-from minicode.state import Store
 from minicode.tooling import ToolRegistry
-from minicode.tui.chrome import (
-    _cached_terminal_size,
-    get_permission_prompt_max_scroll_offset,
-    render_permission_prompt,
-    SUBTLE,
-    RESET,
-)
+from minicode.tui.chrome import _cached_terminal_size
 from minicode.tui.input_parser import (
     KeyEvent,
     ParsedInputEvent,
     TextEvent,
-    WheelEvent,
     parse_input_chunk,
-)
-from minicode.tui.transcript import (
-    _render_transcript_lines,
 )
 from minicode.tui.types import TranscriptEntry
 from minicode.types import ChatMessage, ModelAdapter
 
 # ---------------------------------------------------------------------------
-from minicode.tui.state import TtyAppArgs, ScreenState, PendingApproval
-from minicode.tui.navigation import _scroll_transcript_by, _jump_transcript_to_edge, _scroll_pending_approval_by, _toggle_pending_approval_expand, _move_pending_approval_selection, _history_up, _history_down, _get_visible_commands
-from minicode.tui.tool_helpers import _is_file_edit_tool, _extract_path_from_tool_input, _summarize_collapsed_tool_body, _summarize_tool_input, _apply_tool_result_visual_state as _shared_apply_tool_result_visual_state, _mark_unfinished_tools as _shared_mark_unfinished_tools, _save_transcript as _shared_save_transcript
-from minicode.tui.tool_lifecycle import _push_transcript_entry, _update_tool_entry, _collapse_tool_entry, _finalize_dangling_running_tools, _schedule_tool_auto_collapse, _get_running_tool_entries
+from minicode.tui.state import TtyAppArgs, ScreenState
+from minicode.tui.tool_helpers import _summarize_collapsed_tool_body, _summarize_tool_input, _apply_tool_result_visual_state as _shared_apply_tool_result_visual_state, _mark_unfinished_tools as _shared_mark_unfinished_tools, _save_transcript as _shared_save_transcript
 from minicode.tui.event_flow import _handle_event as _handle_tty_event
-from minicode.tui.runtime_control import enter_tty_runtime, exit_tty_runtime, install_sigwinch_rerender
+from minicode.tui.runtime_control import _ThrottledRenderer, enter_tty_runtime, exit_tty_runtime, install_sigwinch_rerender
 from minicode.tui.session_flow import handle_session_listing, load_or_create_session, build_tty_runtime_state, install_permission_prompt, finalize_tty_session
 from minicode.tui.renderer import _render_screen
 from minicode.tui.input_handler import _RawModeContext, _handle_input
@@ -69,67 +44,6 @@ from minicode.tui.input_handler import _RawModeContext, _handle_input
 
 # Alias to the single canonical implementation in chrome.py
 _get_terminal_size = _cached_terminal_size
-
-
-# ---------------------------------------------------------------------------
-# Throttled renderer
-# ---------------------------------------------------------------------------
-
-class _ThrottledRenderer:
-    """Coalesces rapid rerender() calls into at most one actual render per interval.
-
-    THREAD SAFETY: The actual render function (_render_fn) is ONLY executed on
-    the thread that calls ``flush()`` or ``force()``.  ``request()`` never
-    invokes the render function directly — it only marks a pending flag.  This
-    ensures that background threads (agent, collapse timer) can safely call
-    ``request()`` without writing to stdout concurrently with the main UI
-    thread.
-    """
-
-    __slots__ = ("_render_fn", "_min_interval", "_pending", "_last_render_time", "_lock")
-
-    def __init__(self, render_fn: Callable[[], None], min_interval: float = 0.033) -> None:
-        self._render_fn = render_fn
-        self._min_interval = min_interval  # ~30 fps cap (sufficient for terminal UI)
-        self._pending = False
-        self._last_render_time: float = 0.0
-        self._lock = threading.Lock()
-
-    def request(self) -> None:
-        """Mark that a rerender is needed.
-
-        This method is safe to call from any thread.  It never invokes the
-        render function — the actual render happens on the next ``flush()``
-        call from the main event loop.
-        """
-        with self._lock:
-            self._pending = True
-
-    def flush(self) -> None:
-        """Execute a pending render if the throttle interval has elapsed.
-
-        Must be called from the main UI thread only.
-        """
-        now = time.monotonic()
-        with self._lock:
-            if not self._pending:
-                return
-            elapsed = now - self._last_render_time
-            if elapsed < self._min_interval:
-                return  # Still within throttle window — defer
-            self._pending = False
-            self._last_render_time = now
-        self._render_fn()
-
-    def force(self) -> None:
-        """Unconditionally render now, ignoring throttle.
-
-        Must be called from the main UI thread only.
-        """
-        with self._lock:
-            self._pending = False
-            self._last_render_time = time.monotonic()
-        self._render_fn()
 
 
 # ---------------------------------------------------------------------------

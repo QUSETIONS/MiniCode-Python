@@ -147,17 +147,26 @@ class TranscriptLayout:
     entry_line_counts: list[int]
 
 
-_entry_cache: dict[int, list[str]] = {}
-_line_count_cache: dict[int, int] = {}
+_EntryCacheKey = tuple[
+    str,
+    str,
+    str | None,
+    bool,
+    int | None,
+    str | None,
+    str | None,
+]
+_entry_cache: dict[_EntryCacheKey, list[str]] = {}
+_line_count_cache: dict[_EntryCacheKey, int] = {}
 _LayoutCacheKey = tuple[int, int, int]
 _layout_cache: dict[_LayoutCacheKey, TranscriptLayout] = {}
 _CACHE_MAX_SIZE = 500
 _LAYOUT_CACHE_MAX_SIZE = 64
 
 
-def _entry_state_hash(entry: TranscriptEntry) -> int:
-    """Compute a stable hash from entry state for cache key."""
-    return hash((
+def _entry_cache_key(entry: TranscriptEntry) -> _EntryCacheKey:
+    """Build a collision-free key from entry render-affecting state."""
+    return (
         entry.kind,
         entry.body,
         entry.status,
@@ -165,13 +174,13 @@ def _entry_state_hash(entry: TranscriptEntry) -> int:
         entry.collapsePhase,
         entry.collapsedSummary,
         entry.toolName,
-    ))
+    )
 
 
 def _get_entry_lines(entry: TranscriptEntry) -> list[str]:
-    state_hash = _entry_state_hash(entry)
+    cache_key = _entry_cache_key(entry)
 
-    cached = _entry_cache.get(state_hash)
+    cached = _entry_cache.get(cache_key)
     if cached is not None:
         return cached
 
@@ -183,26 +192,26 @@ def _get_entry_lines(entry: TranscriptEntry) -> list[str]:
             del _entry_cache[k]
             _line_count_cache.pop(k, None)
 
-    _entry_cache[state_hash] = lines
+    _entry_cache[cache_key] = lines
     return lines
 
 
 def _get_entry_line_count(entry: TranscriptEntry) -> int:
-    state_hash = _entry_state_hash(entry)
+    cache_key = _entry_cache_key(entry)
 
-    cached_lc = _line_count_cache.get(state_hash)
+    cached_lc = _line_count_cache.get(cache_key)
     if cached_lc is not None:
         return cached_lc
 
-    cached_full = _entry_cache.get(state_hash)
+    cached_full = _entry_cache.get(cache_key)
     if cached_full is not None:
         count = len(cached_full)
-        _line_count_cache[state_hash] = count
+        _line_count_cache[cache_key] = count
         return count
 
     lines = _get_entry_lines(entry)
     count = len(lines)
-    _line_count_cache[state_hash] = count
+    _line_count_cache[cache_key] = count
     return count
 
 
