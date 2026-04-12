@@ -462,3 +462,40 @@ class PermissionManager:
         else:
             self.session_denied_edits.add(normalized_target)
         raise RuntimeError(f"Edit denied: {normalized_target}")
+
+
+class PermissionGate:
+    """Explicit permission gate for critical actions.
+
+    Provides a declarative way to check permissions before executing
+    high-risk operations (file writes, command execution, network requests).
+
+    Usage:
+        gate = PermissionGate(permissions, cwd)
+        gate.check_file_write("src/main.py")
+        gate.check_command_run("rm -rf /tmp")
+    """
+
+    def __init__(
+        self,
+        permissions: PermissionManager,
+        cwd: str,
+    ) -> None:
+        self.permissions = permissions
+        self.cwd = cwd
+
+    def check_path_access(self, target_path: str, intent: str) -> None:
+        """Gate for path access (read/write/list/search)."""
+        self.permissions.ensure_path_access(target_path, intent)
+
+    def check_file_write(self, target_path: str) -> None:
+        """Gate specifically for file write operations."""
+        self.check_path_access(target_path, "write")
+
+    def check_command_run(self, command: str, args: list[str]) -> None:
+        """Gate for command execution."""
+        self.permissions.ensure_command(command, args, self.cwd)
+
+    def check_file_edit(self, target_path: str, diff_preview: str) -> None:
+        """Gate for file edit operations with diff preview."""
+        self.permissions.ensure_edit(target_path, diff_preview)
