@@ -4,12 +4,16 @@ import os
 import sys
 import time
 import uuid
-from typing import Any
+from typing import Any, Callable
 
 from minicode.tooling import BackgroundTaskResult
 
 # In-memory registry of background tasks
 _background_tasks: dict[str, dict[str, Any]] = {}
+
+# Task slot management
+_max_slots: int = 5  # Maximum concurrent background tasks
+_slot_callbacks: dict[str, Callable] = {}  # Completion callbacks
 
 
 def _is_process_alive(pid: int) -> bool | None:
@@ -108,3 +112,83 @@ def get_background_task(task_id: str) -> dict[str, Any] | None:
     if record is None:
         return None
     return _refresh_record(record)
+
+
+# ---------------------------------------------------------------------------
+# Task Slot Management
+# ---------------------------------------------------------------------------
+
+def get_slot_stats() -> dict[str, Any]:
+    """Get current slot usage statistics."""
+    running = sum(1 for r in _background_tasks.values() if r.get("status") == "running")
+    return {
+        "used_slots": running,
+        "max_slots": _max_slots,
+        "available_slots": _max_slots - running,
+        "total_tracked": len(_background_tasks),
+    }
+
+
+def can_start_new_task() -> bool:
+    """Check if there's an available slot for a new task."""
+    stats = get_slot_stats()
+    return stats["available_slots"] > 0
+
+
+def set_max_slots(max_slots: int) -> None:
+    """Set the maximum number of concurrent background tasks."""
+    global _max_slots
+    _max_slots = max(1, max_slots)  # At least 1 slot
+
+
+def register_completion_callback(task_id: str, callback: Callable) -> None:
+    """Register a callback for when a task completes."""
+    _slot_callbacks[task_id] = callback
+
+
+def check_completed_tasks() -> list[str]:
+    """Check for completed tasks and fire callbacks.
+
+    Returns list of completed task IDs.
+    """
+    completed = []
+    for task_id, record in list(_background_tasks.items()):
+        if record.get("status") == "running":
+            refreshed = _refresh_record(record)
+            if refreshed["status"] != "running":
+                completed.append(task_id)
+                # Fire callback if registered
+                callback = _slot_callbacks.pop(task_id, None)
+                if callback:
+                    try:
+                        callback(task_id, refreshed)
+                    except Exception:
+                        pass  # Don't let callback errors break the loop
+    return completed
+
+
+def format_slot_status() -> str:
+    """Format slot status for display."""
+    stats = get_slot_stats()
+    running_tasks = [
+        r for r in _background_tasks.values() if r.get("status") == "running"
+    ]
+
+    lines = [
+        "Background Task Slots",
+        "=" * 50,
+        f"Slots: {stats['used_slots']}/{stats['max_slots']} used",
+        f"Available: {stats['available_slots']}",
+        f"Total tracked: {stats['total_tracked']}",
+        "",
+    ]
+
+    if running_tasks:
+        lines.append("Running Tasks:")
+        for task in running_tasks:
+            lines.append(
+                f"  • [{task.get('taskId', '?')}] {task.get('label', task.get('command', 'unknown'))}"
+            )
+        lines.append("")
+
+    return "\n".join(lines)
