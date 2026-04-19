@@ -47,6 +47,65 @@ _get_terminal_size = _cached_terminal_size
 
 
 # ---------------------------------------------------------------------------
+# Windows keyboard input — translate scan codes to Unix escape sequences
+# ---------------------------------------------------------------------------
+# On Windows, msvcrt.getwch() returns special keys (arrows, F-keys, nav keys)
+# as a two-byte sequence: a prefix (\x00 or \xe0) followed by a scan code.
+# The downstream input_parser.py expects Unix-style escape sequences, so we
+# translate here rather than teaching the parser about Windows.
+
+_WIN_SCAN_CODE_MAP: dict[str, str] = {
+    # Navigation keys (prefix \xe0)
+    "H": "\x1b[A",    # Up arrow
+    "P": "\x1b[B",    # Down arrow
+    "M": "\x1b[C",    # Right arrow
+    "K": "\x1b[D",    # Left arrow
+    "G": "\x1b[H",    # Home
+    "O": "\x1b[F",    # End
+    "S": "\x1b[3~",   # Delete
+    "R": "\x1b[2~",   # Insert
+    "I": "\x1b[5~",   # Page Up
+    "Q": "\x1b[6~",   # Page Down
+    # Function keys F1–F10 (prefix \x00)
+    ";": "\x1bOP",    # F1
+    "<": "\x1bOQ",    # F2
+    "=": "\x1bOR",    # F3
+    ">": "\x1bOS",    # F4
+    "?": "\x1b[15~",  # F5
+    "@": "\x1b[17~",  # F6
+    "A": "\x1b[18~",  # F7
+    "B": "\x1b[19~",  # F8
+    "C": "\x1b[20~",  # F9
+    "D": "\x1b[21~",  # F10
+}
+
+
+def _win_read_one_key() -> str:
+    """Read one key on Windows and translate special keys to Unix escape sequences.
+
+    msvcrt.getwch() returns normal characters as-is (e.g. 'a', '\\r', '\\x08',
+    '\\x1b'). Special keys arrive as a two-char sequence: '\\x00' (F-keys) or
+    '\\xe0' (arrows / nav) followed by a scan code. We translate the scan code
+    to the Unix escape sequence the input parser expects.
+
+    Returns:
+        Empty string if no key is buffered.
+        A single character for normal keys.
+        A multi-character escape sequence for special keys.
+    """
+    import msvcrt
+
+    if not msvcrt.kbhit():
+        return ""
+    ch = msvcrt.getwch()
+    if ch in ("\x00", "\xe0"):
+        # The scan code follows immediately on Windows — safe to block briefly.
+        scan = msvcrt.getwch()
+        return _WIN_SCAN_CODE_MAP.get(scan, "")
+    return ch
+
+
+# ---------------------------------------------------------------------------
 # Main event-driven TTY app
 # ---------------------------------------------------------------------------
 
