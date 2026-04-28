@@ -455,6 +455,18 @@ def test_memory_manager_get_context(tmp_path):
     assert "Entry 1" in context or "Entry 2" in context or "Entry 3" in context
 
 
+def test_memory_manager_handles_explicit_chat_memory(tmp_path):
+    """Test explicit chat memory input is persisted and searchable."""
+    workspace = str(tmp_path / "workspace")
+    (tmp_path / "workspace").mkdir()
+
+    mm = MemoryManager(workspace)
+    result = mm.handle_user_memory_input("# Prefer pytest before release")
+
+    assert result == "Saved memory (project): Prefer pytest before release"
+    assert any("pytest" in entry.content for entry in mm.search("pytest"))
+
+
 def test_inject_memory_into_prompt(tmp_path):
     """Test memory injection into system prompt."""
     workspace = str(tmp_path / "workspace")

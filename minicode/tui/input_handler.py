@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections import defaultdict
 import logging
 import os
 import sys
@@ -7,7 +8,11 @@ from typing import Any, Callable
 from minicode.tui.input_parser import KeyEvent, ParsedInputEvent, TextEvent, WheelEvent, parse_input_chunk
 from minicode.tui.state import ScreenState, TtyAppArgs
 from minicode.cli_commands import try_handle_local_command, find_matching_slash_commands
+from minicode.agent_loop import run_agent_turn
+from minicode.history import save_history_entries
 from minicode.local_tool_shortcuts import parse_local_tool_shortcut
+from minicode.prompt import build_system_prompt
+from minicode.tooling import ToolContext
 from minicode.tui.navigation import _scroll_pending_approval_by, _toggle_pending_approval_expand, _move_pending_approval_selection, _scroll_transcript_by, _jump_transcript_to_edge, _history_up, _history_down, _get_visible_commands
 from minicode.tui.chrome import _cached_terminal_size
 from minicode.tui.tool_helpers import _summarize_tool_input, _is_file_edit_tool, _extract_path_from_tool_input, _summarize_collapsed_tool_body
@@ -270,6 +275,14 @@ def _handle_input(
     if input_text == "/exit":
         return True
 
+    memory_mgr = getattr(args, "memory_manager", None)
+    if memory_mgr is not None:
+        memory_result = memory_mgr.handle_user_memory_input(input_text)
+        if memory_result is not None:
+            _push_transcript_entry(state, kind="user", body=input_text)
+            _push_transcript_entry(state, kind="assistant", body=memory_result)
+            return False
+
     # History
     if not state.history or state.history[-1] != input_text:
         state.history.append(input_text)
@@ -293,7 +306,7 @@ def _handle_input(
         return False
 
     # Local commands
-    local_result = try_handle_local_command(input_text, tools=args.tools)
+    local_result = try_handle_local_command(input_text, tools=args.tools, cwd=args.cwd)
     if local_result is not None:
         _push_transcript_entry(state, kind="assistant", body=local_result)
         return False
@@ -361,6 +374,7 @@ def _handle_input(
             {
                 "skills": args.tools.get_skills(),
                 "mcpServers": args.tools.get_mcp_servers(),
+                "memory_context": memory_mgr.get_relevant_context() if memory_mgr is not None else "",
             },
         ),
     }

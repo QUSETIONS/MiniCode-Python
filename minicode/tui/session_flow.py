@@ -66,6 +66,7 @@ def build_tty_runtime_state(
     cwd: str,
     permissions: PermissionManager,
     session: SessionData,
+    memory_manager: Any | None = None,
 ) -> tuple[TtyAppArgs, ScreenState]:
     args = TtyAppArgs(
         runtime=runtime,
@@ -74,6 +75,7 @@ def build_tty_runtime_state(
         messages=messages,
         cwd=cwd,
         permissions=permissions,
+        memory_manager=memory_manager,
     )
 
     state = ScreenState(

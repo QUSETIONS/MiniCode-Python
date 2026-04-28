@@ -1,4 +1,4 @@
-from minicode.cli_commands import find_matching_slash_commands, format_slash_commands
+from minicode.cli_commands import find_matching_slash_commands, format_slash_commands, try_handle_local_command
 from minicode.local_tool_shortcuts import parse_local_tool_shortcut
 
 
@@ -45,3 +45,10 @@ def test_format_slash_commands_includes_history_and_retry() -> None:
     commands = format_slash_commands()
     assert "/history" in commands
     assert "/retry" in commands
+
+
+def test_memory_command_uses_current_workspace(tmp_path) -> None:
+    result = try_handle_local_command("/memory", cwd=str(tmp_path))
+
+    assert result is not None
+    assert "Memory System Status" in result

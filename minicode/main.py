@@ -25,7 +25,7 @@ from minicode.workspace import resolve_tool_path
 def _handle_local_command(user_input: str, tools) -> str | None:
     if user_input == "/tools":
         return "\n".join(f"{tool.name}: {tool.description}" for tool in tools.list())
-    local_result = try_handle_local_command(user_input, tools=tools)
+    local_result = try_handle_local_command(user_input, tools=tools, cwd=str(Path.cwd()))
     return local_result
 
 
@@ -127,6 +127,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--validate-config",
+        "--valid-config",
         action="store_true",
         help="Validate configuration and exit",
     )
@@ -137,7 +138,9 @@ def main() -> None:
         help="Set logging level (default: WARNING)",
     )
 
-    args = parser.parse_args()
+    args, remaining_argv = parser.parse_known_args()
+    if remaining_argv and not any(not arg.startswith("--") for arg in remaining_argv):
+        parser.error(f"unrecognized arguments: {' '.join(remaining_argv)}")
 
     # Initialize logging
     from minicode.logging_config import setup_logging
@@ -156,7 +159,7 @@ def main() -> None:
         return
     
     cwd = str(Path.cwd())
-    argv = sys.argv[1:]
+    argv = remaining_argv
     
     # Filter out our custom args before passing to management commands
     management_argv = [a for a in argv if not a.startswith("--")]
@@ -283,6 +286,12 @@ def main() -> None:
                     saved_path = _save_transcript_file(cwd, permissions, transcript, output_path)
                     print(f"Saved transcript to {saved_path}")
                     continue
+                memory_result = memory_mgr.handle_user_memory_input(user_input)
+                if memory_result is not None:
+                    _append_transcript(transcript, kind="user", body=user_input)
+                    _append_transcript(transcript, kind="assistant", body=memory_result)
+                    print(memory_result)
+                    continue
                 local_result = _handle_local_command(user_input, tools)
                 if local_result is not None:
                     _append_transcript(transcript, kind="user", body=user_input)
@@ -318,6 +327,7 @@ def main() -> None:
                         {
                             "skills": tools.get_skills(),
                             "mcpServers": tools.get_mcp_servers(),
+                            "memory_context": memory_mgr.get_relevant_context(),
                         },
                     ),
                 }
@@ -353,6 +363,7 @@ def main() -> None:
             permissions=permissions,
             resume_session=args.resume,
             list_sessions_only=args.list_sessions,
+            memory_manager=memory_mgr,
         )
     except KeyboardInterrupt:
         print("\n\nInterrupted by user. Shutting down gracefully...")

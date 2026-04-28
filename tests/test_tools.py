@@ -6,6 +6,7 @@ from minicode.tools.patch_file import patch_file_tool
 from minicode.tools.run_command import run_command_tool
 from minicode.tools.write_file import write_file_tool
 from minicode.tooling import ToolContext
+from minicode.tools import create_default_tool_registry
 
 
 def test_split_command_line_supports_quotes() -> None:
@@ -80,3 +81,21 @@ def test_run_command_tool_supports_echo_on_current_platform(tmp_path: Path) -> N
 
     assert result.ok is True
     assert "hello" in result.output.lower()
+
+
+def test_default_tool_registry_is_core_first(tmp_path: Path) -> None:
+    tools = create_default_tool_registry(str(tmp_path), runtime=None)
+    names = {tool.name for tool in tools.list()}
+
+    assert "read_file" in names
+    assert "run_command" in names
+    assert "base64_encode" not in names
+    assert "csv_parse" not in names
+
+
+def test_full_tool_registry_can_opt_into_utility_wrappers(tmp_path: Path) -> None:
+    tools = create_default_tool_registry(str(tmp_path), runtime={"toolProfile": "full"})
+    names = {tool.name for tool in tools.list()}
+
+    assert "base64_encode" in names
+    assert "csv_parse" in names

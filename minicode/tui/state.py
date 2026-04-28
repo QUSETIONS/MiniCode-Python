@@ -20,6 +20,7 @@ class TtyAppArgs:
     messages: list[ChatMessage]
     cwd: str
     permissions: PermissionManager
+    memory_manager: Any | None = None
 
 
 @dataclass

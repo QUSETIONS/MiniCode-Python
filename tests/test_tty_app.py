@@ -9,6 +9,9 @@ from minicode.tty_app import (
 )
 from minicode.permissions import PermissionManager
 from minicode.tui.runtime_control import _ThrottledRenderer as RuntimeThrottledRenderer
+from minicode.tui.event_flow import _handle_event
+from minicode.tui.input_parser import KeyEvent
+from minicode.tui.state import ScreenState, TtyAppArgs
 from minicode.tui.transcript import format_transcript_text
 from minicode.tui.types import TranscriptEntry
 
@@ -111,3 +114,36 @@ def test_success_tool_entry_collapses_to_summary() -> None:
     assert entry.collapsed is True
     assert entry.collapsedSummary == "FILE: README.md"
     assert entry.collapsePhase == 3
+
+
+def test_empty_tty_return_does_not_start_input_handler(tmp_path) -> None:
+    calls = []
+    state = ScreenState(input="   ", cursor_offset=3)
+    args = TtyAppArgs(
+        runtime=None,
+        tools=None,
+        model=None,
+        messages=[],
+        cwd=str(tmp_path),
+        permissions=PermissionManager(str(tmp_path)),
+    )
+
+    def rerender() -> None:
+        calls.append("rerender")
+
+    def handle_input(*_args, **_kwargs):
+        calls.append("handle_input")
+        return False
+
+    _handle_event(
+        args,
+        state,
+        KeyEvent(name="return", ctrl=False, meta=False),
+        rerender,
+        __import__("threading").Event(),
+        {},
+        handle_input,
+    )
+
+    assert "handle_input" not in calls
+    assert state.input == ""

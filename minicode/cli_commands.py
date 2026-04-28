@@ -126,7 +126,7 @@ def complete_slash_command(line: str) -> tuple[list[str], str]:
     return (hits if hits else [command.usage for command in SLASH_COMMANDS], line)
 
 
-def try_handle_local_command(user_input: str, tools=None) -> str | None:
+def try_handle_local_command(user_input: str, tools=None, cwd: str | None = None) -> str | None:
     if user_input in {"/", "/help"}:
         return format_slash_commands()
 
@@ -168,29 +168,8 @@ def try_handle_local_command(user_input: str, tools=None) -> str | None:
         try:
             from minicode.memory import MemoryManager
             from pathlib import Path
-            memory_mgr = MemoryManager(project_root=Path(cwd))
-            
-            lines = ["Memory System Status", "=" * 40, ""]
-            
-            # Show summary
-            summary = memory_mgr.get_summary()
-            lines.append(f"User memory: {summary['user_entries']} entries")
-            lines.append(f"Project memory: {summary['project_entries']} entries")
-            lines.append(f"Local memory: {summary['local_entries']} entries")
-            lines.append(f"Total: {summary['total_entries']} entries")
-            lines.append("")
-            
-            # Show recent entries
-            lines.append("Recent Entries:")
-            recent = memory_mgr.search("", scope=None)[:10]  # Get 10 most recent
-            if recent:
-                for entry in recent:
-                    tags_str = f" [{', '.join(entry.tags)}]" if entry.tags else ""
-                    lines.append(f"  - {entry.content[:80]}{tags_str}")
-            else:
-                lines.append("  No entries yet")
-            
-            return "\n".join(lines)
+            memory_mgr = MemoryManager(project_root=Path(cwd) if cwd else Path.cwd())
+            return memory_mgr.format_stats()
         except Exception as e:
             return f"Error loading memory: {e}"
 

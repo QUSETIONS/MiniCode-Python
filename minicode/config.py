@@ -4,6 +4,7 @@ import json
 import os
 import re
 from pathlib import Path
+from urllib.parse import urlparse
 from typing import Any
 
 
@@ -235,8 +236,65 @@ def load_runtime_config(cwd: str | Path | None = None) -> dict[str, Any]:
         "projectUserProfilePath": str(proj_user_profile),
         "responseLanguage": response_language,
         "responseVerbosity": response_verbosity,
+        "toolProfile": str(
+            os.environ.get("MINI_CODE_TOOL_PROFILE")
+            or effective.get("toolProfile", "")
+            or "core"
+        ).strip().lower(),
         "sourceSummary": f"config: {MINI_CODE_SETTINGS_PATH} > {CLAUDE_SETTINGS_PATH} > process.env",
     }
+
+
+def _is_valid_http_url(value: str | None) -> bool:
+    if not value:
+        return False
+    parsed = urlparse(str(value))
+    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+
+
+def validate_provider_runtime(runtime: dict[str, Any]) -> list[str]:
+    """Validate the auth/base-url required by the detected provider.
+
+    A generic API key is not enough: if the selected model routes to OpenAI,
+    OpenAI-compatible credentials must be present; likewise for Anthropic,
+    OpenRouter, and custom endpoints.
+    """
+    from minicode.model_registry import Provider, detect_provider
+
+    model = str(runtime.get("model", "")).strip()
+    provider = detect_provider(model, runtime)
+    errors: list[str] = []
+
+    if provider == Provider.OPENAI:
+        if not runtime.get("openaiApiKey"):
+            errors.append(
+                "Provider is openai for this model, but OPENAI_API_KEY/openaiApiKey is not configured."
+            )
+        if not _is_valid_http_url(runtime.get("openaiBaseUrl")):
+            errors.append("OpenAI base URL must be an http(s) URL.")
+    elif provider == Provider.OPENROUTER:
+        if not runtime.get("openrouterApiKey"):
+            errors.append(
+                "Provider is openrouter for this model, but OPENROUTER_API_KEY is not configured."
+            )
+        if not _is_valid_http_url(runtime.get("openrouterBaseUrl")):
+            errors.append("OpenRouter base URL must be an http(s) URL.")
+    elif provider == Provider.CUSTOM:
+        if not runtime.get("customBaseUrl"):
+            errors.append("Provider is custom, but CUSTOM_API_BASE_URL/customBaseUrl is not configured.")
+        elif not _is_valid_http_url(runtime.get("customBaseUrl")):
+            errors.append("Custom base URL must be an http(s) URL.")
+        if not runtime.get("customApiKey"):
+            errors.append("Provider is custom, but CUSTOM_API_KEY/customApiKey is not configured.")
+    elif provider == Provider.ANTHROPIC:
+        if not (runtime.get("apiKey") or runtime.get("authToken")):
+            errors.append(
+                "Provider is anthropic for this model, but ANTHROPIC_API_KEY/ANTHROPIC_AUTH_TOKEN is not configured."
+            )
+        if not _is_valid_http_url(runtime.get("baseUrl")):
+            errors.append("Anthropic base URL must be an http(s) URL.")
+
+    return errors
 
 
 def get_mcp_config_path(scope: str, cwd: str | Path | None = None) -> Path:
@@ -267,6 +325,7 @@ def validate_config(cwd: str | Path | None = None) -> tuple[bool, list[str]]:
     
     try:
         config = load_runtime_config(cwd)
+        errors.extend(validate_provider_runtime(config))
         
         # 检查模型名称拼写
         model = config.get("model", "")
@@ -339,13 +398,13 @@ def format_config_diagnostic(cwd: str | Path | None = None) -> str:
             lines.append("")
             lines.append("Warnings:")
             for msg in messages:
-                lines.append(f"  ⚠️  {msg}")
+                lines.append(f"  [WARN] {msg}")
     else:
         lines.append("Status: ERRORS")
         lines.append("")
         lines.append("Errors:")
         for msg in messages:
-            lines.append(f"  ❌ {msg}")
+            lines.append(f"  [ERROR] {msg}")
     
     # 显示当前配置摘要
     try:

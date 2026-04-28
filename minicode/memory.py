@@ -656,6 +656,42 @@ class MemoryManager:
         self.memories[scope] = MemoryFile(scope=scope)
         self._save_scope(scope)
 
+    def handle_user_memory_input(self, user_input: str) -> str | None:
+        """Handle explicit memory inputs from the main chat path.
+
+        Supported forms:
+        - "# remember this project convention"
+        - "/memory add remember this project convention"
+        - "/memory add project: remember this shared project convention"
+        - "/memory add local: remember this local-only note"
+        - "/memory add user: remember this cross-project preference"
+        """
+        raw = user_input.strip()
+        if not raw:
+            return None
+
+        content = ""
+        scope = MemoryScope.PROJECT
+        category = "note"
+
+        if raw.startswith("#"):
+            content = raw[1:].strip()
+            category = "directive"
+        elif raw.startswith("/memory add "):
+            content = raw[len("/memory add ") :].strip()
+            scope_match = re.match(r"^(user|project|local)\s*:\s*(.+)$", content, flags=re.I)
+            if scope_match:
+                scope = MemoryScope(scope_match.group(1).lower())
+                content = scope_match.group(2).strip()
+        else:
+            return None
+
+        if not content:
+            return "Usage: # <memory> or /memory add [user|project|local:] <memory>"
+
+        entry = self.add_entry(scope, category, content, tags=["chat"])
+        return f"Saved memory ({entry.scope.value}): {entry.content}"
+
 
 # ---------------------------------------------------------------------------
 # System prompt integration

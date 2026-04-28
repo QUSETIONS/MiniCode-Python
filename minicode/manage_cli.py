@@ -12,7 +12,8 @@ def _print_usage() -> None:
         "minicode mcp remove <name> [--project]\n\n"
         "minicode skills list\n"
         "minicode skills add <path-to-skill-or-dir> [--name <name>] [--project]\n"
-        "minicode skills remove <name> [--project]"
+        "minicode skills remove <name> [--project]\n\n"
+        "minicode valid-config"
     )
 
 
@@ -157,8 +158,11 @@ def maybe_handle_management_command(cwd: str, argv: list[str]) -> bool:
         return _handle_mcp_command(cwd, rest)
     if category == "skills":
         return _handle_skills_command(cwd, rest)
+    if category in {"valid-config", "validate-config"}:
+        from minicode.config import format_config_diagnostic
+        print(format_config_diagnostic(cwd))
+        return True
     if category in {"help", "--help", "-h"}:
         _print_usage()
         return True
     return False
-

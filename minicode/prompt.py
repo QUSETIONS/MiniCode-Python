@@ -227,6 +227,19 @@ def build_system_prompt(
 
         pipeline.register_dynamic("mcp", _build_mcp, cache_ttl=60.0)
 
+    memory_context = str(extras.get("memory_context") or "").strip()
+    if memory_context:
+        pipeline.register_dynamic(
+            "memory",
+            lambda: (
+                "## Project Memory & Context\n\n"
+                "The following information has been accumulated from previous sessions. "
+                "Use it to preserve project conventions and decisions:\n\n"
+                f"{memory_context}"
+            ),
+            cache_ttl=30.0,
+        )
+
     # Global CLAUDE.md (file-cached)
     global_claude_md = _maybe_read(Path.home() / ".claude" / "CLAUDE.md")
     if global_claude_md:

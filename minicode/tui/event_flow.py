@@ -261,6 +261,8 @@ def _handle_normal_mode_return(
     state.cursor_offset = 0
     state.selected_slash_index = 0
     rerender()
+    if not submitted.strip():
+        return
     if handle_input_fn(args, state, rerender, submitted):
         raise SystemExit(0)
     rerender()
