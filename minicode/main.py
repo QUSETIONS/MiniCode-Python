@@ -90,6 +90,16 @@ def _make_cli_permission_prompt():
     return _prompt
 
 
+def _configure_stdio_for_unicode() -> None:
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+
+
 def _save_transcript_file(cwd: str, permissions, transcript: list[TranscriptEntry], output_path: str) -> str:
     target = resolve_tool_path(ToolContext(cwd=cwd, permissions=permissions), output_path, "write")
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -97,6 +107,8 @@ def _save_transcript_file(cwd: str, permissions, transcript: list[TranscriptEntr
     return str(target)
 
 def main() -> None:
+    _configure_stdio_for_unicode()
+
     parser = argparse.ArgumentParser(
         description="MiniCode Python - A lightweight terminal coding assistant",
         add_help=True,
