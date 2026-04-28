@@ -455,6 +455,21 @@ def test_memory_manager_get_context(tmp_path):
     assert "Entry 1" in context or "Entry 2" in context or "Entry 3" in context
 
 
+def test_memory_manager_get_context_can_filter_by_query(tmp_path):
+    """Test prompt memory can be narrowed to the current user request."""
+    workspace = str(tmp_path / "workspace")
+    (tmp_path / "workspace").mkdir()
+
+    mm = MemoryManager(workspace)
+    mm.add_entry(MemoryScope.PROJECT, "test", "Use pytest before release")
+    mm.add_entry(MemoryScope.PROJECT, "style", "Use black for formatting")
+
+    context = mm.get_relevant_context(query="release tests")
+
+    assert "Use pytest before release" in context
+    assert "Use black for formatting" not in context
+
+
 def test_memory_manager_handles_explicit_chat_memory(tmp_path):
     """Test explicit chat memory input is persisted and searchable."""
     workspace = str(tmp_path / "workspace")

@@ -441,6 +441,7 @@ def format_config_diagnostic(cwd: str | Path | None = None) -> str:
             auth_methods.append("CUSTOM_API_KEY")
         lines.append(f"  Auth: {', '.join(auth_methods) or 'none'}")
         lines.append(f"  MCP Servers: {len(config.get('mcpServers', {}))}")
+        lines.append(f"  Tool Profile: {config.get('toolProfile', 'core')}")
 
         # User profile info
         global_profile_path = config.get('globalUserProfilePath', '')

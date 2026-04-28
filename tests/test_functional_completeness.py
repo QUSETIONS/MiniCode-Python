@@ -36,6 +36,7 @@ class TestStartupAndConfig:
         result = format_config_diagnostic()
         assert "Configuration Diagnostics" in result
         assert "Status:" in result
+        assert "Tool Profile:" in result
 
     def test_logging_system_initialization(self):
         """Test logging system initializes correctly."""

@@ -543,6 +543,7 @@ class MemoryManager:
         self,
         max_entries: int = 20,
         max_tokens: int = 8000,
+        query: str | None = None,
     ) -> str:
         """Get relevant memory context for system prompt injection.
         
@@ -550,6 +551,24 @@ class MemoryManager:
         respecting token limits.
         """
         from minicode.context_manager import estimate_tokens
+
+        query = (query or "").strip()
+        if query:
+            scoped_parts = []
+            total_tokens = 0
+            for scope in [MemoryScope.LOCAL, MemoryScope.PROJECT, MemoryScope.USER]:
+                entries = self.search(query, scope=scope, limit=max_entries, min_relevance=0.0)
+                if not entries:
+                    continue
+                memory = MemoryFile(scope=scope, entries=entries[:max_entries])
+                formatted = memory.format_as_markdown(include_header=True)
+                tokens = estimate_tokens(formatted)
+                if total_tokens + tokens > max_tokens:
+                    break
+                scoped_parts.append(formatted)
+                total_tokens += tokens
+            if scoped_parts:
+                return "\n\n".join(scoped_parts)
         
         parts = []
         total_tokens = 0
