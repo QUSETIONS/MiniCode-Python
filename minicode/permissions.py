@@ -66,11 +66,16 @@ def _is_within_directory(root: str, target: str) -> bool:
     if _is_win:
         # Windows: case-insensitive path comparison
         target_str = target.lower()
-        root_str = root.lower()
-        return target_str == root_str or target_str.startswith(root_str + os.sep)
+        root_str = root.lower().rstrip("\\/")
+        return (
+            target_str == root_str
+            or target_str.startswith(root_str + "\\")
+            or target_str.startswith(root_str + "/")
+        )
     
     # Unix: direct string comparison (paths already normalized)
-    return target == root or target.startswith(root + os.sep)
+    root_str = root.rstrip(os.sep)
+    return target == root_str or target.startswith(root_str + os.sep)
 
 
 def _matches_directory_prefix(target_path: str, directories: set[str]) -> bool:
