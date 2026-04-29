@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from typing import Any
 from minicode.tooling import ToolDefinition, ToolResult
+from minicode.workspace import resolve_tool_path
 
 
 # ---------------------------------------------------------------------------
@@ -135,7 +136,10 @@ def _validate(input_data: dict) -> dict:
 
 def _run(input_data: dict, context) -> ToolResult:
     """Review Python code quality."""
-    target = Path(context.cwd) / input_data["path"]
+    try:
+        target = resolve_tool_path(context, input_data["path"], "review")
+    except (PermissionError, RuntimeError) as error:
+        return ToolResult(ok=False, output=str(error))
     checks_type = input_data["checks"]
 
     if not target.exists():

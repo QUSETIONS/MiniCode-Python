@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from typing import Any
 from minicode.tooling import ToolDefinition, ToolResult
+from minicode.workspace import resolve_tool_path
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +143,10 @@ def _validate_find_symbols(input_data: dict) -> dict:
 
 def _run_find_symbols(input_data: dict, context) -> ToolResult:
     """Find all symbols in Python files."""
-    search_path = Path(context.cwd) / input_data["path"]
+    try:
+        search_path = resolve_tool_path(context, input_data["path"], "analyze")
+    except (PermissionError, RuntimeError) as error:
+        return ToolResult(ok=False, output=str(error))
     symbol_type = input_data["symbol_type"]
 
     if not search_path.exists():
@@ -215,7 +219,10 @@ def _validate_find_references(input_data: dict) -> dict:
 def _run_find_references(input_data: dict, context) -> ToolResult:
     """Find all references to a symbol."""
     symbol_name = input_data["symbol_name"]
-    search_path = Path(context.cwd) / input_data["path"]
+    try:
+        search_path = resolve_tool_path(context, input_data["path"], "analyze")
+    except (PermissionError, RuntimeError) as error:
+        return ToolResult(ok=False, output=str(error))
 
     if not search_path.exists():
         return ToolResult(ok=False, output=f"Path not found: {search_path}")
@@ -270,7 +277,10 @@ def _validate_get_ast_info(input_data: dict) -> dict:
 
 def _run_get_ast_info(input_data: dict, context) -> ToolResult:
     """Get AST information for a Python file."""
-    target = Path(context.cwd) / input_data["file_path"]
+    try:
+        target = resolve_tool_path(context, input_data["file_path"], "analyze")
+    except (PermissionError, RuntimeError) as error:
+        return ToolResult(ok=False, output=str(error))
 
     if not target.exists():
         return ToolResult(ok=False, output=f"File not found: {target}")

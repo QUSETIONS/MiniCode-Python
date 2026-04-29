@@ -10,6 +10,8 @@ import minicode.tools.test_runner as test_runner_module
 import minicode.tools.run_command as run_command_module
 from minicode.permissions import PermissionManager
 from minicode.tools.batch_ops import batch_copy_tool, batch_move_tool
+from minicode.tools.code_nav import find_references_tool, find_symbols_tool, get_ast_info_tool
+from minicode.tools.code_review import code_review_tool
 from minicode.tools.file_tree import file_tree_tool
 from minicode.tools.run_command import _build_execution_command, split_command_line
 from minicode.tools.patch_file import patch_file_tool
@@ -242,6 +244,33 @@ def test_test_runner_rejects_paths_that_escape_workspace(
 
     assert result.ok is False
     assert "escapes workspace" in result.output
+
+
+@pytest.mark.parametrize(
+    "tool,input_data",
+    [
+        (find_symbols_tool, {"path": "../outside", "symbol_type": "all"}),
+        (find_references_tool, {"path": "../outside", "symbol_name": "secret"}),
+        (get_ast_info_tool, {"file_path": "../outside/secret.py"}),
+        (code_review_tool, {"path": "../outside", "checks": "all"}),
+    ],
+)
+def test_code_analysis_tools_reject_paths_that_escape_workspace(
+    tmp_path: Path,
+    tool,
+    input_data: dict,
+) -> None:
+    workspace = tmp_path / "workspace"
+    outside = tmp_path / "outside"
+    workspace.mkdir()
+    outside.mkdir()
+    (outside / "secret.py").write_text("def secret():\n    return 42\n", encoding="utf-8")
+
+    result = tool.run(input_data, ToolContext(cwd=str(workspace), permissions=None))
+
+    assert result.ok is False
+    assert "escapes workspace" in result.output
+    assert "return 42" not in result.output
 
 
 def test_core_tool_registry_does_not_import_utility_modules(tmp_path: Path) -> None:
