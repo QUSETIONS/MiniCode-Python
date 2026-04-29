@@ -470,6 +470,35 @@ def test_memory_manager_get_context_can_filter_by_query(tmp_path):
     assert "Use black for formatting" not in context
 
 
+def test_memory_manager_query_without_matches_does_not_inject_all_memory(tmp_path):
+    """Query-scoped prompt memory should not fall back to unrelated full memory."""
+    workspace = str(tmp_path / "workspace")
+    (tmp_path / "workspace").mkdir()
+
+    mm = MemoryManager(workspace)
+    mm.add_entry(MemoryScope.PROJECT, "style", "Use black for formatting")
+    mm.add_entry(MemoryScope.USER, "shell", "Prefer PowerShell examples")
+
+    context = mm.get_relevant_context(query="release database migration")
+
+    assert context == ""
+
+
+def test_memory_manager_query_budget_skips_oversized_scope_and_keeps_later_matches(tmp_path):
+    """One oversized matching scope should not block smaller relevant memories."""
+    workspace = str(tmp_path / "workspace")
+    (tmp_path / "workspace").mkdir()
+
+    mm = MemoryManager(workspace)
+    mm.add_entry(MemoryScope.LOCAL, "release", "release " + ("x" * 2000))
+    mm.add_entry(MemoryScope.PROJECT, "release", "Run smoke tests before release")
+
+    context = mm.get_relevant_context(query="release", max_tokens=80)
+
+    assert "Run smoke tests before release" in context
+    assert "x" * 100 not in context
+
+
 def test_memory_manager_handles_explicit_chat_memory(tmp_path):
     """Test explicit chat memory input is persisted and searchable."""
     workspace = str(tmp_path / "workspace")

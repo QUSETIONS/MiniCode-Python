@@ -1,10 +1,14 @@
 import json
+import os
 import sys
 
 
 def send(message):
     sys.stdout.write(json.dumps(message) + "\n")
     sys.stdout.flush()
+
+
+MODE = os.environ.get("FAKE_MCP_MODE", "normal")
 
 
 for line in sys.stdin:
@@ -70,6 +74,20 @@ for line in sys.stdin:
             }
         )
     elif method == "tools/call":
+        if MODE == "exit_on_call":
+            sys.exit(7)
+        if MODE == "hang_on_call":
+            continue
+        if MODE == "oversized_payload":
+            huge_text = "x" * 256
+            send(
+                {
+                    "jsonrpc": "2.0",
+                    "id": message_id,
+                    "result": {"content": [{"type": "text", "text": huge_text}]},
+                }
+            )
+            continue
         arguments = message.get("params", {}).get("arguments", {})
         send(
             {
@@ -78,4 +96,3 @@ for line in sys.stdin:
                 "result": {"content": [{"type": "text", "text": f"echo:{arguments.get('text', '')}"}]},
             }
         )
-

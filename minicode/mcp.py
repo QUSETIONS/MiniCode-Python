@@ -275,8 +275,13 @@ class StdioMcpClient:
     
     def _ensure_started(self) -> None:
         """Ensure the server is started before making a request."""
+        if self._started and not self._is_process_alive():
+            self.close()
         if not self._started:
             self.start()
+
+    def _is_process_alive(self) -> bool:
+        return self.process is not None and self.process.poll() is None
 
     def _spawn_process(self) -> None:
         command = str(self.config.get("command", "")).strip()
@@ -351,6 +356,12 @@ class StdioMcpClient:
 
                 stripped = line.strip()
                 if not stripped:
+                    continue
+
+                if len(line_bytes) > MAX_MCP_PAYLOAD_BYTES:
+                    self.stderr_lines.append(
+                        f"MCP payload too large: {len(line_bytes)} bytes (limit {MAX_MCP_PAYLOAD_BYTES})"
+                    )
                     continue
 
                 # Auto-detect protocol if not determined yet

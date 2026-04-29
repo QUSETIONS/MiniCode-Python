@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
@@ -55,7 +56,12 @@ class MiniCodeGatewayHandler(BaseHTTPRequestHandler):
             from minicode.headless import run_headless
 
             self._send_json({"ok": True, "response": run_headless(prompt)})
-        except Exception as exc:  # noqa: BLE001
+        except (Exception, SystemExit) as exc:  # noqa: BLE001
+            if isinstance(exc, SystemExit):
+                message = str(exc) or f"headless exited with status {exc.code}"
+                print(f"MiniCode gateway headless exit: {message}", file=sys.stderr)
+                self._send_json({"ok": False, "error": message}, status=500)
+                return
             self._send_json({"ok": False, "error": str(exc)}, status=500)
 
 

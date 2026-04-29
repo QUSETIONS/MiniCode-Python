@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -127,6 +128,26 @@ def _strip_trailing_background_operator(command: str) -> str:
     return command.strip().removesuffix("&").strip()
 
 
+def _classify_shell_snippet_risk(command: str) -> str | None:
+    lowered = command.lower()
+    collapsed = re.sub(r"\s+", " ", lowered).strip()
+    if re.search(r"\brm\s+-[a-z]*r[a-z]*f\b|\brm\s+-[a-z]*f[a-z]*r\b", collapsed):
+        return f"shell snippet contains rm -rf payload: {command}"
+    if re.search(r"\b(del|erase)\b.*\s/(s|q)\b", collapsed):
+        return f"shell snippet contains recursive Windows delete payload: {command}"
+    if re.search(r"\b(rmdir|rd)\b.*\s/s\b", collapsed):
+        return f"shell snippet contains recursive Windows directory removal: {command}"
+    if re.search(r"\b(curl|wget)\b.*\|\s*(sh|bash|zsh|fish)\b", collapsed):
+        return f"shell snippet downloads and executes a shell script: {command}"
+    if re.search(r"\b(iwr|irm|invoke-webrequest|invoke-restmethod|curl|wget)\b.*\|\s*(iex|invoke-expression)\b", collapsed):
+        return f"shell snippet downloads and executes PowerShell code: {command}"
+    if re.search(r"\b(powershell|pwsh)\b.*\b(iex|invoke-expression)\b", collapsed):
+        return f"shell snippet invokes PowerShell expression execution: {command}"
+    if re.search(r"\b(sh|bash|zsh|fish|cmd|powershell|pwsh)\b\s+(-c|/c|/command)\b", collapsed):
+        return f"shell snippet invokes an explicit command interpreter: {command}"
+    return None
+
+
 def _normalize_command_input(input_data: dict) -> tuple[str, list[str]]:
     command = str(input_data.get("command", "")).strip()
     raw_args = input_data.get("args") or []
@@ -223,7 +244,12 @@ def _run(input_data: dict, context) -> ToolResult:
         use_shell=use_shell,
         background_shell=background_shell,
     )
-    force_prompt_reason = None if use_shell or known_command else f"Unknown command '{normalized_command}' is not in the built-in read-only/development set"
+    shell_prompt_reason = _classify_shell_snippet_risk(input_data["command"]) if use_shell else None
+    force_prompt_reason = (
+        shell_prompt_reason
+        if shell_prompt_reason
+        else None if use_shell or known_command else f"Unknown command '{normalized_command}' is not in the built-in read-only/development set"
+    )
 
     if context.permissions is not None:
         if force_prompt_reason:

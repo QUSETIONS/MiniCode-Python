@@ -6,6 +6,7 @@ import subprocess
 import sys
 import threading
 import tomllib
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -94,6 +95,64 @@ def test_gateway_health_endpoint_responds() -> None:
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=5) as response:
             payload = json.loads(response.read().decode("utf-8"))
         assert payload == {"ok": True, "service": "minicode-gateway"}
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def _post_gateway_json(port: int, payload: dict) -> tuple[int, dict]:
+    request = urllib.request.Request(
+        f"http://127.0.0.1:{port}/run",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            return response.status, json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        return error.code, json.loads(error.read().decode("utf-8"))
+
+
+def test_gateway_run_endpoint_returns_headless_response(monkeypatch) -> None:
+    from http.server import ThreadingHTTPServer
+
+    import minicode.headless
+    from minicode.gateway import MiniCodeGatewayHandler
+
+    monkeypatch.setattr(minicode.headless, "run_headless", lambda prompt: f"mock:{prompt}")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), MiniCodeGatewayHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        status, payload = _post_gateway_json(server.server_address[1], {"prompt": "hello"})
+        assert status == 200
+        assert payload == {"ok": True, "response": "mock:hello"}
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_gateway_run_endpoint_converts_system_exit_to_json_error(monkeypatch) -> None:
+    from http.server import ThreadingHTTPServer
+
+    import minicode.headless
+    from minicode.gateway import MiniCodeGatewayHandler
+
+    def fail_headless(_prompt: str) -> str:
+        raise SystemExit("missing config")
+
+    monkeypatch.setattr(minicode.headless, "run_headless", fail_headless)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), MiniCodeGatewayHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        status, payload = _post_gateway_json(server.server_address[1], {"prompt": "hello"})
+        assert status == 500
+        assert payload["ok"] is False
+        assert "missing config" in payload["error"]
     finally:
         server.shutdown()
         server.server_close()

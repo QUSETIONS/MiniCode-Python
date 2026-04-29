@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol, TypedDict
+from typing import Any, Callable, Literal, Protocol, TypedDict
 
 
 class ChatMessage(TypedDict, total=False):
@@ -44,5 +44,10 @@ class AgentStep:
 
 
 class ModelAdapter(Protocol):
-    def next(self, messages: list[ChatMessage], on_stream_chunk: Callable[[str], None] | None = None) -> AgentStep: ...
+    def next(
+        self,
+        messages: list[ChatMessage],
+        on_stream_chunk: Callable[[str], None] | None = None,
+        store: Any | None = None,
+    ) -> AgentStep: ...
 

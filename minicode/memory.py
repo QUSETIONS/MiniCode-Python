@@ -560,15 +560,27 @@ class MemoryManager:
                 entries = self.search(query, scope=scope, limit=max_entries, min_relevance=0.0)
                 if not entries:
                     continue
-                memory = MemoryFile(scope=scope, entries=entries[:max_entries])
-                formatted = memory.format_as_markdown(include_header=True)
-                tokens = estimate_tokens(formatted)
-                if total_tokens + tokens > max_tokens:
+                accepted_entries: list[MemoryEntry] = []
+                for entry in entries[:max_entries]:
+                    candidate_memory = MemoryFile(scope=scope, entries=[*accepted_entries, entry])
+                    candidate = candidate_memory.format_as_markdown(include_header=True)
+                    candidate_tokens = estimate_tokens(candidate)
+                    if total_tokens + candidate_tokens <= max_tokens:
+                        accepted_entries.append(entry)
+                        continue
+                    if not accepted_entries:
+                        # Skip an oversized match instead of blocking lower-priority
+                        # scopes that may have compact, relevant context.
+                        continue
                     break
+                if not accepted_entries:
+                    continue
+                formatted = MemoryFile(scope=scope, entries=accepted_entries).format_as_markdown(include_header=True)
                 scoped_parts.append(formatted)
-                total_tokens += tokens
+                total_tokens += estimate_tokens(formatted)
             if scoped_parts:
                 return "\n\n".join(scoped_parts)
+            return ""
         
         parts = []
         total_tokens = 0

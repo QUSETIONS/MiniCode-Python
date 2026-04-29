@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import concurrent.futures
+import inspect
 from typing import Any, Callable
 
 from minicode.context_manager import ContextManager, estimate_message_tokens
@@ -161,6 +162,31 @@ def _should_treat_assistant_as_progress(*, kind: str | None, content: str, saw_t
     return False
 
 
+def _model_next(
+    model: ModelAdapter,
+    messages: list[ChatMessage],
+    *,
+    on_stream_chunk: Callable[[str], None] | None,
+    store: Store[AppState] | None,
+) -> AgentStep:
+    """Call provider adapters with store support while preserving test doubles."""
+    if store is None:
+        return model.next(messages, on_stream_chunk=on_stream_chunk)
+
+    try:
+        signature = inspect.signature(model.next)
+    except (TypeError, ValueError):
+        return model.next(messages, on_stream_chunk=on_stream_chunk, store=store)
+
+    supports_store = any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD or parameter.name == "store"
+        for parameter in signature.parameters.values()
+    )
+    if supports_store:
+        return model.next(messages, on_stream_chunk=on_stream_chunk, store=store)
+    return model.next(messages, on_stream_chunk=on_stream_chunk)
+
+
 def run_agent_turn(
     *,
     model: ModelAdapter,
@@ -208,7 +234,12 @@ def run_agent_turn(
             
             next_step: AgentStep
             try:
-                next_step = model.next(current_messages, on_stream_chunk=on_assistant_stream_chunk)
+                next_step = _model_next(
+                    model,
+                    current_messages,
+                    on_stream_chunk=on_assistant_stream_chunk,
+                    store=store,
+                )
             except KeyboardInterrupt:
                 raise  # Let Ctrl-C propagate
             except ConnectionError as error:

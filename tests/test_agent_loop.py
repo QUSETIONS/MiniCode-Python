@@ -1,4 +1,5 @@
 from minicode.agent_loop import run_agent_turn
+from minicode.state import create_app_store
 from minicode.tooling import ToolDefinition, ToolRegistry, ToolResult
 from minicode.types import AgentStep, ChatMessage, ModelAdapter, StepDiagnostics
 
@@ -12,6 +13,15 @@ class ScriptedModel(ModelAdapter):
         step = self._steps[self.calls]
         self.calls += 1
         return step
+
+
+class StoreCapturingModel(ModelAdapter):
+    def __init__(self) -> None:
+        self.received_store = None
+
+    def next(self, messages: list[ChatMessage], on_stream_chunk=None, store=None) -> AgentStep:
+        self.received_store = store
+        return AgentStep(type="assistant", content="done")
 
 
 def test_agent_turn_executes_tool_and_returns_assistant() -> None:
@@ -167,3 +177,20 @@ def test_tool_registry_dispose_calls_disposer() -> None:
     registry.dispose()
 
     assert disposed == [True]
+
+
+def test_agent_turn_passes_store_to_provider_adapter() -> None:
+    model = StoreCapturingModel()
+    registry = ToolRegistry([])
+    store = create_app_store()
+
+    messages = run_agent_turn(
+        model=model,
+        tools=registry,
+        messages=[{"role": "system", "content": "sys"}],
+        cwd=".",
+        store=store,
+    )
+
+    assert messages[-1] == {"role": "assistant", "content": "done"}
+    assert model.received_store is store
