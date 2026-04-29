@@ -7,7 +7,10 @@ from minicode.tty_app import (
     summarize_tool_input,
     summarize_tool_output,
 )
+import minicode.tui.input_handler as input_handler_module
+from minicode.context_manager import ContextManager
 from minicode.permissions import PermissionManager
+from minicode.tooling import ToolRegistry
 from minicode.tui.runtime_control import _ThrottledRenderer as RuntimeThrottledRenderer
 from minicode.tui.event_flow import _handle_event
 from minicode.tui.input_parser import KeyEvent
@@ -147,3 +150,36 @@ def test_empty_tty_return_does_not_start_input_handler(tmp_path) -> None:
 
     assert "handle_input" not in calls
     assert state.input == ""
+
+
+def test_tty_input_passes_and_persists_context_manager(tmp_path, monkeypatch) -> None:
+    captured: dict = {}
+    saved: list[ContextManager] = []
+    context_manager = ContextManager(model="default", context_window=1000)
+
+    def fake_run_agent_turn(**kwargs):
+        captured.update(kwargs)
+        manager = kwargs["context_manager"]
+        manager.messages = list(kwargs["messages"])
+        return [*kwargs["messages"], {"role": "assistant", "content": "done"}]
+
+    monkeypatch.setattr(input_handler_module, "run_agent_turn", fake_run_agent_turn)
+    monkeypatch.setattr(input_handler_module, "save_context_state", saved.append, raising=False)
+
+    state = ScreenState(input="Please inspect context", cursor_offset=22)
+    args = TtyAppArgs(
+        runtime={"model": "default"},
+        tools=ToolRegistry([]),
+        model=object(),
+        messages=[{"role": "system", "content": "sys"}],
+        cwd=str(tmp_path),
+        permissions=PermissionManager(str(tmp_path)),
+        context_manager=context_manager,
+    )
+
+    assert input_handler_module._handle_input(args, state, lambda: None) is False
+    state.agent_thread.join(timeout=5)
+
+    assert captured["context_manager"] is context_manager
+    assert saved == [context_manager]
+    assert state.agent_result["messages"][-1] == {"role": "assistant", "content": "done"}

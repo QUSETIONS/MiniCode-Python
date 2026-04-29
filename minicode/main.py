@@ -376,6 +376,7 @@ def main() -> None:
             resume_session=args.resume,
             list_sessions_only=args.list_sessions,
             memory_manager=memory_mgr,
+            context_manager=context_mgr,
         )
     except KeyboardInterrupt:
         print("\n\nInterrupted by user. Shutting down gracefully...")

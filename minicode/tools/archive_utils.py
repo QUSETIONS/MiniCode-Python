@@ -8,6 +8,55 @@ import zipfile
 from pathlib import Path
 
 from minicode.tooling import ToolDefinition, ToolContext, ToolResult
+from minicode.workspace import resolve_tool_path
+
+
+def _resolve_archive_member(destination: Path, member_name: str) -> Path:
+    normalized_name = member_name.replace("\\", "/")
+    member_path = Path(normalized_name)
+    if member_path.is_absolute() or any(part == ".." for part in member_path.parts):
+        raise ValueError(f"Archive member escapes extraction destination: {member_name}")
+
+    destination_root = destination.resolve()
+    target = (destination_root / member_path).resolve()
+    try:
+        target.relative_to(destination_root)
+    except ValueError as error:
+        raise ValueError(f"Archive member escapes extraction destination: {member_name}") from error
+    return target
+
+
+def _safe_extract_zip(source: Path, destination: Path) -> None:
+    destination.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(source, "r") as zf:
+        for info in zf.infolist():
+            target = _resolve_archive_member(destination, info.filename)
+            if info.is_dir():
+                target.mkdir(parents=True, exist_ok=True)
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with zf.open(info, "r") as src, open(target, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+
+
+def _safe_extract_tar(source: Path, destination: Path) -> None:
+    destination.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(source, "r:*") as tar:
+        for member in tar.getmembers():
+            if member.issym() or member.islnk():
+                raise ValueError(f"Archive member uses unsupported link: {member.name}")
+            target = _resolve_archive_member(destination, member.name)
+            if member.isdir():
+                target.mkdir(parents=True, exist_ok=True)
+                continue
+            if not member.isfile():
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            src = tar.extractfile(member)
+            if src is None:
+                continue
+            with src, open(target, "wb") as dst:
+                shutil.copyfileobj(src, dst)
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +234,7 @@ def _validate_tar_extract(input_data: dict) -> dict:
 
 
 def _run_tar_extract(input_data: dict, context: ToolContext) -> ToolResult:
-    source = Path(context.cwd) / input_data["source"]
+    source = resolve_tool_path(context, input_data["source"], "read")
     dest_dir = input_data.get("destination", "")
     
     if not source.exists():
@@ -193,15 +242,12 @@ def _run_tar_extract(input_data: dict, context: ToolContext) -> ToolResult:
     
     try:
         if dest_dir:
-            destination = Path(context.cwd) / dest_dir
+            destination = resolve_tool_path(context, dest_dir, "write")
         else:
             # Extract to same directory as archive
             destination = source.parent / source.stem
         
-        destination.mkdir(parents=True, exist_ok=True)
-        
-        with tarfile.open(source, "r:*") as tar:
-            tar.extractall(destination)
+        _safe_extract_tar(source, destination)
         
         return ToolResult(ok=True, output=f"Extracted to {destination}")
     except Exception as e:
@@ -291,7 +337,7 @@ def _validate_zip_extract(input_data: dict) -> dict:
 
 
 def _run_zip_extract(input_data: dict, context: ToolContext) -> ToolResult:
-    source = Path(context.cwd) / input_data["source"]
+    source = resolve_tool_path(context, input_data["source"], "read")
     dest_dir = input_data.get("destination", "")
     
     if not source.exists():
@@ -299,14 +345,11 @@ def _run_zip_extract(input_data: dict, context: ToolContext) -> ToolResult:
     
     try:
         if dest_dir:
-            destination = Path(context.cwd) / dest_dir
+            destination = resolve_tool_path(context, dest_dir, "write")
         else:
             destination = source.parent / source.stem
         
-        destination.mkdir(parents=True, exist_ok=True)
-        
-        with zipfile.ZipFile(source, "r") as zf:
-            zf.extractall(destination)
+        _safe_extract_zip(source, destination)
         
         return ToolResult(ok=True, output=f"Extracted to {destination}")
     except Exception as e:

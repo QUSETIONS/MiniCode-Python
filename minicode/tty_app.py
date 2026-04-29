@@ -62,6 +62,7 @@ def run_tty_app(
     resume_session: str | None = None,
     list_sessions_only: bool = False,
     memory_manager: Any | None = None,
+    context_manager: Any | None = None,
 ) -> list[ChatMessage]:
     """Event-driven full-screen TTY application, ported from the TypeScript version.
     
@@ -74,7 +75,17 @@ def run_tty_app(
         return messages
 
     session = load_or_create_session(cwd, resume_session)
-    args, state = build_tty_runtime_state(runtime, tools, model, messages, cwd, permissions, session, memory_manager)
+    args, state = build_tty_runtime_state(
+        runtime,
+        tools,
+        model,
+        messages,
+        cwd,
+        permissions,
+        session,
+        memory_manager,
+        context_manager,
+    )
 
     # Throttled renderer: coalesces rapid rerender() calls to reduce flickering
     throttled = _ThrottledRenderer(lambda: _render_screen(args, state), min_interval=0.016)

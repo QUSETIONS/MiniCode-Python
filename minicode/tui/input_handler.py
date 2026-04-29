@@ -3,12 +3,14 @@ from collections import defaultdict
 import logging
 import os
 import sys
+import threading
 import time
 from typing import Any, Callable
 from minicode.tui.input_parser import KeyEvent, ParsedInputEvent, TextEvent, WheelEvent, parse_input_chunk
 from minicode.tui.state import ScreenState, TtyAppArgs
 from minicode.cli_commands import try_handle_local_command, find_matching_slash_commands
 from minicode.agent_loop import run_agent_turn
+from minicode.context_manager import save_context_state
 from minicode.history import save_history_entries
 from minicode.local_tool_shortcuts import parse_local_tool_shortcut
 from minicode.prompt import build_system_prompt
@@ -579,8 +581,13 @@ def _handle_input(
                 on_assistant_message=on_assistant_message,
                 on_progress_message=on_progress_message,
                 on_assistant_stream_chunk=on_assistant_stream_chunk,
+                store=state.app_state,
+                context_manager=args.context_manager,
                 runtime=args.runtime,
             )
+            if args.context_manager is not None:
+                args.context_manager.messages = next_messages
+                save_context_state(args.context_manager)
             with agent_thread_lock:
                 agent_result["messages"] = next_messages
         except Exception as e:

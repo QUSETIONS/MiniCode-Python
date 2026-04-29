@@ -1,5 +1,8 @@
 from pathlib import Path
+import io
 import sys
+import tarfile
+import zipfile
 
 import pytest
 
@@ -7,6 +10,7 @@ import minicode.tools.run_command as run_command_module
 from minicode.permissions import PermissionManager
 from minicode.tools.run_command import _build_execution_command, split_command_line
 from minicode.tools.patch_file import patch_file_tool
+from minicode.tools.archive_utils import tar_extract_tool, zip_extract_tool
 from minicode.tools.run_command import run_command_tool
 from minicode.tools.write_file import write_file_tool
 from minicode.tooling import ToolContext
@@ -139,6 +143,39 @@ def test_full_tool_registry_can_opt_into_utility_wrappers(tmp_path: Path) -> Non
 
     assert "base64_encode" in names
     assert "csv_parse" in names
+
+
+def test_zip_extract_rejects_entries_that_escape_destination(tmp_path: Path) -> None:
+    archive = tmp_path / "evil.zip"
+    with zipfile.ZipFile(archive, "w") as zf:
+        zf.writestr("../escape.txt", "owned")
+
+    result = zip_extract_tool.run(
+        {"source": "evil.zip", "destination": "out"},
+        ToolContext(cwd=str(tmp_path), permissions=None),
+    )
+
+    assert result.ok is False
+    assert "escapes extraction destination" in result.output
+    assert not (tmp_path / "escape.txt").exists()
+
+
+def test_tar_extract_rejects_entries_that_escape_destination(tmp_path: Path) -> None:
+    archive = tmp_path / "evil.tar"
+    payload = b"owned"
+    info = tarfile.TarInfo("../escape.txt")
+    info.size = len(payload)
+    with tarfile.open(archive, "w") as tf:
+        tf.addfile(info, io.BytesIO(payload))
+
+    result = tar_extract_tool.run(
+        {"source": "evil.tar", "destination": "out"},
+        ToolContext(cwd=str(tmp_path), permissions=None),
+    )
+
+    assert result.ok is False
+    assert "escapes extraction destination" in result.output
+    assert not (tmp_path / "escape.txt").exists()
 
 
 def test_core_tool_registry_does_not_import_utility_modules(tmp_path: Path) -> None:

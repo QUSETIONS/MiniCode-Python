@@ -21,6 +21,7 @@ class TtyAppArgs:
     cwd: str
     permissions: PermissionManager
     memory_manager: Any | None = None
+    context_manager: Any | None = None
 
 
 @dataclass
