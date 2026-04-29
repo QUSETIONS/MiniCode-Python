@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 from minicode.tooling import ToolDefinition, ToolResult
+from minicode.workspace import resolve_tool_path
 
 
 # ---------------------------------------------------------------------------
@@ -174,7 +175,10 @@ def _validate(input_data: dict) -> dict:
 
 def _run(input_data: dict, context) -> ToolResult:
     """Display file tree."""
-    target = Path(context.cwd) / input_data["path"]
+    try:
+        target = resolve_tool_path(context, input_data["path"], "list")
+    except (PermissionError, RuntimeError) as error:
+        return ToolResult(ok=False, output=str(error))
     max_depth = input_data["max_depth"]
     show_hidden = input_data["show_hidden"]
     pattern = input_data.get("pattern")

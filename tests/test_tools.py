@@ -6,12 +6,16 @@ import zipfile
 
 import pytest
 
+import minicode.tools.test_runner as test_runner_module
 import minicode.tools.run_command as run_command_module
 from minicode.permissions import PermissionManager
+from minicode.tools.batch_ops import batch_copy_tool, batch_move_tool
+from minicode.tools.file_tree import file_tree_tool
 from minicode.tools.run_command import _build_execution_command, split_command_line
 from minicode.tools.patch_file import patch_file_tool
 from minicode.tools.archive_utils import tar_extract_tool, zip_extract_tool
 from minicode.tools.run_command import run_command_tool
+from minicode.tools.test_runner import test_runner_tool
 from minicode.tools.write_file import write_file_tool
 from minicode.tooling import ToolContext
 from minicode.tools import create_default_tool_registry
@@ -176,6 +180,68 @@ def test_tar_extract_rejects_entries_that_escape_destination(tmp_path: Path) -> 
     assert result.ok is False
     assert "escapes extraction destination" in result.output
     assert not (tmp_path / "escape.txt").exists()
+
+
+@pytest.mark.parametrize(
+    "tool,input_data",
+    [
+        (batch_copy_tool, {"source": "../outside.txt", "destination": "copied.txt"}),
+        (batch_move_tool, {"source": "../outside.txt", "destination": "moved.txt"}),
+    ],
+)
+def test_batch_file_operations_reject_paths_that_escape_workspace(tmp_path: Path, tool, input_data: dict) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    outside = tmp_path / "outside.txt"
+    outside.write_text("do not touch", encoding="utf-8")
+
+    result = tool.run(input_data, ToolContext(cwd=str(workspace), permissions=None))
+
+    assert result.ok is False
+    assert "escapes workspace" in result.output
+    assert outside.exists()
+    assert not (workspace / input_data["destination"]).exists()
+
+
+def test_file_tree_rejects_paths_that_escape_workspace(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    outside = tmp_path / "outside"
+    workspace.mkdir()
+    outside.mkdir()
+    (outside / "secret.txt").write_text("secret", encoding="utf-8")
+
+    result = file_tree_tool.run(
+        {"path": "../outside", "max_depth": 1, "show_hidden": False, "pattern": None},
+        ToolContext(cwd=str(workspace), permissions=None),
+    )
+
+    assert result.ok is False
+    assert "escapes workspace" in result.output
+    assert "secret.txt" not in result.output
+
+
+def test_test_runner_rejects_paths_that_escape_workspace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+    outside = tmp_path / "outside"
+    workspace.mkdir()
+    outside.mkdir()
+    (outside / "test_secret.py").write_text("def test_secret():\n    assert True\n", encoding="utf-8")
+
+    def fail_if_executed(*_args, **_kwargs):
+        pytest.fail("test runner executed outside workspace path")
+
+    monkeypatch.setattr(test_runner_module.subprocess, "run", fail_if_executed)
+
+    result = test_runner_tool.run(
+        {"path": "../outside", "framework": "unittest", "verbose": False, "coverage": False, "pattern": None, "timeout": 10},
+        ToolContext(cwd=str(workspace), permissions=None),
+    )
+
+    assert result.ok is False
+    assert "escapes workspace" in result.output
 
 
 def test_core_tool_registry_does_not_import_utility_modules(tmp_path: Path) -> None:

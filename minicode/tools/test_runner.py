@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from typing import Any
 from minicode.tooling import ToolDefinition, ToolResult
+from minicode.workspace import resolve_tool_path
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +162,10 @@ def _validate(input_data: dict) -> dict:
 
 def _run(input_data: dict, context) -> ToolResult:
     """Run tests with smart discovery and parsing."""
-    target = Path(context.cwd) / input_data["path"]
+    try:
+        target = resolve_tool_path(context, input_data["path"], "test")
+    except (PermissionError, RuntimeError) as error:
+        return ToolResult(ok=False, output=str(error))
     framework = input_data["framework"]
     verbose = input_data["verbose"]
     coverage = input_data["coverage"]

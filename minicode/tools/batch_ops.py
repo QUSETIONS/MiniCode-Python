@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import os
 import shutil
-from pathlib import Path
 
 from minicode.tooling import ToolDefinition, ToolContext, ToolResult
+from minicode.workspace import resolve_tool_path
 
 
 def _validate_batch_copy(input_data: dict) -> dict:
@@ -20,8 +19,11 @@ def _validate_batch_copy(input_data: dict) -> dict:
 
 def _run_batch_copy(input_data: dict, context: ToolContext) -> ToolResult:
     """Copy files or directories."""
-    source = Path(context.cwd) / input_data["source"]
-    destination = Path(context.cwd) / input_data["destination"]
+    try:
+        source = resolve_tool_path(context, input_data["source"], "read")
+        destination = resolve_tool_path(context, input_data["destination"], "write")
+    except (PermissionError, RuntimeError) as error:
+        return ToolResult(ok=False, output=str(error))
     
     if not source.exists():
         return ToolResult(ok=False, output=f"Source not found: {input_data['source']}")
@@ -73,8 +75,11 @@ def _validate_batch_move(input_data: dict) -> dict:
 
 def _run_batch_move(input_data: dict, context: ToolContext) -> ToolResult:
     """Move files or directories."""
-    source = Path(context.cwd) / input_data["source"]
-    destination = Path(context.cwd) / input_data["destination"]
+    try:
+        source = resolve_tool_path(context, input_data["source"], "read")
+        destination = resolve_tool_path(context, input_data["destination"], "write")
+    except (PermissionError, RuntimeError) as error:
+        return ToolResult(ok=False, output=str(error))
     
     if not source.exists():
         return ToolResult(ok=False, output=f"Source not found: {input_data['source']}")
@@ -117,17 +122,14 @@ def _validate_batch_delete(input_data: dict) -> dict:
 
 def _run_batch_delete(input_data: dict, context: ToolContext) -> ToolResult:
     """Delete files or directories."""
-    target = Path(context.cwd) / input_data["path"]
+    try:
+        target = resolve_tool_path(context, input_data["path"], "delete")
+    except (PermissionError, RuntimeError) as error:
+        return ToolResult(ok=False, output=str(error))
     recursive = input_data.get("recursive", False)
     
     if not target.exists():
         return ToolResult(ok=False, output=f"Path not found: {input_data['path']}")
-    
-    # Safety check: don't allow deleting outside workspace
-    try:
-        target.relative_to(Path(context.cwd).resolve())
-    except ValueError:
-        return ToolResult(ok=False, output="Cannot delete paths outside workspace")
     
     try:
         if target.is_dir():
