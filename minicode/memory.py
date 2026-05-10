@@ -14,6 +14,7 @@ Search uses TF-IDF relevance scoring for intelligent retrieval.
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 import re
@@ -26,18 +27,298 @@ from typing import Any
 
 from minicode.config import MINI_CODE_DIR
 
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Memory data validation
+# ---------------------------------------------------------------------------
+
+
+def _validate_memory_data(data: dict) -> tuple[bool, list[str]]:
+    """Validate the structure of memory JSON data before loading.
+
+    Checks for:
+    - Required fields present (entries)
+    - Valid enum values for scope
+    - Valid data types for all entry fields
+
+    Args:
+        data: Parsed JSON data dictionary
+
+    Returns:
+        Tuple of (is_valid, list_of_errors)
+    """
+    errors: list[str] = []
+
+    if not isinstance(data, dict):
+        return False, ["Root data must be a dictionary"]
+
+    if "entries" not in data:
+        errors.append("Missing required field: 'entries'")
+        return False, errors
+
+    entries = data.get("entries")
+    if not isinstance(entries, list):
+        errors.append("'entries' must be a list")
+        return False, errors
+
+    for idx, entry_data in enumerate(entries):
+        _, entry_errors = _validate_entry(entry_data, idx)
+        errors.extend(entry_errors)
+
+    return len(errors) == 0, errors
+
+
+def _validate_entry(entry: Any, index: int) -> tuple[bool, list[str]]:
+    """Validate a single memory entry dictionary.
+
+    Returns:
+        Tuple of (is_valid, list_of_errors)
+    """
+    errors: list[str] = []
+    prefix = f"Entry at index {index}"
+
+    if not isinstance(entry, dict):
+        return False, [f"{prefix} is not a dictionary"]
+
+    required_fields = ["id", "content"]
+    for field_name in required_fields:
+        if field_name not in entry:
+            errors.append(f"{prefix} missing required field: '{field_name}'")
+
+    if "id" in entry and not isinstance(entry["id"], str):
+        errors.append(f"{prefix} field 'id' must be a string")
+
+    if "scope" in entry:
+        scope_val = entry["scope"]
+        if not isinstance(scope_val, str):
+            errors.append(f"{prefix} field 'scope' must be a string")
+        elif scope_val not in _VALID_SCOPES:
+            errors.append(
+                f"{prefix} has invalid scope value: '{scope_val}'. "
+                f"Must be one of: {', '.join(sorted(_VALID_SCOPES))}"
+            )
+
+    if "category" in entry and not isinstance(entry["category"], str):
+        errors.append(f"{prefix} field 'category' must be a string")
+
+    if "content" in entry and not isinstance(entry["content"], str):
+        errors.append(f"{prefix} field 'content' must be a string")
+
+    if "created_at" in entry:
+        val = entry["created_at"]
+        if not isinstance(val, (int, float)):
+            errors.append(f"{prefix} field 'created_at' must be a number")
+
+    if "updated_at" in entry:
+        val = entry["updated_at"]
+        if not isinstance(val, (int, float)):
+            errors.append(f"{prefix} field 'updated_at' must be a number")
+
+    if "tags" in entry:
+        val = entry["tags"]
+        if not isinstance(val, list):
+            errors.append(f"{prefix} field 'tags' must be a list")
+        elif not all(isinstance(t, str) for t in val):
+            errors.append(f"{prefix} field 'tags' must contain only strings")
+
+    if "usage_count" in entry:
+        val = entry["usage_count"]
+        if not isinstance(val, int):
+            errors.append(f"{prefix} field 'usage_count' must be an integer")
+
+    return len(errors) == 0, errors
+
+
+# ---------------------------------------------------------------------------
+# Corrupted data recovery
+# ---------------------------------------------------------------------------
+
+def _recover_entries(data: dict, memory_json_path: Path) -> list[dict]:
+    """Attempt to recover valid entries from corrupted memory data.
+
+    Creates a backup of the corrupted file and returns only valid entries.
+
+    Args:
+        data: Parsed JSON data (may be partially corrupted)
+        memory_json_path: Path to the original memory.json file
+
+    Returns:
+        List of valid entry dictionaries
+    """
+    backup_path = memory_json_path.with_suffix(".json.bak")
+    try:
+        import shutil
+        shutil.copy2(str(memory_json_path), str(backup_path))
+        logger.warning(
+            "Corrupted memory file backed up to %s", backup_path
+        )
+    except OSError as e:
+        logger.error(
+            "Failed to create backup of corrupted memory file: %s", e
+        )
+
+    entries = data.get("entries", [])
+    valid_entries = []
+    recovered_count = 0
+
+    for idx, entry_data in enumerate(entries):
+        entry_valid, _ = _validate_entry(entry_data, idx)
+        if not entry_valid:
+            logger.warning("Skipping corrupted entry at index %d", idx)
+        else:
+            valid_entries.append(entry_data)
+            recovered_count += 1
+
+    total = len(entries)
+    logger.info(
+        "Recovery complete: %d/%d entries recovered", recovered_count, total
+    )
+    return valid_entries
+
+
+
 
 # ---------------------------------------------------------------------------
 # TF-IDF search utilities
 # ---------------------------------------------------------------------------
 
-# Tokenize text into lowercase words (alphanumeric + CJK)
+# Tokenize text into lowercase words, individual CJK chars, and CJK bigrams
 _WORD_RE = re.compile(r'[a-zA-Z0-9]+|[\u4e00-\u9fff]')
+_CJK_BIGRAM_RE = re.compile(r'[\u4e00-\u9fff]{2}')
+
+# Common code terminology expansions (bidirectional)
+_CODE_TERM_EXPANSIONS: dict[str, list[str]] = {
+    "函数": ["function", "func", "method"],
+    "function": ["函数", "func", "method"],
+    "func": ["函数", "function", "method"],
+    "method": ["函数", "function", "func"],
+    "类": ["class", "type"],
+    "class": ["类", "type"],
+    "type": ["类", "class"],
+    "变量": ["variable", "var"],
+    "variable": ["变量", "var"],
+    "var": ["变量", "variable"],
+    "参数": ["parameter", "param", "argument", "arg"],
+    "parameter": ["参数", "param", "argument"],
+    "param": ["参数", "parameter", "arg"],
+    "argument": ["参数", "parameter", "arg"],
+    "属性": ["attribute", "attr", "property", "prop"],
+    "attribute": ["属性", "attr", "property"],
+    "property": ["属性", "attr", "prop"],
+    "接口": ["interface"],
+    "interface": ["接口"],
+    "模块": ["module"],
+    "module": ["模块"],
+    "包": ["package"],
+    "package": ["包"],
+    "方法": ["method", "function"],
+    "对象": ["object", "obj"],
+    "object": ["对象", "obj"],
+    "继承": ["inherit", "inheritance", "extends"],
+    "inherit": ["继承"],
+    "多态": ["polymorphism"],
+    "封装": ["encapsulation", "encapsulate"],
+    "异常": ["exception", "error"],
+    "exception": ["异常"],
+    "error": ["错误", "异常"],
+    "错误": ["error", "bug"],
+    "bug": ["错误", "bug", "缺陷"],
+    "循环": ["loop", "iteration", "iterate"],
+    "loop": ["循环"],
+    "条件": ["condition"],
+    "condition": ["条件"],
+    "数组": ["array"],
+    "array": ["数组"],
+    "列表": ["list"],
+    "list": ["列表"],
+    "字典": ["dict", "dictionary", "map"],
+    "dict": ["字典", "dictionary"],
+    "dictionary": ["字典", "dict"],
+    "map": ["字典", "映射"],
+    "映射": ["map"],
+    "集合": ["set"],
+    "set": ["集合"],
+    "字符串": ["string", "str"],
+    "string": ["字符串"],
+    "整数": ["int", "integer"],
+    "integer": ["整数"],
+    "浮点": ["float"],
+    "float": ["浮点"],
+    "布尔": ["bool", "boolean"],
+    "boolean": ["布尔"],
+    "同步": ["sync", "synchronous"],
+    "异步": ["async", "asynchronous"],
+    "async": ["异步"],
+    "回调": ["callback"],
+    "callback": ["回调"],
+    "事件": ["event"],
+    "event": ["事件"],
+    "装饰器": ["decorator"],
+    "decorator": ["装饰器"],
+    "生成器": ["generator"],
+    "generator": ["生成器"],
+    "迭代器": ["iterator"],
+    "iterator": ["迭代器"],
+    "测试": ["test", "testing"],
+    "test": ["测试"],
+    "调试": ["debug", "debugging"],
+    "debug": ["调试"],
+    "配置": ["config", "configuration"],
+    "config": ["配置"],
+    "数据库": ["database", "db"],
+    "database": ["数据库", "db"],
+    "缓存": ["cache"],
+    "cache": ["缓存"],
+    "队列": ["queue"],
+    "queue": ["队列"],
+    "栈": ["stack"],
+    "stack": ["栈"],
+    "树": ["tree"],
+    "tree": ["树"],
+    "图": ["graph"],
+    "graph": ["图"],
+    "搜索": ["search"],
+    "search": ["搜索"],
+    "排序": ["sort", "sorting"],
+    "sort": ["排序"],
+    "文件": ["file"],
+    "file": ["文件"],
+    "路径": ["path"],
+    "path": ["路径"],
+    "网络": ["network"],
+    "network": ["网络"],
+    "请求": ["request"],
+    "request": ["请求"],
+    "响应": ["response"],
+    "response": ["响应"],
+}
+
+
+def _expand_query_terms(terms: list[str]) -> list[str]:
+    """Expand query terms using code terminology dictionary."""
+    expanded = list(terms)
+    for term in terms:
+        if term in _CODE_TERM_EXPANSIONS:
+            expanded.extend(_CODE_TERM_EXPANSIONS[term])
+    return expanded
 
 
 def _tokenize(text: str) -> list[str]:
-    """Tokenize text into words for TF-IDF scoring."""
-    return [w.lower() for w in _WORD_RE.findall(text)]
+    """Tokenize text into words for TF-IDF scoring.
+
+    Handles alphanumeric words, individual CJK characters, and CJK bigrams
+    for better Chinese text semantic matching.
+    """
+    tokens = [w.lower() for w in _WORD_RE.findall(text)]
+    cjk_bigrams = [match.lower() for match in _CJK_BIGRAM_RE.findall(text)]
+    return tokens + cjk_bigrams
+
+
+# BM25 parameters
+_BM25_K1 = 1.5  # Term frequency scaling
+_BM25_B = 0.75  # Document length normalization
 
 
 def _compute_tf(tokens: list[str]) -> dict[str, float]:
@@ -50,7 +331,10 @@ def _compute_tf(tokens: list[str]) -> dict[str, float]:
 
 
 def _compute_idf(documents: list[list[str]]) -> dict[str, float]:
-    """Compute inverse document frequency across documents."""
+    """Compute inverse document frequency across documents.
+
+    Uses smoothed IDF formula: log((N + 1) / (df + 1)) + 1
+    """
     n = len(documents)
     if n == 0:
         return {}
@@ -60,29 +344,144 @@ def _compute_idf(documents: list[list[str]]) -> dict[str, float]:
         for term in seen:
             doc_freq[term] = doc_freq.get(term, 0) + 1
     return {
-        term: math.log((n + 1) / (df + 1)) + 1  # Smoothed IDF
+        term: math.log((n + 1) / (df + 1)) + 1
         for term, df in doc_freq.items()
     }
+
+
+def _compute_avgdl(documents: list[list[str]]) -> float:
+    """Compute average document length."""
+    if not documents:
+        return 0.0
+    return sum(len(doc) for doc in documents) / len(documents)
+
+
+def _bm25_score(
+    query_tokens: list[str],
+    doc_tokens: list[str],
+    idf: dict[str, float],
+    avgdl: float,
+    *,
+    k1: float = _BM25_K1,
+    b: float = _BM25_B,
+) -> float:
+    """Compute Okapi BM25 score between query and document.
+
+    Formula:
+        score(q,d) = sum(IDF(qi) * (tf(qi,d) * (k1 + 1)) /
+                         (tf(qi,d) + k1 * (1 - b + b * |d|/avgdl)))
+    """
+    if not query_tokens or not doc_tokens or avgdl == 0:
+        return 0.0
+
+    doc_len = len(doc_tokens)
+    tf_doc = _compute_tf(doc_tokens)
+    total_tokens = doc_len
+
+    score = 0.0
+    for term in set(query_tokens):
+        if term not in idf:
+            continue
+        tf = tf_doc.get(term, 0.0)
+        if tf == 0:
+            continue
+        numerator = tf * (k1 + 1)
+        denominator = tf + k1 * (1 - b + b * (total_tokens / avgdl))
+        score += idf[term] * (numerator / denominator)
+
+    return score
 
 
 def _tfidf_score(
     query_tokens: list[str],
     doc_tokens: list[str],
     idf: dict[str, float],
+    avgdl: float = 0.0,
 ) -> float:
-    """Compute TF-IDF cosine similarity between query and document."""
-    if not query_tokens or not doc_tokens:
-        return 0.0
-    
-    tf_doc = _compute_tf(doc_tokens)
-    
-    # Compute dot product (query terms only)
-    score = 0.0
-    for term in query_tokens:
-        if term in tf_doc and term in idf:
-            score += tf_doc[term] * idf[term]
-    
-    return score
+    """Compute BM25 score between query and document.
+
+    Note: This function name is kept for backward compatibility but now
+    uses BM25 scoring internally for better short-text ranking.
+    """
+    return _bm25_score(query_tokens, doc_tokens, idf, avgdl)
+
+
+def get_tfidf_keywords(text: str, top_n: int = 10) -> list[tuple[str, float]]:
+    """Extract top N most important terms from text using TF scores.
+
+    Useful for auto-categorization and understanding key topics in text.
+
+    Args:
+        text: Input text to analyze
+        top_n: Number of top keywords to return
+
+    Returns:
+        List of (term, tf_score) tuples sorted by importance
+    """
+    tokens = _tokenize(text)
+    if not tokens:
+        return []
+    tf = _compute_tf(tokens)
+    sorted_terms = sorted(tf.items(), key=lambda x: x[1], reverse=True)
+    return sorted_terms[:top_n]
+
+
+# ---------------------------------------------------------------------------
+# Auto-classification heuristics
+# ---------------------------------------------------------------------------
+
+_CLASSIFICATION_RULES: list[tuple[str, list[str], list[str]]] = [
+    ("architecture", ["architecture", "design", "pattern", "api", "rest", "backend", "service", "架构", "设计", "模式"]),
+    ("code-pattern", ["function", "method", "def", "class", "函数", "方法", "类"]),
+    ("testing", ["test", "assert", "pytest", "unit", "测试", "断言"]),
+    ("configuration", ["config", "settings", "env", "配置", "设置", "环境"]),
+    ("workflow", ["git", "commit", "branch", "merge", "工作流", "分支", "合并"]),
+    ("security", ["security", "auth", "permission", "安全", "认证", "权限"]),
+    ("performance", ["performance", "optimization", "benchmark", "性能", "优化", "基准"]),
+    ("convention", ["convention", "style", "naming", "规范", "风格", "命名"]),
+]
+
+
+def _auto_classify_content(content: str) -> tuple[str, list[str]]:
+    """Analyze content and return (category, tags) using keyword heuristics.
+
+    Supports both English and Chinese keywords. Returns "general" category
+    with empty tags if no classification rules match.
+
+    Args:
+        content: Text content to classify
+
+    Returns:
+        Tuple of (category, tags) - e.g., ("architecture", ["design-pattern"])
+    """
+    content_lower = content.lower()
+    category_scores: dict[str, int] = {}
+    matched_tags: list[str] = []
+
+    category_to_tags = {
+        "architecture": ["design-pattern"],
+        "code-pattern": ["function"],
+        "testing": ["test"],
+        "configuration": ["config"],
+        "workflow": ["git"],
+        "security": ["security"],
+        "performance": ["optimization"],
+        "convention": ["style"],
+    }
+
+    for category, keywords in (
+        (rule[0], rule[1]) for rule in _CLASSIFICATION_RULES
+    ):
+        score = sum(1 for kw in keywords if kw in content_lower)
+        if score > 0:
+            category_scores[category] = score
+            matched_tags.extend(category_to_tags.get(category, []))
+
+    if not category_scores:
+        return "general", []
+
+    best_category = max(category_scores, key=category_scores.get)
+    return best_category, matched_tags
 
 
 # ---------------------------------------------------------------------------
@@ -94,6 +493,9 @@ class MemoryScope(str, Enum):
     USER = "user"       # Cross-project, ~/.mini-code/memory/
     PROJECT = "project" # Project-shared, .mini-code-memory/
     LOCAL = "local"     # Project-local, .mini-code-memory-local/
+
+
+_VALID_SCOPES = {m.value for m in MemoryScope}
 
 
 @dataclass
@@ -176,67 +578,69 @@ class MemoryFile:
         return [e for e in self.entries if e.category == category]
     
     def search(self, query: str) -> list[MemoryEntry]:
-        """Search entries by keyword with TF-IDF relevance scoring.
-        
-        Combines TF-IDF semantic relevance with usage frequency for
+        """Search entries by keyword with BM25 relevance scoring.
+
+        Combines BM25 semantic relevance with usage frequency for
         better result ranking than simple substring matching.
+        Query terms are expanded using code terminology dictionary.
+        Exact tag matches receive highest priority scores.
         """
         if not self.entries:
             return []
-        
+
         query_tokens = _tokenize(query)
+        query_tokens = _expand_query_terms(query_tokens)
         if not query_tokens:
             return []
-        
-        # Also do substring matching as fallback for partial matches
+
         query_lower = query.lower()
-        
-        # Pre-tokenize all entries for TF-IDF
+        query_terms = query_lower.split()
+
         entry_tokens = []
         for entry in self.entries:
             text = f"{entry.content} {entry.category} {' '.join(entry.tags)}"
             entry_tokens.append(_tokenize(text))
-        
-        # Compute IDF across all entries
+
         idf = _compute_idf(entry_tokens)
-        
-        # Score each entry
+        avgdl = _compute_avgdl(entry_tokens)
+
         scored: list[tuple[float, MemoryEntry]] = []
         for i, entry in enumerate(self.entries):
-            # TF-IDF score
-            tfidf = _tfidf_score(query_tokens, entry_tokens[i], idf)
-            
-            # Substring match bonus (for partial keyword matches)
+            bm25 = _bm25_score(query_tokens, entry_tokens[i], idf, avgdl)
+
             substring_score = 0.0
             content_lower = entry.content.lower()
             if query_lower in content_lower:
-                substring_score = 2.0  # Strong bonus for exact substring
-            elif any(q in content_lower for q in query_lower.split()):
-                substring_score = 1.0  # Partial match
-            
-            # Category/tag match bonus
+                substring_score = 2.0
+            elif any(q in content_lower for q in query_terms):
+                substring_score = 1.0
+
             tag_score = 0.0
-            if any(query_lower in tag.lower() for tag in entry.tags):
+            exact_tag_match = any(
+                tag.lower() == query_lower for tag in entry.tags
+            )
+            partial_tag_match = any(
+                query_lower in tag.lower() for tag in entry.tags
+            )
+            if exact_tag_match:
+                tag_score = 5.0
+            elif partial_tag_match:
                 tag_score = 1.5
             if query_lower in entry.category.lower():
                 tag_score += 1.0
 
-            match_score = tfidf + substring_score + tag_score
+            match_score = bm25 + substring_score + tag_score
             if match_score <= 0:
                 continue
 
-            # Usage frequency bonus (logarithmic to avoid dominating)
             usage_bonus = math.log1p(entry.usage_count) * 0.3
-            
-            # Recency bonus (newer entries slightly preferred)
+
             age_hours = (time.time() - entry.updated_at) / 3600
             recency_bonus = 1.0 / (1.0 + age_hours / 24.0) * 0.5
-            
-            # Combine scores
+
             total_score = match_score + usage_bonus + recency_bonus
             scored.append((total_score, entry))
-        
-        # Sort by score (descending)
+
         scored.sort(key=lambda x: x[0], reverse=True)
         return [entry for _, entry in scored]
     
@@ -333,6 +737,83 @@ class MemoryManager:
         """Load all memory files."""
         for scope in MemoryScope:
             self._load_scope(scope)
+            self._auto_recover_scope(scope)
+    
+    def _auto_recover_scope(self, scope: MemoryScope) -> None:
+        """Check integrity and auto-recover if issues are found.
+
+        After loading, validates the memory state. If integrity issues
+        are detected, attempts to recover by removing invalid entries
+        and deduplicating IDs.
+
+        Args:
+            scope: Memory scope to check and recover
+        """
+        result = self.check_integrity(scope)
+        if not result["is_valid"]:
+            logger.warning(
+                "Integrity check failed for scope %s: %d issues found. "
+                "Attempting auto-recovery...",
+                scope.value,
+                len(result["issues"]),
+            )
+            self._recover_scope(scope)
+    
+    def _recover_scope(self, scope: MemoryScope) -> None:
+        """Attempt to recover a scope with integrity issues.
+
+        Removes entries with invalid IDs, deduplicates IDs (keeps first),
+        and fixes entries with empty content or category.
+
+        Args:
+            scope: Memory scope to recover
+        """
+        entries = self.memories[scope].entries
+        seen_ids: set[str] = set()
+        recovered: list[MemoryEntry] = []
+        removed_count = 0
+        fixed_count = 0
+
+        for entry in entries:
+            if not entry.id or not isinstance(entry.id, str):
+                logger.warning(
+                    "Removing entry with invalid ID during recovery"
+                )
+                removed_count += 1
+                continue
+
+            if entry.id in seen_ids:
+                logger.warning(
+                    "Removing duplicate entry with ID '%s'", entry.id
+                )
+                removed_count += 1
+                continue
+
+            if not entry.category or not isinstance(entry.category, str):
+                entry.category = "general"
+                fixed_count += 1
+
+            if not entry.content or not isinstance(entry.content, str):
+                logger.warning(
+                    "Removing entry '%s' with empty content", entry.id
+                )
+                removed_count += 1
+                continue
+
+            seen_ids.add(entry.id)
+            recovered.append(entry)
+
+        self.memories[scope].entries = recovered
+        self._save_scope(scope)
+
+        logger.info(
+            "Recovery complete for scope %s: %d entries recovered, "
+            "%d removed, %d fixed",
+            scope.value,
+            len(recovered),
+            removed_count,
+            fixed_count,
+        )
     
     def _load_scope(self, scope: MemoryScope) -> None:
         """Load memory file for a scope."""
@@ -346,13 +827,36 @@ class MemoryManager:
         # Load JSON metadata if exists
         if memory_json.exists():
             try:
-                data = json.loads(memory_json.read_text(encoding="utf-8"))
-                for entry_data in data.get("entries", []):
-                    entry = MemoryEntry.from_dict(entry_data)
-                    self.memories[scope].entries.append(entry)
-                return
-            except (json.JSONDecodeError, KeyError):
-                pass
+                raw_text = memory_json.read_text(encoding="utf-8")
+                data = json.loads(raw_text)
+                
+                is_valid, errors = _validate_memory_data(data)
+                if is_valid:
+                    for entry_data in data.get("entries", []):
+                        entry = MemoryEntry.from_dict(entry_data)
+                        self.memories[scope].entries.append(entry)
+                    return
+                else:
+                    logger.warning(
+                        "Memory data validation failed for scope %s: %s",
+                        scope.value,
+                        "; ".join(errors[:5]),
+                    )
+                    valid_entries = _recover_entries(data, memory_json)
+                    for entry_data in valid_entries:
+                        entry = MemoryEntry.from_dict(entry_data)
+                        self.memories[scope].entries.append(entry)
+                    if valid_entries:
+                        self._save_scope(scope)
+                    return
+            except json.JSONDecodeError as e:
+                logger.error(
+                    "JSON decode error in scope %s: %s", scope.value, e
+                )
+            except KeyError as e:
+                logger.error(
+                    "Missing key in scope %s data: %s", scope.value, e
+                )
         
         # Load from MEMORY.md
         if memory_md.exists():
@@ -414,22 +918,43 @@ class MemoryManager:
     def add_entry(
         self,
         scope: MemoryScope,
-        category: str,
-        content: str,
+        category: str = "auto",
+        content: str = "",
         tags: list[str] | None = None,
     ) -> MemoryEntry:
-        """Add a new memory entry."""
+        """Add a new memory entry.
+
+        If category is 'auto' or not provided, content will be automatically
+        classified using keyword heuristics.
+
+        Args:
+            scope: Memory scope level
+            category: Category for the entry, or 'auto' for auto-classification
+            content: Content of the memory entry
+            tags: Optional list of tags
+
+        Returns:
+            The created MemoryEntry
+        """
         self._ensure_scope_path(scope)
-        
+
+        final_category = category
+        final_tags = tags or []
+
+        if category == "auto" and content:
+            auto_category, auto_tags = _auto_classify_content(content)
+            final_category = auto_category
+            final_tags = list(dict.fromkeys(final_tags + auto_tags))
+
         entry_id = f"{scope.value}-{int(time.time())}-{len(self.memories[scope].entries)}"
         entry = MemoryEntry(
             id=entry_id,
             scope=scope,
-            category=category,
+            category=final_category,
             content=content,
-            tags=tags or [],
+            tags=final_tags,
         )
-        
+
         self.memories[scope].add_entry(entry)
         self._save_scope(scope)
         return entry
@@ -447,7 +972,50 @@ class MemoryManager:
             self._save_scope(scope)
             return True
         return False
-    
+
+    def add_tag(self, scope: MemoryScope, entry_id: str, tag: str) -> bool:
+        """Add a tag to an entry."""
+        for entry in self.memories[scope].entries:
+            if entry.id == entry_id:
+                if tag not in entry.tags:
+                    entry.tags.append(tag)
+                    self._save_scope(scope)
+                return True
+        return False
+
+    def remove_tag(self, scope: MemoryScope, entry_id: str, tag: str) -> bool:
+        """Remove a tag from an entry."""
+        for entry in self.memories[scope].entries:
+            if entry.id == entry_id:
+                if tag in entry.tags:
+                    entry.tags.remove(tag)
+                    self._save_scope(scope)
+                return True
+        return False
+
+    def search_by_tag(self, scope: MemoryScope, tag: str) -> list[MemoryEntry]:
+        """Search entries by tag."""
+        return [
+            entry for entry in self.memories[scope].entries
+            if tag in entry.tags
+        ]
+
+    def get_all_tags(self, scope: MemoryScope) -> set[str]:
+        """Get all unique tags in a scope."""
+        tags: set[str] = set()
+        for entry in self.memories[scope].entries:
+            tags.update(entry.tags)
+        return tags
+
+    def get_tags_by_category(self, scope: MemoryScope) -> dict[str, list[str]]:
+        """Get tags grouped by category."""
+        category_tags: dict[str, set[str]] = {}
+        for entry in self.memories[scope].entries:
+            if entry.category not in category_tags:
+                category_tags[entry.category] = set()
+            category_tags[entry.category].update(entry.tags)
+        return {cat: sorted(list(tags)) for cat, tags in category_tags.items()}
+
     def search(
         self,
         query: str,
@@ -507,14 +1075,14 @@ class MemoryManager:
         if not query_tokens:
             return 0.0
 
-        # TF-IDF score
+        query_tokens_expanded = _expand_query_terms(query_tokens)
         entry_tokens = _tokenize(
             f"{entry.content} {entry.category} {' '.join(entry.tags)}"
         )
-        idf = _compute_idf([entry_tokens])  # Single doc IDF for comparison
-        tfidf = _tfidf_score(query_tokens, entry_tokens, idf)
+        idf = _compute_idf([entry_tokens])
+        avgdl = len(entry_tokens)
+        bm25 = _bm25_score(query_tokens_expanded, entry_tokens, idf, avgdl)
 
-        # Substring match bonus
         query_lower = " ".join(query_tokens).lower()
         content_lower = entry.content.lower()
         substring_score = 0.0
@@ -523,21 +1091,22 @@ class MemoryManager:
         elif any(q in content_lower for q in query_tokens):
             substring_score = 1.0
 
-        # Category/tag match bonus
         tag_score = 0.0
-        if any(query_lower in tag.lower() for tag in entry.tags):
+        exact_tag_match = any(tag.lower() == query_lower for tag in entry.tags)
+        partial_tag_match = any(query_lower in tag.lower() for tag in entry.tags)
+        if exact_tag_match:
+            tag_score = 5.0
+        elif partial_tag_match:
             tag_score = 1.5
         if query_lower in entry.category.lower():
             tag_score += 1.0
 
-        # Usage frequency bonus
         usage_bonus = math.log1p(entry.usage_count) * 0.3
 
-        # Recency bonus
         age_hours = (time.time() - entry.updated_at) / 3600
         recency_bonus = 1.0 / (1.0 + age_hours / 24.0) * 0.5
 
-        return tfidf + substring_score + tag_score + usage_bonus + recency_bonus
+        return bm25 + substring_score + tag_score + usage_bonus + recency_bonus
     
     def get_relevant_context(
         self,
@@ -722,6 +1291,194 @@ class MemoryManager:
 
         entry = self.add_entry(scope, category, content, tags=["chat"])
         return f"Saved memory ({entry.scope.value}): {entry.content}"
+
+    def check_integrity(self, scope: MemoryScope) -> dict[str, Any]:
+        """Validate all entries in a scope for integrity.
+
+        Checks:
+        - Valid IDs (non-empty strings)
+        - Valid categories (non-empty strings)
+        - Non-empty content
+        - No duplicate IDs
+
+        Args:
+            scope: Memory scope to check
+
+        Returns:
+            Dictionary with {is_valid: bool, issues: list[str]}
+        """
+        issues: list[str] = []
+        seen_ids: set[str] = set()
+        entries = self.memories[scope].entries
+
+        for idx, entry in enumerate(entries):
+            if not entry.id or not isinstance(entry.id, str):
+                issues.append(
+                    f"Entry at index {idx} has invalid or empty ID"
+                )
+
+            if entry.id in seen_ids:
+                issues.append(
+                    f"Duplicate ID found: '{entry.id}' "
+                    f"(entries {list(self._find_entry_indices(scope, entry.id))})"
+                )
+            else:
+                seen_ids.add(entry.id)
+
+            if not entry.category or not isinstance(entry.category, str):
+                issues.append(
+                    f"Entry '{entry.id}' has invalid or empty category"
+                )
+
+            if not entry.content or not isinstance(entry.content, str):
+                issues.append(
+                    f"Entry '{entry.id}' has empty or invalid content"
+                )
+
+        return {
+            "is_valid": len(issues) == 0,
+            "issues": issues,
+        }
+
+    def compress_scope(
+        self, scope: MemoryScope, similarity_threshold: float = 0.8
+    ) -> dict[str, int]:
+        """Compress memory entries by merging similar content.
+
+        Merges entries with content similarity above the threshold.
+        Removes duplicate entries (exact content matches).
+        Updates timestamps and preserves usage counts.
+
+        Args:
+            scope: Memory scope to compress
+            similarity_threshold: Jaccard similarity threshold for merging
+                (default 0.8 = 80%)
+
+        Returns:
+            Stats dictionary with {merged_count, removed_count, remaining_count}
+        """
+        entries = self.memories[scope].entries
+        if len(entries) <= 1:
+            return {"merged_count": 0, "removed_count": 0, "remaining_count": len(entries)}
+
+        seen_content: dict[str, int] = {}
+        duplicates_removed = 0
+
+        unique_entries = []
+        for entry in entries:
+            content_key = entry.content.strip().lower()
+            if content_key in seen_content:
+                master_idx = seen_content[content_key]
+                master = unique_entries[master_idx]
+                master.usage_count += entry.usage_count
+                master.updated_at = max(master.updated_at, entry.updated_at)
+                master.tags = sorted(
+                    list(set(master.tags + entry.tags))
+                )
+                duplicates_removed += 1
+            else:
+                seen_content[content_key] = len(unique_entries)
+                unique_entries.append(entry)
+
+        merged_count = 0
+        final_entries: list[MemoryEntry] = []
+        merged_indices: set[int] = set()
+
+        for i, entry_a in enumerate(unique_entries):
+            if i in merged_indices:
+                continue
+
+            best_match_idx = None
+            best_similarity = 0.0
+
+            for j, entry_b in enumerate(unique_entries):
+                if i == j or j in merged_indices:
+                    continue
+
+                similarity = self._jaccard_similarity(
+                    entry_a.content, entry_b.content
+                )
+                if similarity >= similarity_threshold and similarity > best_similarity:
+                    best_similarity = similarity
+                    best_match_idx = j
+
+            if best_match_idx is not None:
+                entry_b = unique_entries[best_match_idx]
+                merged_content = self._merge_entry_content(
+                    entry_a.content, entry_b.content
+                )
+                entry_a.content = merged_content
+                entry_a.usage_count += entry_b.usage_count
+                entry_a.updated_at = max(
+                    entry_a.updated_at, entry_b.updated_at
+                )
+                entry_a.tags = sorted(
+                    list(set(entry_a.tags + entry_b.tags))
+                )
+                merged_indices.add(best_match_idx)
+                merged_count += 1
+
+            final_entries.append(entry_a)
+
+        self.memories[scope].entries = final_entries
+        self._save_scope(scope)
+
+        return {
+            "merged_count": merged_count,
+            "removed_count": duplicates_removed,
+            "remaining_count": len(final_entries),
+        }
+
+    @staticmethod
+    def _jaccard_similarity(text_a: str, text_b: str) -> float:
+        """Compute Jaccard similarity between two text strings.
+
+        Uses token-based Jaccard similarity: |A ∩ B| / |A ∪ B|
+
+        Args:
+            text_a: First text string
+            text_b: Second text string
+
+        Returns:
+            Similarity score between 0.0 and 1.0
+        """
+        tokens_a = set(_tokenize(text_a))
+        tokens_b = set(_tokenize(text_b))
+
+        if not tokens_a and not tokens_b:
+            return 1.0
+        if not tokens_a or not tokens_b:
+            return 0.0
+
+        intersection = tokens_a & tokens_b
+        union = tokens_a | tokens_b
+
+        return len(intersection) / len(union)
+
+    @staticmethod
+    def _merge_entry_content(content_a: str, content_b: str) -> str:
+        """Merge two similar content strings.
+
+        Keeps the longer version, appends unique parts from the shorter.
+
+        Args:
+            content_a: First content string
+            content_b: Second content string
+
+        Returns:
+            Merged content string
+        """
+        if len(content_a) >= len(content_b):
+            return content_a
+        return content_b
+
+    def _find_entry_indices(self, scope: MemoryScope, entry_id: str) -> list[int]:
+        """Find all indices of entries with a given ID."""
+        indices = []
+        for idx, entry in enumerate(self.memories[scope].entries):
+            if entry.id == entry_id:
+                indices.append(idx)
+        return indices
 
 
 # ---------------------------------------------------------------------------

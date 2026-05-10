@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import concurrent.futures
 import inspect
@@ -13,6 +13,10 @@ from minicode.types import AgentStep, ChatMessage, ModelAdapter
 
 # Hooks integration
 from minicode.hooks import HookEvent, fire_hook_sync
+
+# Intelligence integration
+from minicode.agent_metrics import AgentMetricsCollector
+from minicode.agent_intelligence import ErrorClassifier, NudgeGenerator, RecoveryStrategy, ToolScheduler
 
 logger = get_logger("agent_loop")
 
@@ -203,6 +207,7 @@ def run_agent_turn(
     on_assistant_stream_chunk: Callable[[str], None] | None = None,
     context_manager: ContextManager | None = None,
     runtime: dict | None = None,
+    metrics_collector: AgentMetricsCollector | None = None,
 ) -> list[ChatMessage]:
     current_messages = list(messages)
     saw_tool_result = False
@@ -210,6 +215,8 @@ def run_agent_turn(
     recoverable_thinking_retry_count = 0
     tool_error_count = 0
     step = 0
+
+    tool_scheduler = ToolScheduler(metrics_collector=metrics_collector)
 
     # 妫€鏌ヤ笂涓嬫枃鐘舵€?
     if context_manager:
@@ -228,10 +235,13 @@ def run_agent_turn(
     try:
         while max_steps is None or step < max_steps:
             step += 1
-            
+
             # Hook: agent turn started
             fire_hook_sync(HookEvent.AGENT_START, step=step, cwd=cwd)
-            
+
+            if metrics_collector:
+                metrics_collector.start_turn(step)
+
             next_step: AgentStep
             try:
                 next_step = _model_next(
@@ -248,6 +258,8 @@ def run_agent_turn(
                 if on_assistant_message:
                     on_assistant_message(fallback)
                 current_messages.append({"role": "assistant", "content": fallback})
+                if metrics_collector:
+                    metrics_collector.end_turn(total_tokens=0)
                 return current_messages
             except TimeoutError as error:
                 fallback = f"Model API timeout: {error}"
@@ -255,6 +267,8 @@ def run_agent_turn(
                 if on_assistant_message:
                     on_assistant_message(fallback)
                 current_messages.append({"role": "assistant", "content": fallback})
+                if metrics_collector:
+                    metrics_collector.end_turn(total_tokens=0)
                 return current_messages
             except Exception as error:
                 # Catch-all for unexpected errors (rate limit, auth, server 5xx, etc.)
@@ -264,6 +278,8 @@ def run_agent_turn(
                 if on_assistant_message:
                     on_assistant_message(fallback)
                 current_messages.append({"role": "assistant", "content": fallback})
+                if metrics_collector:
+                    metrics_collector.end_turn(total_tokens=0)
                 return current_messages
 
             if next_step.type == "assistant":
@@ -379,32 +395,33 @@ def run_agent_turn(
             # Classify calls into concurrent-safe (read-only) vs serial (writes/commands)
             calls = next_step.calls
             _results: list[tuple[dict, ToolResult]] = []
-            
+
             if len(calls) <= 1:
-                # Single call 鈥?no benefit from concurrency, run directly
+                # Single call — no benefit from concurrency, run directly
+                call = calls[0]
+                if metrics_collector:
+                    metrics_collector.start_tool(call["toolName"])
                 result = _execute_single_tool(
-                    calls[0], tools, cwd, permissions, runtime, store, step,
+                    call, tools, cwd, permissions, runtime, store, step,
                     on_tool_start, on_tool_result,
                 )
-                _results.append((calls[0], result))
+                if metrics_collector:
+                    metrics_collector.end_tool(
+                        success=result.ok,
+                        error=result.output if not result.ok else "",
+                    )
+                _results.append((call, result))
             else:
-                # Multiple calls 鈥?partition into concurrent-safe and serial batches
-                concurrent_calls: list[dict] = []
-                serial_calls: list[dict] = []
-                
-                for call in calls:
-                    tool_def = tools.find(call["toolName"])
-                    if tool_def and tool_def.is_concurrency_safe:
-                        concurrent_calls.append(call)
-                    else:
-                        serial_calls.append(call)
-                
+                # Multiple calls — use ToolScheduler for intelligent partitioning
+                concurrent_calls, serial_calls = tool_scheduler.schedule_calls(calls, tools)
+
                 _results: list[tuple[dict, ToolResult]] = []
-                
+
                 # Phase 1: Run all concurrent-safe tools in parallel
                 if concurrent_calls:
+                    max_workers = tool_scheduler.get_recommended_max_workers(concurrent_calls)
                     with concurrent.futures.ThreadPoolExecutor(
-                        max_workers=min(len(concurrent_calls), 8),
+                        max_workers=max_workers,
                         thread_name_prefix="mc-tool",
                     ) as pool:
                         future_to_call = {
@@ -422,14 +439,21 @@ def run_agent_turn(
                             except Exception as exc:
                                 result = ToolResult(ok=False, output=f"Concurrent execution error: {exc}")
                             _results.append((call, result))
-                
+
                 # Phase 2: Run serial tools sequentially (in original order)
                 if serial_calls:
                     for call in serial_calls:
+                        if metrics_collector:
+                            metrics_collector.start_tool(call["toolName"])
                         result = _execute_single_tool(
                             call, tools, cwd, permissions, runtime, store, step,
                             on_tool_start, on_tool_result,
                         )
+                        if metrics_collector:
+                            metrics_collector.end_tool(
+                                success=result.ok,
+                                error=result.output if not result.ok else "",
+                            )
                         _results.append((call, result))
                         # If a serial tool awaits user, return immediately
                         if result.awaitUser:
@@ -477,6 +501,22 @@ def run_agent_turn(
                 saw_tool_result = True
                 if not result.ok:
                     tool_error_count += 1
+                    # Use ErrorClassifier for intelligent error handling
+                    classified = ErrorClassifier.classify(result.output, tool_name=call["toolName"])
+                    nudge = NudgeGenerator.generate(classified, retry_count=tool_error_count)
+                    # Append nudge to tool result content for model context
+                    result_output = result.output + "\n\n[System note: " + nudge + "]"
+                else:
+                    result_output = result.output
+
+                # Record conflicts between concurrent tools if both failed
+                if not result.ok and len(calls) > 1:
+                    for other_call, other_result in _results:
+                        if other_call["id"] == call["id"]:
+                            continue
+                        if not other_result.ok:
+                            tool_scheduler.record_conflict(call["toolName"], other_call["toolName"])
+
                 current_messages.append(
                     {
                         "role": "assistant_tool_call",
@@ -490,18 +530,25 @@ def run_agent_turn(
                         "role": "tool_result",
                         "toolUseId": call["id"],
                         "toolName": call["toolName"],
-                        "content": result.output,
+                        "content": result_output,
                         "isError": not result.ok,
                     }
                 )
                 if result.awaitUser:
                     if on_assistant_message:
-                        on_assistant_message(result.output)
-                    current_messages.append({"role": "assistant", "content": result.output})
+                        on_assistant_message(result_output)
+                    current_messages.append({"role": "assistant", "content": result_output})
+                    if metrics_collector:
+                        metrics_collector.end_turn(total_tokens=0)
                     return current_messages
 
             # Tool execution completed for this step; ask the model for the next turn
             # instead of falling through to the max-step fallback.
+            if metrics_collector:
+                total_tokens = sum(
+                    estimate_message_tokens(m) for m in current_messages
+                ) if context_manager else 0
+                metrics_collector.end_turn(total_tokens=total_tokens)
             continue
 
         fallback = "Reached the maximum tool step limit for this turn."
