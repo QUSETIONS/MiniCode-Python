@@ -510,7 +510,19 @@ class MemoryEntry:
     updated_at: float = field(default_factory=time.time)
     tags: list[str] = field(default_factory=list)
     usage_count: int = 0  # How often this was referenced
-    
+    _cached_tokens: list[str] | None = None  # Precomputed tokens for search
+
+    def get_tokens(self) -> list[str]:
+        """Get precomputed tokens, computing if needed."""
+        if self._cached_tokens is None:
+            text = f"{self.content} {self.category} {' '.join(self.tags)}"
+            self._cached_tokens = _tokenize(text)
+        return self._cached_tokens
+
+    def invalidate_tokens(self) -> None:
+        """Invalidate cached tokens after mutation."""
+        self._cached_tokens = None
+
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
@@ -563,6 +575,7 @@ class MemoryFile:
             if entry.id == entry_id:
                 entry.content = content
                 entry.updated_at = time.time()
+                entry.invalidate_tokens()
                 return True
         return False
     
@@ -597,10 +610,7 @@ class MemoryFile:
         query_lower = query.lower()
         query_terms = query_lower.split()
 
-        entry_tokens = []
-        for entry in self.entries:
-            text = f"{entry.content} {entry.category} {' '.join(entry.tags)}"
-            entry_tokens.append(_tokenize(text))
+        entry_tokens = [entry.get_tokens() for entry in self.entries]
 
         idf = _compute_idf(entry_tokens)
         avgdl = _compute_avgdl(entry_tokens)

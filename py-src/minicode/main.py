@@ -16,6 +16,7 @@ from minicode.model_registry import create_model_adapter, detect_provider, forma
 from minicode.agent_router import get_agent_router, reset_agent_router
 from minicode.model_switcher import ModelSwitcher, SwitchResult
 from minicode.smart_router import SmartRouter, get_smart_router, reset_smart_router
+from minicode.session_persistence import SessionPersistence
 from minicode.permissions import PermissionManager
 from minicode.prompt import build_system_prompt
 from minicode.tools import create_default_tool_registry
@@ -26,9 +27,22 @@ from minicode.tty_app import run_tty_app
 from minicode.workspace import resolve_tool_path
 
 
-def _handle_local_command(user_input: str, tools) -> str | None:
+def _handle_local_command(user_input: str, tools, session_persistence=None) -> str | None:
     if user_input == "/tools":
         return "\n".join(f"{tool.name}: {tool.description}" for tool in tools.list())
+    if user_input == "/sessions" and session_persistence is not None:
+        sessions = session_persistence.list_sessions()
+        if not sessions:
+            return "No saved sessions found."
+        lines = ["Saved sessions:", ""]
+        for i, s in enumerate(sessions, 1):
+            lines.append(
+                f"  {i}. [{s['session_id'][:8]}] {s['model']} - "
+                f"{s['messages']} messages, {s['age_hours']}h ago"
+            )
+        lines.append("")
+        lines.append(f"Total: {len(sessions)} session(s)")
+        return "\n".join(lines)
     local_result = try_handle_local_command(user_input, tools=tools, cwd=str(Path.cwd()))
     return local_result
 
@@ -249,6 +263,12 @@ def main() -> None:
     )
     logger.info("Store initialized with session: %s", app_store.get_state().session_id)
 
+    # Initialize Session Persistence for auto-save/resume
+    session_persistence = SessionPersistence(
+        session_id=app_store.get_state().session_id,
+        workspace=cwd,
+    )
+
     # Initialize Smart Router for intelligent model routing
     feedback_path = Path(cwd) / ".minicode" / "routing_feedback.json"
     current_model_name = runtime.get("model", "") if runtime else ""
@@ -322,7 +342,7 @@ def main() -> None:
                     _append_transcript(transcript, kind="assistant", body=memory_result)
                     print(memory_result)
                     continue
-                local_result = _handle_local_command(user_input, tools)
+                local_result = _handle_local_command(user_input, tools, session_persistence)
                 if local_result is not None:
                     _append_transcript(transcript, kind="user", body=user_input)
                     _append_transcript(transcript, kind="assistant", body=local_result)
@@ -438,6 +458,13 @@ def main() -> None:
                 if last_assistant:
                     _append_transcript(transcript, kind="assistant", body=last_assistant["content"])
                     print(last_assistant["content"])
+
+                # Auto-save session state
+                session_persistence.save(
+                    model=switcher.current_model,
+                    messages=messages,
+                    compaction_level=context_mgr._compaction_level if context_mgr else 0,
+                )
             return
 
         run_tty_app(
@@ -459,14 +486,26 @@ def main() -> None:
         from minicode.logging_config import get_logger
         logger = get_logger("main")
         logger.info("Shutting down...")
-        
+
+        # Force save session before exit
+        try:
+            session_persistence.save(
+                model=switcher.current_model,
+                messages=messages,
+                compaction_level=context_mgr._compaction_level if context_mgr else 0,
+                force=True,
+            )
+            logger.info("Session saved before shutdown")
+        except Exception as e:
+            logger.warning("Error saving session: %s", e)
+
         # Dispose tools (closes MCP connections)
         try:
             tools.dispose()
             logger.info("Tools disposed successfully")
         except Exception as e:
             logger.warning("Error disposing tools: %s", e)
-        
+
         logger.info("Shutdown complete")
 
 

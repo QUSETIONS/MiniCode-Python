@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from minicode.logging_config import get_logger
+from minicode.working_memory import WorkingMemoryTracker, get_working_memory
 
 logger = get_logger("context_manager")
 
@@ -256,6 +257,7 @@ class ContextManager:
         self,
         messages: list[dict[str, Any]],
         context_window: int = 200000,
+        working_memory: WorkingMemoryTracker | None = None,
     ):
         self.messages = messages
         self.context_window = context_window
@@ -263,6 +265,7 @@ class ContextManager:
         # Incremental token count
         self._total_tokens: int | None = None
         self._last_compaction_time: float = 0
+        self._working_memory = working_memory or get_working_memory()
     
     def get_stats(self) -> ContextStats:
         """Get context statistics with incremental counting."""
@@ -499,24 +502,43 @@ class ContextManager:
     ) -> list[dict[str, Any]]:
         """Finalize compaction: update state and log results."""
         final_messages = system_messages + new_messages
-        
+
+        # Inject working memory as a system message to preserve critical context
+        protected = self._working_memory.get_protected_content()
+        if protected:
+            wm_text = "\n".join(protected)
+            wm_message = {
+                "role": "system",
+                "content": f"[Working Memory - Critical context preserved during compaction]\n{wm_text}",
+            }
+            wm_tokens = estimate_message_tokens(wm_message)
+            # Only inject if it fits within target
+            current_tokens = estimate_messages_tokens(final_messages)
+            if current_tokens + wm_tokens <= target_tokens:
+                # Insert after the first system message (or at beginning)
+                if final_messages and final_messages[0].get("role") == "system":
+                    final_messages.insert(1, wm_message)
+                else:
+                    final_messages.insert(0, wm_message)
+                logger.debug("Injected working memory: %d tokens", wm_tokens)
+
         # Update incremental token count
         self._total_tokens = estimate_messages_tokens(final_messages)
         self._compaction_level += 1
         self.messages = final_messages
         self._last_compaction_time = time.time()
-        
+
         # Log compaction results
         new_stats = self.get_stats()
         removed_count = len(old_messages) - len(new_messages)
-        
+
         logger.info(
             f"Context compaction level {self._compaction_level}: "
             f"Removed {removed_count} messages, "
             f"Tokens: {old_stats.total_tokens} -> {new_stats.total_tokens} "
             f"(target: {target_tokens}, usage: {new_stats.usage_pct:.0%})"
         )
-        
+
         return final_messages
     
     def force_compact(self) -> list[dict[str, Any]]:

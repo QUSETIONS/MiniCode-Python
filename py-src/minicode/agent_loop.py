@@ -17,6 +17,7 @@ from minicode.hooks import HookEvent, fire_hook_sync
 # Intelligence integration
 from minicode.agent_metrics import AgentMetricsCollector
 from minicode.agent_intelligence import ErrorClassifier, NudgeGenerator, RecoveryStrategy, ToolScheduler
+from minicode.working_memory import protect_context
 
 logger = get_logger("agent_loop")
 
@@ -380,6 +381,12 @@ def run_agent_turn(
                 if on_assistant_message:
                     on_assistant_message(next_step.content)
                 current_messages.append({"role": "assistant", "content": next_step.content})
+                # Protect final answer in working memory
+                protect_context(
+                    content=next_step.content[:500],
+                    entry_type="key_decision",
+                    ttl_seconds=3600,
+                )
                 return current_messages
 
             if next_step.content:

@@ -307,6 +307,26 @@ def _handle_input(
         )
         return False
 
+    # /sessions - list saved sessions from SessionPersistence
+    if input_text == "/sessions":
+        from minicode.session_persistence import SessionPersistence
+        sp = SessionPersistence(session_id="", workspace=args.cwd)
+        sessions = sp.list_sessions()
+        if not sessions:
+            body = "No saved sessions found."
+        else:
+            lines = ["Saved sessions:", ""]
+            for i, s in enumerate(sessions, 1):
+                lines.append(
+                    f"  {i}. [{s['session_id'][:8]}] {s['model']} - "
+                    f"{s['messages']} messages, {s['age_hours']}h ago"
+                )
+            lines.append("")
+            lines.append(f"Total: {len(sessions)} session(s)")
+            body = "\n".join(lines)
+        _push_transcript_entry(state, kind="assistant", body=body)
+        return False
+
     # Local commands
     local_result = try_handle_local_command(input_text, tools=args.tools, cwd=args.cwd)
     if local_result is not None:
