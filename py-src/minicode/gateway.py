@@ -18,6 +18,10 @@ def _json_bytes(payload: dict[str, Any], status: int = 200) -> tuple[int, bytes]
     return status, json.dumps(payload, ensure_ascii=False).encode("utf-8")
 
 
+# Precomputed constants for HTTP responses
+_JSON_CONTENT_TYPE = "application/json; charset=utf-8"
+
+
 class MiniCodeGatewayHandler(BaseHTTPRequestHandler):
     server_version = "MiniCodeGateway/0.1"
 
@@ -28,7 +32,7 @@ class MiniCodeGatewayHandler(BaseHTTPRequestHandler):
     def _send_json(self, payload: dict[str, Any], status: int = 200) -> None:
         status_code, body = _json_bytes(payload, status)
         self.send_response(status_code)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Type", _JSON_CONTENT_TYPE)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)

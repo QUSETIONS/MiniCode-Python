@@ -6,6 +6,7 @@ Supports GPT-4o, GPT-4-turbo, GPT-4o-mini and any OpenAI-compatible endpoint
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 import time
@@ -19,9 +20,11 @@ from minicode.state import Store, AppState, add_cost, record_api_error, update_c
 from minicode.types import AgentStep, StepDiagnostics
 
 DEFAULT_MAX_RETRIES = 4
-OPENAI_MODELS = {"gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o1-mini", "o3-mini"}
+OPENAI_MODELS = frozenset({"gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o1-mini", "o3-mini"})
+_OPENAI_PREFIXES = ("gpt-4", "gpt-3.5", "o1-", "o3-", "chatgpt-")
 
 
+@functools.lru_cache(maxsize=64)
 def _is_openai_model(model: str) -> bool:
     """Check if model name indicates an OpenAI-compatible API."""
     model_lower = model.lower()
@@ -29,9 +32,8 @@ def _is_openai_model(model: str) -> bool:
     if model_lower in OPENAI_MODELS:
         return True
     # Prefix match for versioned models
-    for prefix in ("gpt-4", "gpt-3.5", "o1-", "o3-", "chatgpt-"):
-        if model_lower.startswith(prefix):
-            return True
+    if any(model_lower.startswith(prefix) for prefix in _OPENAI_PREFIXES):
+        return True
     # Check if explicitly using OpenAI base URL
     base_url = os.environ.get("OPENAI_BASE_URL", os.environ.get("OPENAI_API_BASE", ""))
     if base_url and "openai" in base_url.lower():
@@ -112,18 +114,21 @@ def _to_openai_messages(messages: list[dict[str, Any]]) -> tuple[str, list[dict[
     return system_message, converted
 
 
+# Precompute marker data for fast parsing
+_ASSISTANT_MARKERS = (
+    ("<final>", "final", "</final>"),
+    ("[FINAL]", "final", None),
+    ("<progress>", "progress", "</progress>"),
+    ("[PROGRESS]", "progress", None),
+)
+
+
 def _parse_assistant_text(content: str) -> tuple[str, str | None]:
     """Parse progress/final markers from assistant text."""
     trimmed = content.strip()
     if not trimmed:
         return "", None
-    markers = [
-        ("<final>", "final", "</final>"),
-        ("[FINAL]", "final", None),
-        ("<progress>", "progress", "</progress>"),
-        ("[PROGRESS]", "progress", None),
-    ]
-    for prefix, kind, closing_tag in markers:
+    for prefix, kind, closing_tag in _ASSISTANT_MARKERS:
         if trimmed.startswith(prefix):
             raw = trimmed[len(prefix):].strip()
             if closing_tag:

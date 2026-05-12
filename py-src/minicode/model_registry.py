@@ -11,6 +11,7 @@ Design inspired by Hermes Agent's provider/model abstraction.
 
 from __future__ import annotations
 
+import functools
 import os
 from dataclasses import dataclass, field
 from enum import Enum
@@ -68,7 +69,8 @@ def _register(info: ModelInfo) -> None:
             BUILTIN_MODELS[alias] = info
 
 
-def _aliases(name: str) -> list[str]:
+@functools.lru_cache(maxsize=64)
+def _aliases(name: str) -> tuple[str, ...]:
     """Generate common aliases for a model name."""
     result: list[str] = []
     # e.g. "claude-sonnet-4-20250514" -> "claude-sonnet-4", "sonnet-4"
@@ -83,7 +85,7 @@ def _aliases(name: str) -> list[str]:
         family = "-".join(parts[idx:idx + 2])  # gpt-4o
         if family != name:
             result.append(family)
-    return result
+    return tuple(result)
 
 
 # --- Anthropic models ---
@@ -160,7 +162,17 @@ _register(ModelInfo("minimax/minimax-m1", Provider.OPENROUTER,
 # Provider detection
 # ---------------------------------------------------------------------------
 
-def detect_provider(model: str, runtime: dict | None = None) -> Provider:
+# Precompute provider detection patterns
+_OPENROUTER_PREFIXES = frozenset({
+    "anthropic/", "openai/", "google/", "meta-llama/", "deepseek/",
+    "qwen/", "minimax/", "mistralai/",
+})
+_OPENAI_PREFIXES = ("gpt-4", "gpt-3.5", "o1-", "o3-", "chatgpt-")
+_OPENAI_EXACT = frozenset({"gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o1-mini", "o3-mini"})
+
+
+@functools.lru_cache(maxsize=128)
+def detect_provider(model: str, runtime_key: int = 0) -> Provider:
     """Auto-detect which provider to use based on model name and config.
 
     Priority:
@@ -174,32 +186,21 @@ def detect_provider(model: str, runtime: dict | None = None) -> Provider:
     # 1. OpenRouter detection
     if os.environ.get("OPENROUTER_API_KEY") or model_lower.startswith("openrouter/"):
         return Provider.OPENROUTER
-    # Also check provider prefix patterns like "anthropic/", "openai/", "google/"
-    for prefix in ("anthropic/", "openai/", "google/", "meta-llama/", "deepseek/",
-                   "qwen/", "minimax/", "mistralai/"):
-        if model_lower.startswith(prefix):
-            if os.environ.get("OPENROUTER_API_KEY"):
-                return Provider.OPENROUTER
-            # Could also be a custom endpoint with this naming
-            if runtime and runtime.get("openaiBaseUrl"):
-                return Provider.CUSTOM
-            # Default to OpenRouter for vendor-prefixed models
+    # Also check provider prefix patterns
+    if any(model_lower.startswith(prefix) for prefix in _OPENROUTER_PREFIXES):
+        if os.environ.get("OPENROUTER_API_KEY"):
             return Provider.OPENROUTER
+        # Default to OpenRouter for vendor-prefixed models
+        return Provider.OPENROUTER
 
     # 2. OpenAI detection
-    openai_prefixes = ("gpt-4", "gpt-3.5", "o1-", "o3-", "chatgpt-")
-    openai_exact = {"gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o1-mini", "o3-mini"}
-    if model_lower in openai_exact or any(model_lower.startswith(p) for p in openai_prefixes):
+    if model_lower in _OPENAI_EXACT or any(model_lower.startswith(p) for p in _OPENAI_PREFIXES):
         return Provider.OPENAI
     if os.environ.get("OPENAI_API_KEY") and not os.environ.get("ANTHROPIC_API_KEY"):
         return Provider.OPENAI
 
     # 3. Custom endpoint detection
-    custom_base = (
-        os.environ.get("CUSTOM_API_BASE_URL", "")
-        or (runtime or {}).get("customBaseUrl", "")
-    )
-    if custom_base:
+    if os.environ.get("CUSTOM_API_BASE_URL"):
         return Provider.CUSTOM
 
     # 4. Default: Anthropic

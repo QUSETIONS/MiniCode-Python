@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import json
 import os
 import subprocess
@@ -12,13 +13,13 @@ from typing import Any
 from minicode.tooling import ToolDefinition, ToolResult
 
 # 安全常量：禁止在命令参数中出现的危险字符
-DANGEROUS_SHELL_CHARS = set('|&;`$(){}<>\n\r')
+DANGEROUS_SHELL_CHARS = frozenset('|&;`$(){}<>\n\r')
 
 # MCP payload 大小上限（防止恶意服务端制造 OOM）
 MAX_MCP_PAYLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
 
 # 允许的命令白名单（常见的 MCP 服务器命令）
-ALLOWED_COMMANDS = {
+ALLOWED_COMMANDS = frozenset({
     'node', 'npm', 'npx', 'python', 'python3', 'pip', 'pip3',
     'uv', 'deno', 'bun', 'cargo', 'go', 'java', 'javac',
     'ruby', 'gem', 'dotnet', 'curl', 'wget',

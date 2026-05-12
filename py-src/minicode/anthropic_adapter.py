@@ -60,17 +60,20 @@ def _extract_error_message(data: Any, status: int) -> str:
     return f"Model request failed: {status}"
 
 
+# Precompute marker data for fast parsing
+_ASSISTANT_MARKERS = (
+    ("<final>", "final", "</final>"),
+    ("[FINAL]", "final", None),
+    ("<progress>", "progress", "</progress>"),
+    ("[PROGRESS]", "progress", None),
+)
+
+
 def _parse_assistant_text(content: str) -> tuple[str, str | None]:
     trimmed = content.strip()
     if not trimmed:
         return "", None
-    markers = [
-        ("<final>", "final", "</final>"),
-        ("[FINAL]", "final", None),
-        ("<progress>", "progress", "</progress>"),
-        ("[PROGRESS]", "progress", None),
-    ]
-    for prefix, kind, closing_tag in markers:
+    for prefix, kind, closing_tag in _ASSISTANT_MARKERS:
         if trimmed.startswith(prefix):
             raw = trimmed[len(prefix) :].strip()
             if closing_tag:
