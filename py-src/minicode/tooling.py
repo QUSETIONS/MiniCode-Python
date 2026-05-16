@@ -1,15 +1,10 @@
 from __future__ import annotations
 
-import logging
 import re
-import time
-import hashlib
-from collections import OrderedDict
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Protocol
-
-logger = logging.getLogger("minicode.tooling")
+from abc import abstractmethod
 
 
 # ---------------------------------------------------------------------------
@@ -22,28 +17,14 @@ _LARGE_OUTPUT_THRESHOLD = 50_000   # Trigger smart truncation above this
 
 # Tool-specific output limits (characters)
 _TOOL_OUTPUT_LIMITS: dict[str, int] = {
-    # File operations
     "read_file": 40_000,
     "grep_files": 20_000,
-    "write_file": 5000,
-    "edit_file": 5000,
-    "multi_edit": 5000,
-    # Command operations
     "run_command": 30_000,
     "run_with_debug": 30_000,
-    # Web/search operations
     "web_fetch": 20_000,
     "web_search": 15_000,
-    "web_fetch_reach": 20_000,
-    "web_search_reach": 15_000,
-    # File listing
     "list_files": 15_000,
     "file_tree": 15_000,
-    # GitHub and RSS
-    "github_search": 15_000,
-    "github_read": 20_000,
-    "rss_read": 15_000,
-    # Testing and other tools
     "code_review": 20_000,
     "diff_viewer": 20_000,
     "db_explorer": 20_000,
@@ -51,12 +32,6 @@ _TOOL_OUTPUT_LIMITS: dict[str, int] = {
     "test_runner": 25_000,
     "api_tester": 15_000,
 }
-
-# Secondary truncation threshold
-_SECONDARY_MAX_OUTPUT = 3000
-
-# Precompiled error pattern for smart truncation
-_ERROR_PATTERN = re.compile(r'(?i)(error|fail|exception|traceback|warning)')
 
 
 def _smart_truncate_output(output: str, tool_name: str, max_chars: int | None = None) -> str:
@@ -85,8 +60,8 @@ def _smart_truncate_output(output: str, tool_name: str, max_chars: int | None = 
     avg_line_len = total_chars / max(1, total_lines)
     max_lines = int(limit / max(40, avg_line_len))
     
-    if tool_name in ("read_file", "github_read"):
-        # Keep head + tail
+    if tool_name == "read_file":
+        # Keep head + tail — most important for understanding file structure
         head_lines = max(1, int(max_lines * 0.6))
         tail_lines = max(1, max_lines - head_lines)
         head = "\n".join(lines[:head_lines])
@@ -103,10 +78,11 @@ def _smart_truncate_output(output: str, tool_name: str, max_chars: int | None = 
         head_lines = max(1, int(max_lines * 0.4))
         tail_lines = max(1, int(max_lines * 0.4))
         
-        # Also extract error/warning lines (use module-level precompiled pattern)
+        # Also extract error/warning lines
+        error_pattern = re.compile(r'(?i)(error|fail|exception|traceback|warning)', re.IGNORECASE)
         error_lines = [
             (i, line) for i, line in enumerate(lines)
-            if _ERROR_PATTERN.search(line) and head_lines <= i < total_lines - tail_lines
+            if error_pattern.search(line) and head_lines <= i < total_lines - tail_lines
         ]
         error_text = ""
         if error_lines:
@@ -123,7 +99,7 @@ def _smart_truncate_output(output: str, tool_name: str, max_chars: int | None = 
             f"{tail}"
         )
     
-    if tool_name in ("grep_files", "web_search", "web_search_reach", "github_search"):
+    if tool_name in ("grep_files", "web_search"):
         # Keep first N matches + summary
         head = "\n".join(lines[:max_lines])
         omitted = total_lines - max_lines
@@ -145,35 +121,9 @@ def _smart_truncate_output(output: str, tool_name: str, max_chars: int | None = 
     )
 
 
-def _truncate_secondary(output: str, max_chars: int) -> str:
-    """Secondary aggressive truncation for very large outputs."""
-    if len(output) <= max_chars:
-        return output
-    
-    lines = output.split("\n")
-    total_lines = len(lines)
-    
-    keep_lines = max(2, int(max_chars / 80))
-    head = max(1, int(keep_lines * 0.7))
-    tail = max(1, keep_lines - head)
-    
-    head_text = "\n".join(lines[:head])
-    tail_text = "\n".join(lines[-tail:])
-    omitted = total_lines - head - tail
-    
-    return (
-        f"{head_text}\n"
-        f"\n... [{omitted} lines omitted, output aggressively truncated to {max_chars} chars] ...\n\n"
-        f"{tail_text}"
-    )
-
-
 # ---------------------------------------------------------------------------
 # Tool metadata (inspired by Claude Code's Tool type)
 # ---------------------------------------------------------------------------
-
-# Read-only tool names for caching (matches context_manager.py)
-_READ_TOOLS = frozenset({"read_file", "list_files", "grep_files", "file_tree"})
 
 class ToolCapability(str, Enum):
     """Tool capability flags."""
@@ -264,7 +214,6 @@ class ToolResult:
     output: str
     backgroundTask: BackgroundTaskResult | None = None
     awaitUser: bool = False
-    cached: bool = False
 
 
 @dataclass(slots=True)
@@ -310,9 +259,6 @@ _READ_ONLY_TOOL_NAMES: frozenset[str] = frozenset({
     "code_review", "diff_viewer", "db_explorer",
     "web_fetch", "web_search", "api_tester",
     "ask_user", "todo_write",
-    # Agent Reach tools (all read-only)
-    "web_fetch_reach", "web_search_reach",
-    "github_search", "github_read", "rss_read",
 })
 
 
@@ -330,18 +276,12 @@ class ToolRegistry:
         self._disposer = disposer
         # 工具查找缓存 - O(1) 查找代替 O(n) 遍历
         self._tool_index: dict[str, ToolDefinition] = {t.name: t for t in tools}
-        # 只读工具结果 TTL 缓存
-        self._read_cache: OrderedDict[str, tuple[float, ToolResult]] = OrderedDict()
-        self._read_cache_max = 500
-        self._read_cache_ttl = 5.0
-
-    @staticmethod
-    def _cache_key(tool_name: str, input_data: Any) -> str:
-        raw = f"{tool_name}:{str(input_data)}"
-        return hashlib.md5(raw.encode(), usedforsecurity=False).hexdigest()
 
     def list(self) -> list[ToolDefinition]:
         return list(self._tools)
+
+    def list_all(self) -> list[str]:
+        return list(self._tool_index.keys())
 
     def get_skills(self) -> list[dict[str, Any]]:
         return list(self._skills)
@@ -366,24 +306,7 @@ class ToolRegistry:
         3. Execution error → error result with traceback excerpt
         4. Output too large → smart truncation
         5. Unexpected errors → error result (never propagates to caller)
-        6. Read-only tool cache → TTL cached results avoid repeated IO
         """
-        # Phase 0: Check read cache for read-only tools
-        if tool_name in _READ_TOOLS:
-            key = self._cache_key(tool_name, input_data)
-            now = time.time()
-            if key in self._read_cache:
-                ts, cached_result = self._read_cache[key]
-                if now - ts < self._read_cache_ttl:
-                    self._read_cache.move_to_end(key)
-                    return ToolResult(
-                        ok=cached_result.ok,
-                        output=cached_result.output,
-                        cached=True,
-                    )
-                else:
-                    del self._read_cache[key]
-
         tool = self.find(tool_name)
         if tool is None:
             return ToolResult(ok=False, output=f"Unknown tool: {tool_name}")
@@ -399,17 +322,8 @@ class ToolRegistry:
                            f"Input was: {str(input_data)[:200]}"
                 )
             
-            # Phase 2: Execution (with crash protection and timing)
-            exec_start = time.time()
+            # Phase 2: Execution (with crash protection)
             result = tool.run(parsed, context)
-            exec_duration_ms = int((time.time() - exec_start) * 1000)
-            
-            # Warn about slow tools
-            if exec_duration_ms > 10000:
-                logger.warning(
-                    "Slow tool execution: %s took %dms (input: %s)",
-                    tool_name, exec_duration_ms, str(input_data)[:100]
-                )
             
             # Phase 3: Output sanitization
             if result.output is None:
@@ -418,17 +332,6 @@ class ToolRegistry:
             # Smart truncation for large outputs
             if result.output and len(result.output) > _LARGE_OUTPUT_THRESHOLD:
                 result.output = _smart_truncate_output(result.output, tool_name)
-            
-            # Store in read cache
-            if tool_name in _READ_TOOLS and result.ok:
-                key = self._cache_key(tool_name, input_data)
-                now = time.time()
-                self._read_cache[key] = (now, ToolResult(
-                    ok=result.ok, output=result.output
-                ))
-                self._read_cache.move_to_end(key)
-                while len(self._read_cache) > self._read_cache_max:
-                    self._read_cache.popitem(last=False)
             
             return result
             

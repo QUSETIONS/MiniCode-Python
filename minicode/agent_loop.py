@@ -450,7 +450,7 @@ def run_agent_turn(
                 if predictive_controller:
                     if context_manager:
                         stats = context_manager.get_stats()
-                        predictive_controller.update("context_usage", stats.usage_pct / 100.0)
+                        predictive_controller.update("context_usage", stats.usage_percentage / 100.0)
                     predictive_controller.update("error_rate", tool_error_count / max(step, 1))
 
                     if step > 2:
@@ -459,7 +459,7 @@ def run_agent_turn(
                             logger.info("Predictive action triggered: %s", actions[0].recommended_action)
                             if self_healing_engine:
                                 healing_actions = self_healing_engine.detect_and_heal({
-                                    "context_usage": stats.usage_pct / 100.0 if context_manager else 0.0,
+                                    "context_usage": stats.usage_percentage / 100.0 if context_manager else 0.0,
                                     "error_rate": tool_error_count / max(step, 1),
                                 })
                                 if healing_actions:
@@ -780,11 +780,11 @@ def run_agent_turn(
                 if decoupling_controller:
                     decoupling_controller.record_measurement({
                         "token_usage_to_latency": (
-                            context_manager.get_stats().usage_pct / 100.0 if context_manager else 0.0,
+                            context_manager.get_stats().usage_percentage / 100.0 if context_manager else 0.0,
                             step * 2.0 / 60.0,
                         ),
                         "context_pressure_to_errors": (
-                            context_manager.get_stats().usage_pct / 100.0 if context_manager else 0.0,
+                            context_manager.get_stats().usage_percentage / 100.0 if context_manager else 0.0,
                             tool_error_count / max(step, 1),
                         ),
                     })
@@ -794,7 +794,7 @@ def run_agent_turn(
                 if self_healing_engine:
                     metrics_for_healing = {
                         "error_rate": tool_error_count / max(step, 1),
-                        "context_usage": context_manager.get_stats().usage_pct / 100.0 if context_manager else 0.0,
+                        "context_usage": context_manager.get_stats().usage_percentage / 100.0 if context_manager else 0.0,
                         "oscillation_index": 0.0,  # 从反馈控制器获取
                     }
                     healing_actions = self_healing_engine.detect_and_heal(metrics_for_healing)
@@ -851,7 +851,7 @@ def run_agent_turn(
                 timestamp=time.time(),
                 error_rate=float(tool_error_count) / max(step, 1),
                 avg_latency=step * 2.0,  # 简化估算
-                context_usage=context_manager.get_stats().usage_pct if context_manager else 0.0,
+                context_usage=context_manager.get_stats().usage_percentage if context_manager else 0.0,
                 active_tasks=1,
             )
             stability_monitor.record_snapshot(snapshot)

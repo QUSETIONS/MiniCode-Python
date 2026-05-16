@@ -42,7 +42,7 @@ def memory_with_entries(memory_manager):
     ]
     for scope, category, content, tags in entries:
         memory_manager.add_entry(
-            MemoryScope(scope.upper()), category, content, tags
+            MemoryScope(scope), category, content, tags
         )
     return memory_manager
 

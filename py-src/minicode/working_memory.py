@@ -17,7 +17,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from minicode.token_estimation import estimate_tokens
+from minicode.context_manager import estimate_tokens
 
 
 @dataclass
@@ -123,32 +123,20 @@ class WorkingMemoryTracker:
         }
 
     def _enforce_limits(self) -> None:
-        """Enforce token and entry count limits using priority-based eviction."""
-        # First remove expired entries
+        """Remove lowest-priority entries if exceeding limits."""
+        # Remove expired first
         self.clear_expired()
 
-        # If still over limits, evict by importance (lowest first)
-        while self.get_protected_tokens() > self.max_tokens or len(self._entries) > self.max_entries:
-            if not self._entries:
-                break
+        # Remove by token budget
+        while self.get_protected_tokens() > self.max_tokens and self._entries:
+            # Remove lowest importance entry
+            self._entries.sort(key=lambda e: e.importance)
+            self._entries.pop(0)
 
-            # Find the entry with lowest importance
-            min_importance = float('inf')
-            target_entry = None
-            for entry in self._entries:
-                if entry.importance < min_importance:
-                    min_importance = entry.importance
-                    target_entry = entry
-                elif entry.importance == min_importance and target_entry is not None:
-                    # Tie-break: remove the older one
-                    if entry.created_at < target_entry.created_at:
-                        target_entry = entry
-
-            if target_entry is not None:
-                self._entries.remove(target_entry)
-            else:
-                # Fallback: remove first entry
-                self._entries.pop(0)
+        # Remove by entry count
+        while len(self._entries) > self.max_entries and self._entries:
+            self._entries.sort(key=lambda e: e.importance)
+            self._entries.pop(0)
 
     def format_status(self) -> str:
         """Format working memory status for display."""

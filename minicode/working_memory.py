@@ -36,7 +36,6 @@ class WorkingMemoryEntry:
             return False
         return time.time() > self.expires_at
 
-    @functools.lru_cache(maxsize=1)
     def token_count(self) -> int:
         """Estimate token count for this entry."""
         return estimate_tokens(self.content)
