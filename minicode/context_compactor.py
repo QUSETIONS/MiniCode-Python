@@ -898,6 +898,10 @@ class ReactiveCompactEngine:
                 )
 
         # Aggressive fallback: truncate oldest messages directly
+        # Only attempt if still within retry budget
+        if self._recovery_attempts > self.MAX_RETRIES:
+            logger.error("Reactive Compact: max retries (%d) exceeded in fallback", self.MAX_RETRIES)
+            return None
         return self._aggressive_truncate(messages)
 
     def _aggressive_truncate(

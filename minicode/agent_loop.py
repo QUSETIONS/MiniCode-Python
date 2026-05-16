@@ -47,6 +47,7 @@ from minicode.context_compactor import (
     CompactTrigger,
     CompactStrategy,
 )
+from minicode.memory import MemoryManager
 
 logger = get_logger("agent_loop")
 
@@ -427,14 +428,15 @@ def run_agent_turn(
                 circuit_breaker_limit=3,
                 session_memory_enabled=True,
             )
+            memory_mgr = MemoryManager(project_root=cwd)
             context_compactor = ContextCompactor(
                 context_window=context_manager.context_window,
                 workspace=cwd,
-                memory_manager=None,  # Will be linked if memory available
+                memory_manager=memory_mgr,
                 estimate_fn=estimate_message_tokens,
                 config=compact_config,
             )
-            logger.info("ContextCompactor initialized: Claude Code-style pipeline")
+            logger.info("ContextCompactor initialized: Claude Code-style pipeline + MemoryManager linked")
 
     # 检查上下文状态 + 运行 Claude Code-style 预请求优化管线
     if context_manager:
@@ -798,6 +800,20 @@ def run_agent_turn(
                             continue
                         if not other_result.ok:
                             tool_scheduler.record_conflict(call["toolName"], other_call["toolName"])
+
+                # ReadDedup: 去重相同文件的重复读取，节省上下文空间
+                if (
+                    context_compactor
+                    and result.ok
+                    and call.get("toolName") == "read_file"
+                ):
+                    file_path = call.get("input", {}).get("path", "")
+                    if file_path:
+                        dedup_mgr = context_compactor.read_dedup
+                        if dedup_mgr.should_dedup(file_path, result_output):
+                            result_output = dedup_mgr.get_stub(file_path)
+                            logger.debug("ReadDedup replaced content for %s (stub)", file_path)
+                        dedup_mgr.register_read(file_path, result_output, len(current_messages))
 
                 current_messages.append(
                     {
