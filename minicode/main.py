@@ -322,6 +322,11 @@ def main() -> None:
         action="store_true",
         help="Emit JSON structured logs (also enabled via MINI_CODE_LOG_STRUCTURED=true)",
     )
+    parser.add_argument(
+        "--trust-project-mcp",
+        action="store_true",
+        help="Load project-level .mcp.json (disabled by default for security; also via MINI_CODE_TRUST_PROJECT_MCP=1)",
+    )
 
     args, remaining_argv = parser.parse_known_args()
     if remaining_argv and not any(not arg.startswith("--") for arg in remaining_argv):
@@ -385,7 +390,7 @@ def main() -> None:
 
     runtime = None
     try:
-        runtime = load_runtime_config(cwd)
+        runtime = load_runtime_config(cwd, trust_project_mcp=args.trust_project_mcp)
     except Exception as e:  # noqa: BLE001
         runtime = None
         print(

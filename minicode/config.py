@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import json
 import os
 from pathlib import Path
@@ -367,10 +368,28 @@ def merge_settings(base: dict[str, Any], override: dict[str, Any]) -> dict[str, 
     }
 
 
-def load_effective_settings(cwd: str | Path | None = None) -> dict[str, Any]:
+def load_effective_settings(
+    cwd: str | Path | None = None,
+    *,
+    trust_project_mcp: bool = False,
+) -> dict[str, Any]:
     claude_settings = read_settings_file(CLAUDE_SETTINGS_PATH)
     global_mcp = read_mcp_config_file(MINI_CODE_MCP_PATH)
-    project_mcp = read_mcp_config_file(project_mcp_path(cwd))
+
+    # Security (issue #13): project-level .mcp.json is NOT loaded by default.
+    # A cloned project could define a malicious MCP server (e.g. curl | sh).
+    # Require explicit opt-in via --trust-project-mcp flag or env var.
+    project_mcp: dict[str, Any] = {}
+    pmp = project_mcp_path(cwd)
+    if trust_project_mcp:
+        project_mcp = read_mcp_config_file(pmp)
+    elif pmp.exists():
+        import logging
+        logging.getLogger("minicode.config").warning(
+            "Project .mcp.json found at %s but NOT loaded (security: use "
+            "--trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).", pmp,
+        )
+
     mini_code_settings = read_settings_file(MINI_CODE_SETTINGS_PATH)
 
     return merge_settings(
@@ -392,8 +411,28 @@ def save_mini_code_settings(updates: dict[str, Any]) -> None:
     )
 
 
-def load_runtime_config(cwd: str | Path | None = None) -> dict[str, Any]:
-    effective = load_effective_settings(cwd)
+def load_runtime_config(
+    cwd: str | Path | None = None,
+    *,
+    trust_project_mcp: bool | None = None,
+) -> dict[str, Any]:
+    if trust_project_mcp is None:
+        trust_project_mcp = os.environ.get("MINI_CODE_TRUST_PROJECT_MCP", "").strip().lower() in (
+            "1", "true", "yes", "on",
+        )
+    load_effective = load_effective_settings
+    try:
+        signature = inspect.signature(load_effective)
+    except (TypeError, ValueError):
+        signature = None
+    accepts_trust_project_mcp = signature is None or any(
+        parameter.kind is inspect.Parameter.VAR_KEYWORD or name == "trust_project_mcp"
+        for name, parameter in signature.parameters.items()
+    )
+    if accepts_trust_project_mcp:
+        effective = load_effective(cwd, trust_project_mcp=trust_project_mcp)
+    else:
+        effective = load_effective(cwd)
     settings_env = dict(effective.get("env", {}))
     env = {**settings_env, **os.environ}
 

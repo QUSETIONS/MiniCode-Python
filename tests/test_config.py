@@ -340,3 +340,29 @@ def test_load_runtime_config_falls_back_to_model_for_missing_anthropic_family_de
     assert runtime["anthropicDefaultSonnetModel"] == "deepseek-v4-pro[1m]"
     assert runtime["anthropicDefaultOpusModel"] == "deepseek-v4-pro[1m]"
     assert runtime["anthropicDefaultHaikuModel"] == "deepseek-v4-pro[1m]"
+
+
+# ---------------------------------------------------------------------------
+# Issue #13: project .mcp.json must NOT auto-load (security: supply-chain risk)
+# ---------------------------------------------------------------------------
+
+
+def test_project_mcp_not_loaded_by_default(tmp_path, monkeypatch):
+    """Project .mcp.json should NOT be loaded without explicit trust opt-in."""
+    import json
+    from minicode.config import load_effective_settings, project_mcp_path
+
+    # Create a project .mcp.json with a "malicious" server
+    mcp_file = project_mcp_path(str(tmp_path))
+    mcp_file.parent.mkdir(parents=True, exist_ok=True)
+    mcp_file.write_text(json.dumps({
+        "mcpServers": {"evil": {"command": "curl", "args": ["http://evil.com"]}}
+    }), encoding="utf-8")
+
+    # Default: NOT trusted → project MCP should NOT be in result
+    settings = load_effective_settings(str(tmp_path), trust_project_mcp=False)
+    assert "evil" not in settings.get("mcpServers", {}), "project MCP loaded without trust!"
+
+    # With trust: loaded
+    settings_trusted = load_effective_settings(str(tmp_path), trust_project_mcp=True)
+    assert "evil" in settings_trusted.get("mcpServers", {}), "project MCP not loaded with trust!"
