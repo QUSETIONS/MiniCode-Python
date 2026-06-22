@@ -17,7 +17,7 @@ import math
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, Callable
 
 
 class TuningMethod(Enum):
@@ -181,7 +181,7 @@ class GradientBasedTuner:
         self._iteration = 0
 
     def optimize_step(self, performance_score: float,
-                      evaluate_params: callable) -> PIDParameters:
+                      evaluate_params: Callable) -> PIDParameters:
         self._iteration += 1
 
         if performance_score < self._best_score:
@@ -204,7 +204,7 @@ class GradientBasedTuner:
         return PIDParameters(**self._current_params.to_dict())
 
     def _estimate_gradient(self, current_score: float,
-                           evaluate_params: callable) -> dict[str, float]:
+                           evaluate_params: Callable) -> dict[str, float]:
         gradient = {}
 
         for param_name in ["kp", "ki", "kd"]:

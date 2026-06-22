@@ -174,10 +174,10 @@ def parse_escape_sequence(chunk: str) -> tuple[ParsedInputEvent | None, int]:
     ss3_match = _SS3_RE.match(chunk)
     if ss3_match:
         key_char = ss3_match.group(1)
-        name_map: dict[str, str] = {
+        ss3_name_map: dict[str, str] = {
             'A': 'up', 'B': 'down', 'C': 'right', 'D': 'left', 'H': 'home', 'F': 'end'
         }
-        return KeyEvent(name=name_map[key_char], ctrl=False, meta=False), ss3_match.end()
+        return KeyEvent(name=ss3_name_map[key_char], ctrl=False, meta=False), ss3_match.end()
 
     # ESC+Tab
     if chunk.startswith('\x1b\t'):
