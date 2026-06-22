@@ -133,9 +133,13 @@
 |---|---|
 | `logging_config.py` | `setup_logging`（按大小轮转）、`StructuredFormatter`、`log_api_call`/`log_tool_execution`/`log_permission_check`/`log_session_event`、`--structured-logs`/`MINI_CODE_LOG_STRUCTURED`。 |
 
-## 控制论子系统（cybernetic）
+## 控制论子系统（cybernetic）— 可选扩展层
 
-> 自适应控制回路：传感器 → PID 控制器 → 执行器，黑盒调节 agent 行为。
+> **架构定位**：控制论层是**可选的性能优化扩展**，不是核心 agent 路径的必要依赖。核心路径（entry → agent_loop → tools → session）在控制论模块完全禁用时仍能正常运行。
+>
+> **模块数**：21 个（27% 代码量），主要集中在反馈控制、预测、自愈等高级特性。启用需显式配置（runtime profile + cybernetic_ablation 开关）。
+>
+> **建议**：新项目建议从**核心路径**开始，稳定后再按需启用控制论层。控制论层对基础功能无侵入，可独立禁用/移除。
 
 | 模块 | 职责 |
 |---|---|
