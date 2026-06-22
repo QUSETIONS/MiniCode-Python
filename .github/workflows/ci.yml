@@ -35,6 +35,17 @@ jobs:
           python -m pip install ruff
           python -m ruff check minicode/ --select=E,F --ignore=E501
 
+      - name: Type check (mypy baseline)
+        run: |
+          python -m pip install mypy
+          # Baseline: 225 errors. Gradual type hardening — fix real bugs, not just noise.
+          ERRORS=$(python -m mypy minicode/ --no-error-summary 2>&1 | grep -c "error:" || echo 0)
+          echo "mypy errors: $ERRORS (baseline 225)"
+          if [ "$ERRORS" -gt 225 ]; then
+            echo "FAIL: mypy errors increased above baseline"
+            exit 1
+          fi
+
       - name: Run packaging smoke tests
         run: python -m pytest tests/test_packaging.py -q
 
