@@ -4,6 +4,7 @@ import concurrent.futures
 import inspect
 import re
 import time
+from pathlib import Path
 from typing import Any, Callable
 
 from minicode.config import describe_fallback_guidance, describe_provider_channel
@@ -361,7 +362,7 @@ def _register_tool_capabilities(tools: ToolRegistry) -> None:
                 description=tool_def.description or f"Tool: {tool_name}",
                 tags=["tool", tool_name],
             )
-            registry.register(metadata, lambda **kw: tools.execute(tool_name, kw, ToolContext()), None)
+            registry.register(metadata, lambda **kw: tools.execute(tool_name, kw, ToolContext(cwd=str(Path.cwd()))), None)
         except Exception as e:
             logger.debug("Failed to register tool %s as capability: %s", tool_name, e)
 
@@ -615,24 +616,27 @@ def _apply_control_signal(
             and hasattr(context_compactor, "_tool_budget")
             and context_compactor._tool_budget
         ):
+            tb = context_compactor._tool_budget
             new_budget = max(
                 1000,
                 int(
-                    context_compactor._tool_budget.budget_per_message
+                    getattr(tb, "budget_per_message", 2000)
                     * control_signal.adjust_token_budget
                 ),
             )
-            context_compactor._tool_budget.budget_per_message = new_budget
+            if hasattr(tb, "budget_per_message"):
+                tb.budget_per_message = new_budget
             logger.info(
                 "FeedbackController: token budget adjusted to %d (mult=%.2f)",
                 new_budget, control_signal.adjust_token_budget,
             )
 
     if control_signal.reduce_parallelism:
-        tool_scheduler._force_max_workers = min(
-            getattr(tool_scheduler, "_force_max_workers", 2) or 2,
-            2,
-        )
+        if hasattr(tool_scheduler, "_force_max_workers"):
+            tool_scheduler._force_max_workers = min(
+                getattr(tool_scheduler, "_force_max_workers", 2) or 2,
+                2,
+            )
         logger.info(
             "FeedbackController: reduce_parallelism -> max_workers=2 "
             "(oscillation=%.2f)",
@@ -641,7 +645,8 @@ def _apply_control_signal(
 
     if control_signal.adjust_concurrency != 0:
         cap = max(1, 4 + control_signal.adjust_concurrency)
-        tool_scheduler._force_max_workers = cap
+        if hasattr(tool_scheduler, "_force_max_workers"):
+            tool_scheduler._force_max_workers = cap
         logger.info(
             "FeedbackController: adjust_concurrency=%+d -> max_workers=%d",
             control_signal.adjust_concurrency, cap,
@@ -654,7 +659,8 @@ def _apply_control_signal(
             system_state.performance_score(),
         )
         if model_switcher:
-            model_switcher._pending_upgrade = True
+            if hasattr(model_switcher, '_pending_upgrade'):
+                model_switcher._pending_upgrade = True  # type: ignore[attr-defined]
 
     if control_signal.decrease_model_level:
         logger.info(
@@ -666,7 +672,8 @@ def _apply_control_signal(
         logger.info("FeedbackController: persisting working memory")
         if context_compactor and hasattr(context_compactor, "_tool_budget"):
             try:
-                context_compactor._tool_budget.flush()
+                if hasattr(context_compactor._tool_budget, "flush"):
+                    context_compactor._tool_budget.flush()
             except Exception:
                 pass
 
@@ -676,29 +683,32 @@ def _apply_control_signal(
             system_state.pattern_reuse_rate,
         )
         # Queue skill update for next maintenance cycle
-        if not hasattr(tool_scheduler, '_pending_skill_update'):
-            tool_scheduler._pending_skill_update = True
+        if not hasattr(tool_scheduler, "_pending_skill_update"):
+            tool_scheduler._pending_skill_update = True  # type: ignore[attr-defined]
         logger.info("FeedbackController: skill update queued for next maintenance cycle")
 
     if control_signal.reduce_tool_timeout:
         new_timeout = max(5.0, control_signal.reduce_tool_timeout)
-        tool_scheduler._force_tool_timeout = new_timeout
+        if hasattr(tool_scheduler, "_force_tool_timeout"):
+            tool_scheduler._force_tool_timeout = new_timeout  # type: ignore[attr-defined]
         logger.info(
             "FeedbackController: tool timeout reduced to %.1fs (high error rate)",
             new_timeout,
         )
     elif hasattr(tool_scheduler, '_force_tool_timeout'):
         # Reset timeout when signal no longer active
-        del tool_scheduler._force_tool_timeout
+        if hasattr(tool_scheduler, '_force_tool_timeout'):
+            del tool_scheduler._force_tool_timeout
 
     if control_signal.increase_nudge_frequency:
-        tool_scheduler._force_nudge_frequency = True
+        tool_scheduler._force_nudge_frequency = True  # type: ignore[attr-defined]
         logger.info(
             "FeedbackController: nudge frequency increased (stability=%.2f)",
             system_state.stability_score(),
         )
     elif hasattr(tool_scheduler, '_force_nudge_frequency'):
-        del tool_scheduler._force_nudge_frequency
+        if hasattr(tool_scheduler, '_force_nudge_frequency'):
+            del tool_scheduler._force_nudge_frequency
 
     if control_signal.promote_pattern:
         if feedback_controller:
@@ -712,7 +722,7 @@ def _apply_control_signal(
 
     if control_signal.force_compaction and context_compactor:
         try:
-            compacted = context_compactor.compact_messages()
+            compacted = context_compactor.compact_messages() if hasattr(context_compactor, 'compact_messages') else False
             logger.info(
                 "FeedbackController: forced compaction completed (%d messages)",
                 len(compacted) if compacted else 0,
@@ -1156,7 +1166,7 @@ def run_agent_turn(
             if compaction_breaker.is_allowed():
                 try:
                     logger.warning("Context near limit, auto-compacting...")
-                    current_messages = context_manager.compact_messages()
+                    current_messages = getattr(context_manager, 'compact_messages', lambda: current_messages)()
                     compaction_breaker.record_success()
                 except Exception as exc:
                     compaction_breaker.record_failure()
@@ -1187,7 +1197,7 @@ def run_agent_turn(
                 and compaction_breaker.is_allowed()
             ):
                 try:
-                    current_messages = context_manager.compact_messages()
+                    current_messages = getattr(context_manager, 'compact_messages', lambda: current_messages)()
                     compaction_breaker.record_success()
                 except Exception as exc:
                     compaction_breaker.record_failure()
@@ -2077,7 +2087,7 @@ def run_agent_turn(
                     pass
             elif reflection_engine and prelude.task:
                 try:
-                    execution_trace: list[dict[str, Any]] = [
+                    _trace: list[dict[str, Any]] = [
                         {"type": "tool_call", "count": turn_state.step},
                         {
                             "type": "error",
@@ -2119,13 +2129,15 @@ def run_agent_turn(
                             try:
                                 scope = MemoryScope(scope_name)
                                 if scope in _mgr.memories:
-                                    entry = _mgr.memories[scope]._id_index.get(mem.id)
-                                    if entry:
-                                        entry.usage_count += (
-                                            2 if turn_state.tool_error_count == 0 else -1
-                                        )
-                                        entry.last_accessed = time.time()
-                                        break
+                                    mem_store = _mgr.memories[scope]
+                                    if hasattr(mem_store, "_id_index"):
+                                        entry = mem_store._id_index.get(mem.id)
+                                        if entry:
+                                            entry.usage_count += (
+                                                2 if turn_state.tool_error_count == 0 else -1
+                                            )
+                                            entry.last_accessed = time.time()
+                                            break
                                         entry.last_accessed = time.time()
                                         break
                             except (ValueError, KeyError):
@@ -2292,7 +2304,8 @@ def run_agent_turn(
                         system_state.error_frequency, system_state.performance_score(),
                     )
                     if model_switcher:
-                        model_switcher._pending_upgrade = True
+                        if hasattr(model_switcher, '_pending_upgrade'):
+                            model_switcher._pending_upgrade = True  # type: ignore[attr-defined]
                 if control_signal.decrease_model_level:
                     logger.info(
                         "FeedbackController: model downgrade recommended (efficiency=%.2f)",
@@ -2313,22 +2326,25 @@ def run_agent_turn(
 
                 if control_signal.reduce_tool_timeout:
                     new_timeout = max(5.0, control_signal.reduce_tool_timeout)
-                    tool_scheduler._force_tool_timeout = new_timeout
+                    if hasattr(tool_scheduler, "_force_tool_timeout"):
+                        tool_scheduler._force_tool_timeout = new_timeout  # type: ignore[attr-defined]
                     logger.info(
                         "FeedbackController: tool timeout reduced to %.1fs",
                         new_timeout,
                     )
                 elif hasattr(tool_scheduler, '_force_tool_timeout'):
-                    del tool_scheduler._force_tool_timeout
+                    if hasattr(tool_scheduler, '_force_tool_timeout'):
+                        del tool_scheduler._force_tool_timeout
 
                 if control_signal.increase_nudge_frequency:
-                    tool_scheduler._force_nudge_frequency = True
+                    tool_scheduler._force_nudge_frequency = True  # type: ignore[attr-defined]
                     logger.info(
                         "FeedbackController: nudge frequency increased (stability=%.2f)",
                         system_state.stability_score(),
                     )
                 elif hasattr(tool_scheduler, '_force_nudge_frequency'):
-                    del tool_scheduler._force_nudge_frequency
+                    if hasattr(tool_scheduler, '_force_nudge_frequency'):
+                        del tool_scheduler._force_nudge_frequency
 
                 if control_signal.promote_pattern:
                     feedback_controller.record_pattern_effectiveness(
@@ -2341,7 +2357,7 @@ def run_agent_turn(
 
                 if control_signal.force_compaction and context_compactor:
                     try:
-                        compacted = context_compactor.compact_messages()
+                        compacted = context_compactor.compact_messages() if hasattr(context_compactor, 'compact_messages') else False
                         logger.info(
                             "FeedbackController: forced compaction (%d messages)",
                             len(compacted) if compacted else 0,
