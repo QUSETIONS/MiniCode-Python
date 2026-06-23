@@ -11,7 +11,10 @@ Design inspired by Hermes Agent's provider/model abstraction.
 
 from __future__ import annotations
 
+import json
 import os
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -207,6 +210,7 @@ class ModelSelectionController:
 # ---------------------------------------------------------------------------
 
 BUILTIN_MODELS: dict[str, ModelInfo] = {}
+_OPENAI_EXPOSED_MODELS_CACHE: dict[tuple[str, str], tuple[str, ...]] = {}
 
 def _register(info: ModelInfo) -> None:
     BUILTIN_MODELS[info.name] = info
@@ -232,6 +236,136 @@ def _aliases(name: str) -> list[str]:
         if family != name:
             result.append(family)
     return result
+
+
+def _normalize_openai_base_url(raw: str) -> str:
+    value = str(raw or "").strip().rstrip("/")
+    if not value:
+        return ""
+    if value.endswith("/chat/completions"):
+        return value[: -len("/chat/completions")]
+    return value
+
+
+def _openai_models_endpoint(base_url: str) -> str:
+    normalized = _normalize_openai_base_url(base_url)
+    if normalized.endswith("/v1"):
+        return f"{normalized}/models"
+    return f"{normalized}/v1/models"
+
+
+def _coerce_model_id_list(raw: Any) -> tuple[str, ...]:
+    if isinstance(raw, str):
+        raw = [item.strip() for item in raw.split(",")]
+    if not isinstance(raw, (list, tuple, set)):
+        return ()
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        model_id = str(item or "").strip()
+        if not model_id or model_id in seen:
+            continue
+        seen.add(model_id)
+        normalized.append(model_id)
+    return tuple(normalized)
+
+
+def _extract_model_ids(payload: Any) -> tuple[str, ...]:
+    rows = []
+    if isinstance(payload, dict):
+        rows = payload.get("data", [])
+    if not isinstance(rows, list):
+        return ()
+    return _coerce_model_id_list([
+        item.get("id")
+        for item in rows
+        if isinstance(item, dict)
+    ])
+
+
+def list_openai_exposed_models(
+    runtime: dict[str, Any] | None = None,
+) -> tuple[str, ...]:
+    runtime = runtime or {}
+    preset = _coerce_model_id_list(
+        runtime.get("_openaiExposedModels") or runtime.get("openaiExposedModels")
+    )
+    if preset:
+        return preset
+
+    base_url = (
+        runtime.get("openaiBaseUrl", "")
+        or os.environ.get("OPENAI_BASE_URL", "")
+        or os.environ.get("OPENAI_API_BASE", "")
+    )
+    api_key = runtime.get("openaiApiKey", "") or os.environ.get("OPENAI_API_KEY", "")
+    if not base_url or not api_key:
+        return ()
+
+    endpoint = _openai_models_endpoint(base_url)
+    cache_key = (endpoint, api_key)
+    if cache_key in _OPENAI_EXPOSED_MODELS_CACHE:
+        models = _OPENAI_EXPOSED_MODELS_CACHE[cache_key]
+        if models:
+            runtime["_openaiExposedModels"] = list(models)
+        return models
+
+    return ()
+
+
+def probe_openai_exposed_models(
+    runtime: dict[str, Any] | None = None,
+    *,
+    refresh: bool = False,
+) -> tuple[str, ...]:
+    runtime = runtime or {}
+    preset = list_openai_exposed_models(runtime)
+    if preset and not refresh:
+        return preset
+
+    base_url = (
+        runtime.get("openaiBaseUrl", "")
+        or os.environ.get("OPENAI_BASE_URL", "")
+        or os.environ.get("OPENAI_API_BASE", "")
+    )
+    api_key = runtime.get("openaiApiKey", "") or os.environ.get("OPENAI_API_KEY", "")
+    if not base_url or not api_key:
+        return preset
+
+    try:
+        req = urllib.request.Request(
+            _openai_models_endpoint(base_url),
+            headers={"Authorization": f"Bearer {api_key}"},
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            payload = resp.read()
+        models = _extract_model_ids(json.loads(payload))
+    except (urllib.error.URLError, OSError, ValueError):
+        return preset
+    except Exception:
+        return preset
+
+    cache_key = (_openai_models_endpoint(base_url), api_key)
+    _OPENAI_EXPOSED_MODELS_CACHE[cache_key] = models
+    if models:
+        runtime["_openaiExposedModels"] = list(models)
+    return models
+
+
+def model_is_exposed_via_openai_runtime(
+    model: str,
+    runtime: dict[str, Any] | None = None,
+) -> bool:
+    model_id = str(model or "").strip()
+    if not model_id:
+        return False
+    exposed = list_openai_exposed_models(runtime)
+    if not exposed:
+        exposed = probe_openai_exposed_models(runtime)
+    if not exposed:
+        return False
+    return model_id in set(exposed)
 
 
 # --- Anthropic models ---
@@ -318,7 +452,7 @@ _register(ModelInfo("minimax/minimax-m1", Provider.OPENROUTER,
 # Provider detection
 # ---------------------------------------------------------------------------
 
-def detect_provider(model: str, runtime: dict | None = None) -> Provider:
+def detect_provider(model: str, runtime: dict[str, Any] | None = None) -> Provider:
     """Auto-detect which provider to use based on model name and config.
 
     Priority:
@@ -343,6 +477,9 @@ def detect_provider(model: str, runtime: dict | None = None) -> Provider:
                 return Provider.CUSTOM
             # Default to OpenRouter for vendor-prefixed models
             return Provider.OPENROUTER
+
+    if runtime and model_is_exposed_via_openai_runtime(model, runtime):
+        return Provider.OPENAI
 
     # 2. DeepSeek direct API detection
     if model_lower.startswith("deepseek") or "deepseek" in model_lower:
@@ -414,7 +551,7 @@ class ProviderConfig:
         return self.provider in (Provider.OPENAI, Provider.OPENROUTER, Provider.CUSTOM)
 
 
-def build_provider_config(model: str, runtime: dict | None = None) -> ProviderConfig:
+def build_provider_config(model: str, runtime: dict[str, Any] | None = None) -> ProviderConfig:
     """Build provider configuration from model name and runtime config.
 
     This centralizes all the provider-specific URL/key/header logic that was
@@ -523,7 +660,7 @@ def _parse_extra_headers(env_var: str) -> dict[str, str]:
 def create_model_adapter(
     model: str,
     tools: Any,
-    runtime: dict | None = None,
+    runtime: dict[str, Any] | None = None,
     force_mock: bool = False,
 ) -> Any:
     """Create the appropriate ModelAdapter for the given model.
@@ -642,7 +779,7 @@ def format_model_list(provider: Provider | None = None) -> str:
     return "\n".join(lines)
 
 
-def format_model_status(model: str, runtime: dict | None = None) -> str:
+def format_model_status(model: str, runtime: dict[str, Any] | None = None) -> str:
     """Format current model status."""
     provider = detect_provider(model, runtime)
     info = resolve_model_info(model, provider)

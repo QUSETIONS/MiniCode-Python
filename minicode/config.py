@@ -227,6 +227,38 @@ def describe_provider_channel(
     return f"{provider_key or 'unknown'} channel"
 
 
+def _normalize_openai_runtime_base_url(value: Any) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    if "://" not in raw:
+        raw = f"https://{raw}"
+    parsed = urlparse(raw)
+    scheme = (parsed.scheme or "https").lower()
+    netloc = (parsed.netloc or "").lower()
+    path = (parsed.path or "").rstrip("/")
+    if path == "/chat/completions":
+        path = ""
+    return f"{scheme}://{netloc}{path}"
+
+
+def _uses_custom_openai_compatible_host(runtime: dict[str, Any] | None) -> bool:
+    runtime = runtime or {}
+    normalized = _normalize_openai_runtime_base_url(runtime.get("openaiBaseUrl"))
+    if not normalized:
+        return False
+    return normalized not in {
+        "https://api.openai.com",
+        "https://api.openai.com/v1",
+    }
+
+
+def _known_openai_exposed_models(runtime: dict[str, Any] | None) -> list[str]:
+    from minicode.model_registry import list_openai_exposed_models
+
+    return list(list_openai_exposed_models(runtime))
+
+
 def describe_fallback_guidance(
     runtime: dict[str, Any] | None,
     provider_name: str | None = None,
@@ -245,6 +277,11 @@ def describe_fallback_guidance(
     active_model = str(current_model or runtime.get("model", "")).strip()
     configured = configured_model_fallbacks(runtime, provider_key)
     defaults = default_model_fallbacks(runtime, provider_key, current_model=active_model)
+    exposed_openai_models = (
+        _known_openai_exposed_models(runtime)
+        if provider_key == "openai" and _uses_custom_openai_compatible_host(runtime)
+        else []
+    )
     guidance: list[str] = []
     provider_specific_key = {
         "anthropic": "anthropicFallbackModels",
@@ -266,13 +303,23 @@ def describe_fallback_guidance(
     if not configured:
         if defaults:
             preview = ", ".join(defaults[:3])
-            guidance.append(
-                "Default failover is already available for this runtime"
-                f"{': ' + preview if preview else '.'}"
-                " If those models are still unavailable on the current provider, "
-                f"set fallbackModels or {provider_specific_key} to models that the provider actually exposes, "
-                "or switch provider credentials."
-            )
+            if exposed_openai_models:
+                exposed_preview = ", ".join(exposed_openai_models[:3])
+                guidance.append(
+                    "Default failover is already available for this runtime"
+                    f"{': ' + preview if preview else '.'}"
+                    f" This OpenAI-compatible provider currently exposes: {exposed_preview}. "
+                    f"Set fallbackModels or {provider_specific_key} to one of the exposed models "
+                    "if the defaults are unavailable on the current provider."
+                )
+            else:
+                guidance.append(
+                    "Default failover is already available for this runtime"
+                    f"{': ' + preview if preview else '.'}"
+                    " If those models are still unavailable on the current provider, "
+                    f"set fallbackModels or {provider_specific_key} to models that the provider actually exposes, "
+                    "or switch provider credentials."
+                )
         else:
             guidance.append(
                 f"Add fallbackModels or {provider_specific_key} to enable model failover."
@@ -642,6 +689,19 @@ def validate_provider_runtime(runtime: dict[str, Any]) -> list[str]:
             )
         if not _is_valid_http_url(runtime.get("openaiBaseUrl")):
             errors.append("OpenAI base URL must be an http(s) URL.")
+        exposed_models = (
+            _known_openai_exposed_models(runtime)
+            if _uses_custom_openai_compatible_host(runtime)
+            else []
+        )
+        if model and exposed_models and model not in set(exposed_models):
+            preview = ", ".join(exposed_models[:3])
+            errors.append(
+                f"Configured model '{model}' is not exposed by the current OpenAI-compatible provider. "
+                f"Observed exposed models: {preview}. "
+                f"Set `model` to one of the exposed models, or set `openaiExposedModels` in your "
+                f"runtime config if the exposed-model list is stale."
+            )
     elif provider == Provider.OPENROUTER:
         if not runtime.get("openrouterApiKey"):
             errors.append(

@@ -719,6 +719,7 @@ def test_model_switcher_bounds_custom_openai_host_fallbacks(monkeypatch) -> None
         "model": "gpt5.5",
         "openaiApiKey": "openai-key",
         "openaiBaseUrl": "https://www.cctq.ai",
+        "_openaiExposedModels": ["claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
     }
 
     monkeypatch.delenv("MINI_CODE_MODEL_FALLBACKS", raising=False)
@@ -738,7 +739,44 @@ def test_model_switcher_bounds_custom_openai_host_fallbacks(monkeypatch) -> None
     )
     switcher.record_runtime_failure("gpt5.5")
 
-    assert switcher._fallback_candidates() == ["gpt-4o", "gpt-4o-mini"]
+    assert switcher._fallback_candidates() == ["claude-sonnet-4-6", "claude-haiku-4-5-20251001"]
+
+
+def test_model_switcher_probes_provider_exposed_models_on_custom_openai_host(monkeypatch) -> None:
+    registry = ToolRegistry([])
+    runtime = {
+        "model": "gpt5.5",
+        "openaiApiKey": "openai-key",
+        "openaiBaseUrl": "https://www.cctq.ai",
+    }
+    probed: list[bool] = []
+
+    monkeypatch.delenv("MINI_CODE_MODEL_FALLBACKS", raising=False)
+    monkeypatch.delenv("OPENAI_MODEL_FALLBACKS", raising=False)
+    monkeypatch.setattr(
+        "minicode.model_switcher.build_provider_config",
+        lambda model, runtime=None: SimpleNamespace(
+            api_key="openai-key",
+            base_url="https://www.cctq.ai",
+        ),
+    )
+
+    def _fake_probe(current_runtime):
+        probed.append(True)
+        current_runtime["_openaiExposedModels"] = ["claude-sonnet-4-6"]
+        return ("claude-sonnet-4-6",)
+
+    monkeypatch.setattr("minicode.model_switcher.probe_openai_exposed_models", _fake_probe)
+
+    switcher = ModelSwitcher(
+        current_model="gpt5.5",
+        current_runtime=runtime,
+        current_tools=registry,
+    )
+    switcher.record_runtime_failure("gpt5.5")
+
+    assert switcher._fallback_candidates() == ["claude-sonnet-4-6"]
+    assert probed == [True]
 
 
 def test_agent_turn_provider_outage_guidance_prefers_provider_exposed_models_when_default_openai_failover_exists(monkeypatch) -> None:
@@ -767,6 +805,7 @@ def test_agent_turn_provider_outage_guidance_prefers_provider_exposed_models_whe
             "model": "gpt5.5",
             "openaiApiKey": "openai-key",
             "openaiBaseUrl": "https://www.cctq.ai",
+            "_openaiExposedModels": ["claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
         },
     )
 
@@ -774,8 +813,8 @@ def test_agent_turn_provider_outage_guidance_prefers_provider_exposed_models_whe
     assert "provider availability failure" in final_message
     assert "active channel: openai via openaiapikey/openaibaseurl" in final_message
     assert "default failover is already available" in final_message
-    assert "gpt-4o, gpt-4o-mini" in final_message
-    assert "provider actually exposes" in final_message
+    assert "claude-sonnet-4-6, claude-haiku-4-5-20251001" in final_message
+    assert "currently exposes:" in final_message
     assert "add fallbackmodels or openaifallbackmodels to enable model failover" not in final_message
 
 
@@ -785,6 +824,7 @@ def test_model_switcher_bounds_custom_openai_host_fallbacks_with_legacy_api_base
         "model": "gpt5.5",
         "openaiApiKey": "openai-key",
         "openaiBaseUrl": "https://www.cctq.ai",
+        "_openaiExposedModels": ["claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
     }
 
     monkeypatch.delenv("MINI_CODE_MODEL_FALLBACKS", raising=False)
@@ -804,4 +844,4 @@ def test_model_switcher_bounds_custom_openai_host_fallbacks_with_legacy_api_base
     )
     switcher.record_runtime_failure("gpt5.5")
 
-    assert switcher._fallback_candidates() == ["gpt-4o", "gpt-4o-mini"]
+    assert switcher._fallback_candidates() == ["claude-sonnet-4-6", "claude-haiku-4-5-20251001"]
