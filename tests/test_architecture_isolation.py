@@ -57,7 +57,28 @@ class _BlockCybernetic:
         return self
 
     def __exit__(self, *args):
-        # Restore blocked modules
+        # Restore cybernetic modules directly.
+        #
+        # Cascade modules (agent_loop, tty_app) are deliberately NOT restored
+        # from the snapshot: tests in this context manager re-import them under
+        # isolation, and writing the stale pre-isolation module object back into
+        # sys.modules can split the module identity (sys.modules holds one
+        # object while later ``import minicode.agent_loop`` resolves another),
+        # which silently breaks subsequent monkeypatch.setattr() calls in other
+        # test files. The robust fix is to drop every cached reference and let
+        # the import machinery rebuild a single canonical module on next access.
+        for key in self.CASCADE_MODULES:
+            sys.modules.pop(key, None)
+            self._blocked.pop(key, None)
+        # Re-import cascade modules so a single canonical instance is cached
+        # both in sys.modules and in any subsequent ``import`` statement.
+        for key in self.CASCADE_MODULES:
+            try:
+                importlib.import_module(key)
+            except Exception:
+                # Best-effort: if re-import fails, leave it absent so the next
+                # real import attempt rebuilds it rather than leaving a split.
+                pass
         sys.modules.update(self._blocked)
 
 

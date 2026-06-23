@@ -19,7 +19,10 @@ from minicode.model_registry import (
     BUILTIN_MODELS,
     build_provider_config,
     create_model_adapter,
+    detect_provider,
     list_available_models,
+    list_openai_exposed_models,
+    probe_openai_exposed_models,
     resolve_model_info,
 )
 
@@ -59,7 +62,7 @@ class ModelSwitcher:
     def __init__(
         self,
         current_model: str,
-        current_runtime: dict,
+        current_runtime: dict[str, Any],
         current_tools: Any,
         available_models: dict[str, Any] | None = None,
     ):
@@ -70,7 +73,7 @@ class ModelSwitcher:
         inferred_default_model = ""
         try:
             if (
-                detect_provider_name(current_model) == "anthropic"
+                detect_provider_name(current_model, current_runtime) == "anthropic"
                 and current_model
                 and not current_model.startswith("claude-")
             ):
@@ -123,15 +126,15 @@ class ModelSwitcher:
                 success=False,
                 old_model=self._current_model,
                 new_model=target_model,
-                old_provider=detect_provider_name(self._current_model),
-                new_provider=detect_provider_name(target_model),
+                old_provider=detect_provider_name(self._current_model, self._runtime),
+                new_provider=detect_provider_name(target_model, self._runtime),
                 reason=reason,
                 errors=["Target model is already active"],
             )
 
         old_model = self._current_model
-        old_provider = detect_provider_name(old_model)
-        new_provider = detect_provider_name(target_model)
+        old_provider = detect_provider_name(old_model, self._runtime)
+        new_provider = detect_provider_name(target_model, self._runtime)
 
         try:
             new_adapter = create_model_adapter(
@@ -175,7 +178,7 @@ class ModelSwitcher:
     def switch_to_fallback(self, reason: str = "fallback") -> SwitchResult:
         """Switch to the first viable fallback candidate."""
         old_model = self._current_model
-        old_provider = detect_provider_name(old_model)
+        old_provider = detect_provider_name(old_model, self._runtime)
         errors: list[str] = []
         candidates = self._fallback_candidates()
 
@@ -212,7 +215,7 @@ class ModelSwitcher:
         return result
 
     def _fallback_candidates(self) -> list[str]:
-        current_provider = detect_provider_name(self._current_model)
+        current_provider = detect_provider_name(self._current_model, self._runtime)
         provider_env = f"{current_provider.upper()}_MODEL_FALLBACKS"
         explicit_candidates: list[str] = []
         candidates: list[str] = []
@@ -228,6 +231,8 @@ class ModelSwitcher:
                 current_model=self._current_model,
             )
         )
+        if current_provider == "openai" and self._uses_custom_openai_compatible_host():
+            candidates.extend(probe_openai_exposed_models(self._runtime))
 
         for env_var in ("MINI_CODE_MODEL_FALLBACKS", provider_env):
             parsed = _parse_model_list(os.environ.get(env_var, ""))
@@ -280,7 +285,7 @@ class ModelSwitcher:
 
     def _should_bound_provider_family_fallbacks(self, explicit_candidates: list[str]) -> bool:
         try:
-            current_provider = detect_provider_name(self._current_model)
+            current_provider = detect_provider_name(self._current_model, self._runtime)
         except Exception:
             return False
         if current_provider == "anthropic":
@@ -294,7 +299,7 @@ class ModelSwitcher:
         return False
 
     def _uses_custom_openai_compatible_host(self) -> bool:
-        if detect_provider_name(self._current_model) != "openai":
+        if detect_provider_name(self._current_model, self._runtime) != "openai":
             return False
         try:
             provider_config = build_provider_config(self._current_model, self._runtime)
@@ -327,7 +332,7 @@ class ModelSwitcher:
 
     def _maybe_seed_runtime_family_defaults(self, model_name: str) -> None:
         try:
-            if detect_provider_name(model_name) != "anthropic" or model_name.startswith("claude-"):
+            if detect_provider_name(model_name, self._runtime) != "anthropic" or model_name.startswith("claude-"):
                 return
         except Exception:
             return
@@ -341,6 +346,11 @@ class ModelSwitcher:
             provider_config = build_provider_config(model_name, self._runtime)
         except Exception:
             return False
+        if self._uses_custom_openai_compatible_host():
+            exposed = list_openai_exposed_models(self._runtime)
+            exposed_set = set(exposed)
+            if exposed_set and model_name not in exposed_set:
+                return False
         return bool(provider_config.api_key)
 
     def get_switch_history(self) -> list[dict[str, Any]]:
@@ -361,10 +371,17 @@ class ModelSwitcher:
         return self._current_adapter
 
 
-def detect_provider_name(model: str) -> str:
-    """Get provider name string for a model."""
-    info = resolve_model_info(model)
-    return info.provider.value
+def detect_provider_name(model: str, runtime: dict[str, Any] | None = None) -> str:
+    """Get provider name string for a model.
+
+    Uses the lightweight ``detect_provider`` helper so that runtime-aware
+    routing (e.g. custom OpenAI-compatible hosts) is respected without having
+    to construct a full provider config just to read a name. This also keeps
+    the function compatible with test doubles that only stub part of the
+    provider config surface.
+    """
+    provider = detect_provider(model, runtime)
+    return provider.value
 
 
 def _parse_model_list(raw: str) -> list[str]:
