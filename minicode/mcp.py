@@ -822,5 +822,5 @@ def create_mcp_backed_tools(*, cwd: str, mcp_servers: dict[str, dict[str, Any]])
     return {
         "tools": tools,
         "servers": servers,
-        "dispose": lambda: [client.close() for client in clients],
+        "dispose": lambda: (_ := [client.close() for client in clients], None)[1],  # type: ignore[func-returns-value, misc]
     }

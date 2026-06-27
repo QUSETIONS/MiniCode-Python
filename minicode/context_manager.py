@@ -145,19 +145,19 @@ def estimate_tokens(text: str) -> int:
         return 0
     
     # 缓存查找（短文本优先缓存）
-    cache_key = text if len(text) < 256 else hash(text)  # 长文本用 hash 作为 key
+    cache_key = text if len(text) < 256 else str(hash(text))  # 长文本用 hash 作为 key
     cached = _token_cache.get(cache_key)
     if cached is not None:
         return cached
-    
+
     # 使用正则表达式快速统计 CJK 字符数量
     cjk_count = len(_CJK_PATTERN.findall(text))
-    
+
     # CJK 字符约 1.5 字符/token，英文约 4 字符/token
     ascii_chars = len(text) - cjk_count
-    
+
     result = max(1, int(cjk_count / 1.5 + ascii_chars / 4.0))
-    
+
     # 缓存结果（防止无限增长）
     if len(_token_cache) < _TOKEN_CACHE_MAX:
         _token_cache[cache_key] = result

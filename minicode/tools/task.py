@@ -12,16 +12,26 @@ The sub-agent runs a full agent loop (model + tools) with:
 from __future__ import annotations
 
 import time
+from typing import Any, TypedDict, cast
 
 from minicode.agent_loop import run_agent_turn
 from minicode.tooling import ToolDefinition, ToolResult
+from minicode.types import ChatMessage
 
 
 # ---------------------------------------------------------------------------
 # Agent type definitions
 # ---------------------------------------------------------------------------
 
-AGENT_TYPES = {
+class AgentDef(TypedDict):
+    name: str
+    description: str
+    system_prompt: str
+    allowed_tools: set[str] | None
+    max_turns: int
+
+
+AGENT_TYPES: dict[str, AgentDef] = {
     "explore": {
         "name": "Explore",
         "description": "Fast, read-only agent for codebase exploration and search",
@@ -147,7 +157,7 @@ def _run(input_data: dict, context) -> ToolResult:
         sub_permissions = PermissionManager(context.cwd, prompt=getattr(context.permissions, 'prompt', None))
     
     # Build isolated message list
-    sub_messages = [
+    sub_messages: list[ChatMessage] = cast(list[ChatMessage], [
         {
             "role": "system",
             "content": agent_def["system_prompt"]
@@ -160,7 +170,7 @@ def _run(input_data: dict, context) -> ToolResult:
             "role": "user",
             "content": task_prompt,
         },
-    ]
+    ])
     
     # Run the sub-agent loop
     start_time = time.time()

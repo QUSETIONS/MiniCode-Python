@@ -140,10 +140,11 @@ class FeedbackLearner:
             "total_tasks": len(self._outcomes),
             "models": {},
         }
-        
+        report_models: dict[str, Any] = report["models"]
+
         for model, perf in self._model_performance.items():
             if perf["total_tasks"] > 0:
-                report["models"][model] = {
+                report_models[model] = {
                     "tasks": perf["total_tasks"],
                     "success_rate": round(
                         perf["successful_tasks"] / perf["total_tasks"], 3
