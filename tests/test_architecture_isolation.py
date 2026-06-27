@@ -10,9 +10,7 @@ from __future__ import annotations
 import importlib
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock
 
-import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -116,8 +114,9 @@ def test_core_context_manager_without_cybernetic():
     assert tokens > 0
 
 
-def test_core_config_without_cybernetic():
+def test_core_config_without_cybernetic(monkeypatch):
     """Config loading must work without cybernetic."""
+    monkeypatch.setenv("ANTHROPIC_MODEL", "claude-haiku-3-20240307")
     from minicode.config import load_runtime_config
     config = load_runtime_config(".", trust_project_mcp=False)
     assert isinstance(config, dict)
