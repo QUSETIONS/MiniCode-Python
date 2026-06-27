@@ -1,196 +1,212 @@
-# 论文写作指南
+# MiniCode Paper Portfolio
 
-## 标题
+Date: 2026-06-19
+Status: active
+Decision: keep one canonical AAAI paper line, and split the old cybernetic
+memory story into a second-paper reserve.
 
-**Closed-Loop Cybernetic Memory: A Control-Theoretic Framework for Adaptive Agent Retrieval**
+## Executive Decision
 
-（闭环控制论记忆：面向自适应 Agent 检索的控制论框架）
+- Paper A is the current AAAI-track manuscript:
+  `task-typed coding-agent evaluation` with `memory-heavy` as the headline
+  result.
+- Paper B is a reserve line:
+  `closed-loop cybernetic memory` / `control-theoretic retrieval`.
+- Do not merge Paper A and Paper B into one abstract, introduction, or
+  conclusion.
+- If Paper A needs to narrow further, narrow inside the task-typed line first;
+  do not reopen the PID/control story inside the same submission draft.
 
-备选：
-- *Engineering Cybernetics for Agent Memory: PID-Controlled Adaptive Retrieval*
-- *Memory as a Control Problem: A Cybernetic Architecture for LLM Agent Recall*
+## Why This Split Is Necessary
 
----
+The repo currently contains two different paper stories:
 
-## 核心贡献（3 个）
+1. a task-typed coding-agent paper whose strongest signal is durable-state
+   preservation on memory-heavy tasks; and
+2. an older cybernetic-memory paper centered on PID, Kalman, and Lyapunov
+   framing.
 
-### 1. 问题形式化
+These two stories ask different research questions, use different evidence
+surfaces, and imply different contribution lists. Keeping both inside one paper
+weakens novelty, blurs the thesis, and invites reviewer confusion about what is
+actually being claimed.
 
-首次将 Agent 记忆检索形式化为**最优控制问题**：
+The correct move is therefore:
 
-```
-状态 x(t): [context_usage, error_rate, relevance, cost]
-控制 u(t): [injection_rate, compaction_intensity, model_tier]
-扰动 d(t): [task_complexity, user_feedback]
-输出 y(t): [task_success, token_efficiency]
+- keep the current submission line mechanism-grounded and family-specific; and
+- preserve the cybernetic material as a second-paper asset package instead of
+  letting it distort the current draft.
 
-目标: min ∫(y(t) - y_desired)² dt
-```
+## Paper A: Current AAAI Mainline
 
-### 2. PID 闭环 + Lyapunov 稳定性证明
+### Working Title Direction
 
-不是启发式规则，而是可证明收敛的控制律：
+Preferred title family:
 
-```
-V_L(e, ∫e) = ½e² + (ki/2)(∫e)²
-V̇_L = -(kp/m)·e² < 0  (当 kp > 0)
-→ 系统渐近稳定: e(t) → 0 as t → ∞
-```
+- `When Memory Matters: Task-Typed Evaluation of Long-Horizon Coding Agents`
+- `Memory-Backed Runtime Continuity for Long-Horizon Coding-Agent Tasks`
+- `Task Families, Not One Winner: A Memory-First Study of Coding-Agent Runtime Capabilities`
 
-### 3. 消融实验
+### One-Sentence Thesis
 
-80 条记忆 × 20 查询 × 4 配置，证明了每个控制论组件的独立贡献。
+Different coding-agent task families stress different runtime capabilities, and
+the clearest current positive signal in our setting comes from memory-heavy
+tasks where success depends on preserving durable prior state across long
+horizons, interruptions, and partial context loss.
 
----
+### Core Claim Budget
 
-## 论文大纲
+Allowed:
 
-### 1. Introduction
+- family-specific capability claims,
+- `memory-heavy` as the strongest current result line,
+- memory-backed runtime continuity as the mechanism story,
+- bounded secondary evidence on `search-heavy` tasks,
+- bounded negative motivation from the old broad architecture study.
 
-**问题陈述**：
-- LLM Agent 依赖记忆来维持跨会话上下文
-- 现有方法（Mem0, MemGPT, RAG）使用**静态检索**：固定的 top-K, 固定阈值
-- 静态检索在不同上下文压力下性能剧烈波动
+Not allowed:
 
-**我们的方案**：
-- 将记忆检索建模为**闭环控制问题**
-- 使用 PID 控制器动态调整检索深度、注入速率
-- Kalman 滤波器估计隐藏系统状态
-- 可证明的稳定性 + 可量化的性能提升
+- broad winner claims across all coding-agent tasks,
+- claims that a single architecture is universally superior,
+- reasoning-heavy positive claims without clean grading,
+- PID, Kalman, or Lyapunov as the central novelty of the current AAAI draft.
 
-**贡献列表**：
-1. 首次将工程控制论形式化地应用于 Agent 记忆
-2. 双 PID 外环 + Kalman 状态估计的完整架构
-3. 消融实验证明每个组件的量化贡献
-4. Memory Value Function V(m,t,c) 的理论分析
+### Section Spine
 
-### 2. Related Work
+1. Introduction:
+   broad winner claims are weak; task families are the right abstraction.
+2. Motivation from bounded negative evidence:
+   the old broad architecture line motivates the pivot, but is not the result.
+3. Task taxonomy:
+   `memory-heavy`, `search-heavy`, `reasoning-heavy`.
+4. Runtime capability view:
+   continuity, durable state, replay, rewind, verification, bounded search.
+5. Memory-heavy mainline:
+   benchmark package, conditions, metrics, mechanism, main results.
+6. Search-heavy secondary line:
+   keep only if the pilot remains clean and bounded.
+7. Reasoning gate:
+   explain why this family stays exploratory for now.
+8. Discussion and limits:
+   what the paper does and does not establish.
 
-| 方向 | 代表工作 | 与我们的差异 |
-|------|---------|------------|
-| Agent 记忆系统 | Mem0, Letta/MemGPT, MemMachine | 静态/RL 检索，无 PID |
-| 控制论+AI | SCL (R-CCAM), HAF, PEACE | 符号规则，无经典控制论 |
-| Memory-as-Control | Oblivion, INFMEM, EvolveMem | RL/衰减驱动，无 PID/Kalman |
-| 记忆理论 | "When to Forget" (Simsek) | 单维 Memory Worth，无多维控制 |
+### Required Experiment Pack Before Draft Lock
 
-**关键 gap**：没有任何论文将经典控制论（PID + Kalman + Lyapunov）形式化应用于 Agent 记忆。
+- matched `Memory-Off`, `Weak-Session`, and `Memory-Backed Continuity`
+  conditions on the same slice,
+- task correctness and anchor-retention analysis,
+- interruption or restart recovery evidence,
+- context-loss or durable-state-drop analysis,
+- search-heavy secondary evidence only if it survives bounded evaluation
+  without becoming noisier than the appendix is worth.
 
-### 3. Architecture
+### What Moves Out Of The Main Paper
 
-```
-┌─────────────────────────────────────────────┐
-│           Cybernetic Memory Pipeline        │
-│                                             │
-│  Sense ─→ Predict ─→ Control ─→ Act ─→ Learn │
-│    │         │          │        │       │    │
-│  Domain    Value     PID×4    Tools   Feedback│
-│  Classif   Scoring   Kalman×5 Budget  Loop   │
-│  BM25      Reranker  Feedfwd  Inject         │
-└─────────────────────────────────────────────┘
-```
+- the old broad architecture story as a positive-result line,
+- reasoning-heavy tasks without clean scoring,
+- control-theoretic formalism as the paper's central novelty,
+- long theoretical digressions that do not directly support the memory-heavy
+  mechanism claim.
 
-**3 层检索管线**：
-- Layer 1: Domain + BM25 + Value Scoring (零 LLM 成本)
-- Layer 2: LLM Reranker (1 次轻量调用)
-- Layer 3: Spreading Activation + Adaptive Injection
+### Success Condition
 
-**双 PID 外环**：
-- 内环 (ContextPID): context_usage → compaction
-- 外环 (FeedbackController): SystemState → 13-dim ControlSignal
+Paper A is ready to write as a full AAAI manuscript when:
 
-### 4. Theoretical Framework
+- the task-typed thesis fits in one paragraph,
+- the memory-heavy claim can be stated in one sentence,
+- every main figure supports the same mechanism story,
+- the search-heavy line is either cleanly bounded or removed from the main
+  narrative,
+- no paragraph depends on the cybernetic-control story to justify the paper's
+  existence.
 
-#### 4.1 Memory Value Function
+## Paper B: Cybernetic Memory Reserve
 
-$$V(m, t, c) = \text{relevance}(m, t) \times \text{freshness}(m) \times \text{utility}(m, c)$$
+### Working Question
 
-| 分量 | 定义 |
-|------|------|
-| relevance | BM25 × 0.7 + domain_jaccard × 0.3 |
-| freshness | exp(-age_days / 30) |
-| utility | 1 + α·ln(1 + usage_count) |
+Can agent-memory retrieval be framed and improved as a closed-loop control
+problem with explicit feedback, adaptive retrieval pressure, and stability
+analysis?
 
-#### 4.2 PID Stability
+### Why It Is Not The Current AAAI Line
 
-构造 Lyapunov 函数 V_L，证明 V̇_L < 0 → 系统渐近稳定。
+Paper B is not the current submission line because it requires a different
+burden of proof:
 
-#### 4.3 Adaptive Cooldown
+- strong standalone retrieval or memory-system baselines,
+- clean `PID on/off` or controller-component ablations,
+- a theory-to-practice bridge that stands on its own,
+- evidence that the control story explains gains better than a simpler
+  engineering mechanism story.
 
-$$\tau_{\text{cool}}(c) = \tau_{\text{base}} \times (1 - \text{context\_pressure})$$
+Right now, the cleaner evidence surface in this repo is not "control theory
+beats alternatives." It is "durable-state preservation matters for
+memory-heavy coding-agent tasks."
 
-#### 4.4 Information Preservation
+### Assets To Preserve
 
-跨层级压缩损失上界：I(m_arch) ≈ I(m) - ε
+- terminology around adaptive retrieval pressure and continuity control,
+- possible controller ablations,
+- theoretical notes on control framing,
+- any standalone retrieval experiments that can later support a dedicated
+  memory-system paper.
 
-### 5. Experiments
+### Reactivation Gate
 
-#### 5.1 Setup
-- 80 条记忆，5 个领域 (frontend/backend/database/devops/testing)
-- 20 条查询，人工标注 ground truth
-- 指标：P@3, R@5, MRR, Noise Rate
+Reopen Paper B only when all of the following become true:
 
-#### 5.2 Ablation Study
+- a clean standalone benchmark exists for the control story,
+- the controller ablation package is complete,
+- there is a credible baseline set beyond the current task-typed paper,
+- the contribution can stand even if the coding-agent taxonomy is removed.
 
-| Configuration | P@3 | Noise |
-|-------------|-----|-------|
-| C0: BM25 (baseline) | 0.350 | 65% |
-| C1: + Domain Weight | 0.383 | 42% |
-| C2: + Query Expansion | 0.450 | 38% |
-| C3: + Reranker (Full) | **0.717** | **6.7%** |
+Until then, Paper B stays a reserve line rather than a section inside Paper A.
 
-#### 5.3 Analysis
+## Material Routing
 
-- Reranker 贡献 73% 精度提升（+0.267 P@3）
-- Domain + Expansion 在零 LLM 成本下削减 27% 噪音
-- 完整管线精度 2.05× 基准
+### Canonical Paper A Assets
 
-#### 5.4 需要补充的实验（投论文前）
+- `.trae/documents/paper-a-canonical-draft.md`
+- `.trae/documents/paper-a-claim-figure-package.md`
+- `.trae/documents/paper-a-figure-drafts.md`
+- `paper/aaai2027/minicode_paper_a_submission.tex`
+- `openspec/changes/task-typed-coding-agent-paper/paper-seed.md`
+- `openspec/changes/task-typed-coding-agent-paper/paper-decision-gate-after-memory-pilot-setup.md`
+- `openspec/changes/task-typed-coding-agent-paper/task-taxonomy.md`
+- `openspec/changes/task-typed-coding-agent-paper/tasks.md`
+- `docs/superpowers/specs/2026-06-08-task-typed-coding-agent-paper-design.md`
+- `docs/superpowers/plans/2026-06-08-task-typed-coding-agent-paper-build.md`
+- `docs/superpowers/reports/2026-06-09-task-typed-coding-agent-paper-verify.md`
 
-- LongMemEval / LoCoMo 标准基准评估
-- 与 Mem0 / MemGPT 的对比
-- PID on/off 对比（证明控制论贡献）
-- 不同模型规模下的鲁棒性
-- 延迟和成本分析
+### Paper B Reserve Assets
 
-### 6. Discussion
+- historical control-theoretic memory notes,
+- any future `PID on/off` retrieval experiments,
+- theory-heavy framing that is not needed to justify the current AAAI draft.
 
-- 控制论视角的局限性
-- Thinking round-trip 的工程挑战
-- 未来方向：多 Agent 记忆联邦、真实代码库验证
+### Canonical Manuscript Package
 
-### 7. Conclusion
+The canonical Paper A package now lives at:
 
-首次将工程控制论形式化地应用于 Agent 记忆系统。PID 闭环提供可证明的稳定性，消融实验证明每个组件的独立贡献。
+- `.trae/documents/paper-a-canonical-draft.md`
+- `.trae/documents/paper-a-claim-figure-package.md`
+- `.trae/documents/paper-a-figure-drafts.md`
+- `paper/aaai2027/minicode_paper_a_submission.tex`
 
----
+These assets now form the primary source of truth for manuscript wording, claim
+control, figure planning, and anonymous AAAI-formatted paper assembly. The
+figure-draft file locks the first paper-facing figure set even before the
+matched suite is rerun. The planning assets listed above remain the upstream
+design basis, not competing drafts.
 
-## 投稿建议
+## Immediate Next Actions
 
-| 会议 | 截稿 | 特点 |
-|------|------|------|
-| **EMNLP 2026** | 约 6 月 | NLP 系统，适合 Agent 方向 |
-| **NeurIPS 2026** | 约 5 月（已过） | 顶会，需要更强理论 |
-| **AAAI 2027** | 约 8 月 | AI 系统，包容性强 |
-| **COLM 2026** | 约 5 月（已过） | 语言建模，新会议 |
-| **ICLR 2027** | 约 9 月 | 顶会，理论要求高 |
-
-**建议**：瞄准 **EMNLP 2026** 或 **AAAI 2027**。
-
----
-
-## 写前准备清单
-
-| 项目 | 状态 | 优先级 |
-|------|------|--------|
-| 消融实验 | ✓ 完成 | — |
-| 基准评估框架 | ✓ Benchmark 脚本 | — |
-| 标准基准 (LongMemEval) | ✗ 需要搭建 | ★★★ |
-| 与 Mem0 对比 | ✗ | ★★ |
-| PID on/off 实验 | ✗ | ★★★ |
-| 延迟/成本分析 | ✗ | ★★ |
-| 理论形式化 | ✓ 完成 | — |
-| 相关论文调研 | ✓ 完成 | — |
-| 架构图 | ✓ 完成 | — |
-| 代码开源 | ✓ GitHub | — |
-
-**下一步**：搭建 LongMemEval + 跑 Mem0 baseline + 写 PID on/off 实验。这三项做完论文实验部分就完整了。
+1. Freeze the abstract, introduction, and contribution list around the
+   memory-heavy task-typed thesis.
+2. Complete the matched same-model three-condition suite for the memory-heavy
+   main result.
+3. Fill the main result figure and metric table only from matched artifacts.
+4. Keep search-heavy only if the bounded pilot remains worth the page budget.
+5. Push all cybernetic/PID/control material into Paper B reserve notes unless a
+   paragraph truly needs it as implementation background.
+6. Start drafting figures and sections only after this split is respected.

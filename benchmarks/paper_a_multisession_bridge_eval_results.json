@@ -1,0 +1,1225 @@
+{
+  "rows": [
+    {
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "query_id": "q1",
+      "family": "single_hop",
+      "prompt": "What state management library does the project use?",
+      "required_phrases": [
+        "zustand"
+      ],
+      "retrieved_ids": [],
+      "retrieved_contents": [],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "query_id": "q2",
+      "family": "single_hop",
+      "prompt": "What API framework is the backend built with?",
+      "required_phrases": [
+        "fastapi"
+      ],
+      "retrieved_ids": [],
+      "retrieved_contents": [],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "query_id": "q3",
+      "family": "single_hop",
+      "prompt": "What database version and extension are used?",
+      "required_phrases": [
+        "postgresql 16",
+        "postgis"
+      ],
+      "retrieved_ids": [],
+      "retrieved_contents": [],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "query_id": "q4",
+      "family": "single_hop",
+      "prompt": "What CI platform does the project use?",
+      "required_phrases": [
+        "github actions"
+      ],
+      "retrieved_ids": [],
+      "retrieved_contents": [],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "query_id": "q5",
+      "family": "single_hop",
+      "prompt": "What end-to-end testing framework is used?",
+      "required_phrases": [
+        "playwright"
+      ],
+      "retrieved_ids": [],
+      "retrieved_contents": [],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "query_id": "q6",
+      "family": "multi_hop",
+      "prompt": "How should forms be validated in the frontend?",
+      "required_phrases": [
+        "react-hook-form",
+        "zod"
+      ],
+      "retrieved_ids": [],
+      "retrieved_contents": [],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "query_id": "q7",
+      "family": "multi_hop",
+      "prompt": "What authentication mechanism is used and how long do access tokens last?",
+      "required_phrases": [
+        "refresh-token rotation",
+        "15 minutes"
+      ],
+      "retrieved_ids": [],
+      "retrieved_contents": [],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "query_id": "q8",
+      "family": "multi_hop",
+      "prompt": "What scaling policy does Kubernetes use?",
+      "required_phrases": [
+        "2 to 10 pods",
+        "70 percent"
+      ],
+      "retrieved_ids": [],
+      "retrieved_contents": [],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "query_id": "q9",
+      "family": "multi_hop",
+      "prompt": "Which async backend test stack is recommended and where are shared fixtures kept?",
+      "required_phrases": [
+        "pytest-asyncio",
+        "conftest.py"
+      ],
+      "retrieved_ids": [],
+      "retrieved_contents": [],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "query_id": "q10",
+      "family": "multi_hop",
+      "prompt": "How is the database deployed and pooled?",
+      "required_phrases": [
+        "postgresql 16",
+        "pgbouncer"
+      ],
+      "retrieved_ids": [],
+      "retrieved_contents": [],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "query_id": "q11",
+      "family": "temporal",
+      "prompt": "Is Redux still used for state management?",
+      "required_phrases": [
+        "all redux code removed"
+      ],
+      "retrieved_ids": [],
+      "retrieved_contents": [],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "query_id": "q12",
+      "family": "temporal",
+      "prompt": "Should production tables be edited manually?",
+      "required_phrases": [
+        "never edited manually"
+      ],
+      "retrieved_ids": [],
+      "retrieved_contents": [],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "query_id": "q13",
+      "family": "temporal",
+      "prompt": "What is the current Docker base image?",
+      "required_phrases": [
+        "python:3.12-slim"
+      ],
+      "retrieved_ids": [],
+      "retrieved_contents": [],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "query_id": "q14",
+      "family": "temporal",
+      "prompt": "What is the default backend rate limit policy?",
+      "required_phrases": [
+        "100 req/min",
+        "redis sliding window"
+      ],
+      "retrieved_ids": [],
+      "retrieved_contents": [],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "query_id": "q15",
+      "family": "temporal",
+      "prompt": "What JSON indexing pattern is used for semi-structured data?",
+      "required_phrases": [
+        "jsonb",
+        "gin"
+      ],
+      "retrieved_ids": [],
+      "retrieved_contents": [],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "query_id": "q1",
+      "family": "single_hop",
+      "prompt": "What state management library does the project use?",
+      "required_phrases": [
+        "zustand"
+      ],
+      "retrieved_ids": [],
+      "retrieved_contents": [],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "query_id": "q2",
+      "family": "single_hop",
+      "prompt": "What API framework is the backend built with?",
+      "required_phrases": [
+        "fastapi"
+      ],
+      "retrieved_ids": [
+        "w2_back",
+        "w3_db"
+      ],
+      "retrieved_contents": [
+        "Backend stack summary: FastAPI API, JWT auth, Redis sliding window at 100 req/min.",
+        "Database stack summary: PostgreSQL/PostGIS with Alembic migrations and JSONB storage."
+      ],
+      "matched_phrases": [
+        "fastapi"
+      ],
+      "exact_support": true,
+      "clause_recall": 1.0
+    },
+    {
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "query_id": "q3",
+      "family": "single_hop",
+      "prompt": "What database version and extension are used?",
+      "required_phrases": [
+        "postgresql 16",
+        "postgis"
+      ],
+      "retrieved_ids": [
+        "w3_db",
+        "w5_test",
+        "w1_front"
+      ],
+      "retrieved_contents": [
+        "Database stack summary: PostgreSQL/PostGIS with Alembic migrations and JSONB storage.",
+        "Testing summary: pytest, Playwright, and all Redux code removed.",
+        "Frontend stack summary: React, TypeScript, Zustand, react-hook-form."
+      ],
+      "matched_phrases": [
+        "postgis"
+      ],
+      "exact_support": false,
+      "clause_recall": 0.5
+    },
+    {
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "query_id": "q4",
+      "family": "single_hop",
+      "prompt": "What CI platform does the project use?",
+      "required_phrases": [
+        "github actions"
+      ],
+      "retrieved_ids": [
+        "w4_ops"
+      ],
+      "retrieved_contents": [
+        "Ops stack summary: GitHub Actions CI, Docker, Kubernetes on EKS."
+      ],
+      "matched_phrases": [
+        "github actions"
+      ],
+      "exact_support": true,
+      "clause_recall": 1.0
+    },
+    {
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "query_id": "q5",
+      "family": "single_hop",
+      "prompt": "What end-to-end testing framework is used?",
+      "required_phrases": [
+        "playwright"
+      ],
+      "retrieved_ids": [
+        "w5_test",
+        "w3_db",
+        "w2_back"
+      ],
+      "retrieved_contents": [
+        "Testing summary: pytest, Playwright, and all Redux code removed.",
+        "Database stack summary: PostgreSQL/PostGIS with Alembic migrations and JSONB storage.",
+        "Backend stack summary: FastAPI API, JWT auth, Redis sliding window at 100 req/min."
+      ],
+      "matched_phrases": [
+        "playwright"
+      ],
+      "exact_support": true,
+      "clause_recall": 1.0
+    },
+    {
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "query_id": "q6",
+      "family": "multi_hop",
+      "prompt": "How should forms be validated in the frontend?",
+      "required_phrases": [
+        "react-hook-form",
+        "zod"
+      ],
+      "retrieved_ids": [
+        "w5_test",
+        "w4_ops",
+        "w2_back",
+        "w1_front"
+      ],
+      "retrieved_contents": [
+        "Testing summary: pytest, Playwright, and all Redux code removed.",
+        "Ops stack summary: GitHub Actions CI, Docker, Kubernetes on EKS.",
+        "Backend stack summary: FastAPI API, JWT auth, Redis sliding window at 100 req/min.",
+        "Frontend stack summary: React, TypeScript, Zustand, react-hook-form."
+      ],
+      "matched_phrases": [
+        "react-hook-form"
+      ],
+      "exact_support": false,
+      "clause_recall": 0.5
+    },
+    {
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "query_id": "q7",
+      "family": "multi_hop",
+      "prompt": "What authentication mechanism is used and how long do access tokens last?",
+      "required_phrases": [
+        "refresh-token rotation",
+        "15 minutes"
+      ],
+      "retrieved_ids": [
+        "w2_back",
+        "w5_test",
+        "w3_db",
+        "w4_ops",
+        "w1_front"
+      ],
+      "retrieved_contents": [
+        "Backend stack summary: FastAPI API, JWT auth, Redis sliding window at 100 req/min.",
+        "Testing summary: pytest, Playwright, and all Redux code removed.",
+        "Database stack summary: PostgreSQL/PostGIS with Alembic migrations and JSONB storage.",
+        "Ops stack summary: GitHub Actions CI, Docker, Kubernetes on EKS.",
+        "Frontend stack summary: React, TypeScript, Zustand, react-hook-form."
+      ],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "query_id": "q8",
+      "family": "multi_hop",
+      "prompt": "What scaling policy does Kubernetes use?",
+      "required_phrases": [
+        "2 to 10 pods",
+        "70 percent"
+      ],
+      "retrieved_ids": [
+        "w4_ops"
+      ],
+      "retrieved_contents": [
+        "Ops stack summary: GitHub Actions CI, Docker, Kubernetes on EKS."
+      ],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "query_id": "q9",
+      "family": "multi_hop",
+      "prompt": "Which async backend test stack is recommended and where are shared fixtures kept?",
+      "required_phrases": [
+        "pytest-asyncio",
+        "conftest.py"
+      ],
+      "retrieved_ids": [
+        "w2_back",
+        "w5_test",
+        "w3_db",
+        "w1_front",
+        "w4_ops"
+      ],
+      "retrieved_contents": [
+        "Backend stack summary: FastAPI API, JWT auth, Redis sliding window at 100 req/min.",
+        "Testing summary: pytest, Playwright, and all Redux code removed.",
+        "Database stack summary: PostgreSQL/PostGIS with Alembic migrations and JSONB storage.",
+        "Frontend stack summary: React, TypeScript, Zustand, react-hook-form.",
+        "Ops stack summary: GitHub Actions CI, Docker, Kubernetes on EKS."
+      ],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "query_id": "q10",
+      "family": "multi_hop",
+      "prompt": "How is the database deployed and pooled?",
+      "required_phrases": [
+        "postgresql 16",
+        "pgbouncer"
+      ],
+      "retrieved_ids": [
+        "w3_db",
+        "w5_test",
+        "w2_back",
+        "w1_front"
+      ],
+      "retrieved_contents": [
+        "Database stack summary: PostgreSQL/PostGIS with Alembic migrations and JSONB storage.",
+        "Testing summary: pytest, Playwright, and all Redux code removed.",
+        "Backend stack summary: FastAPI API, JWT auth, Redis sliding window at 100 req/min.",
+        "Frontend stack summary: React, TypeScript, Zustand, react-hook-form."
+      ],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "query_id": "q11",
+      "family": "temporal",
+      "prompt": "Is Redux still used for state management?",
+      "required_phrases": [
+        "all redux code removed"
+      ],
+      "retrieved_ids": [
+        "w5_test",
+        "w1_front",
+        "w3_db",
+        "w2_back"
+      ],
+      "retrieved_contents": [
+        "Testing summary: pytest, Playwright, and all Redux code removed.",
+        "Frontend stack summary: React, TypeScript, Zustand, react-hook-form.",
+        "Database stack summary: PostgreSQL/PostGIS with Alembic migrations and JSONB storage.",
+        "Backend stack summary: FastAPI API, JWT auth, Redis sliding window at 100 req/min."
+      ],
+      "matched_phrases": [
+        "all redux code removed"
+      ],
+      "exact_support": true,
+      "clause_recall": 1.0
+    },
+    {
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "query_id": "q12",
+      "family": "temporal",
+      "prompt": "Should production tables be edited manually?",
+      "required_phrases": [
+        "never edited manually"
+      ],
+      "retrieved_ids": [
+        "w4_ops"
+      ],
+      "retrieved_contents": [
+        "Ops stack summary: GitHub Actions CI, Docker, Kubernetes on EKS."
+      ],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "query_id": "q13",
+      "family": "temporal",
+      "prompt": "What is the current Docker base image?",
+      "required_phrases": [
+        "python:3.12-slim"
+      ],
+      "retrieved_ids": [
+        "w4_ops",
+        "w3_db",
+        "w2_back"
+      ],
+      "retrieved_contents": [
+        "Ops stack summary: GitHub Actions CI, Docker, Kubernetes on EKS.",
+        "Database stack summary: PostgreSQL/PostGIS with Alembic migrations and JSONB storage.",
+        "Backend stack summary: FastAPI API, JWT auth, Redis sliding window at 100 req/min."
+      ],
+      "matched_phrases": [],
+      "exact_support": false,
+      "clause_recall": 0.0
+    },
+    {
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "query_id": "q14",
+      "family": "temporal",
+      "prompt": "What is the default backend rate limit policy?",
+      "required_phrases": [
+        "100 req/min",
+        "redis sliding window"
+      ],
+      "retrieved_ids": [
+        "w2_back",
+        "w3_db"
+      ],
+      "retrieved_contents": [
+        "Backend stack summary: FastAPI API, JWT auth, Redis sliding window at 100 req/min.",
+        "Database stack summary: PostgreSQL/PostGIS with Alembic migrations and JSONB storage."
+      ],
+      "matched_phrases": [
+        "100 req/min",
+        "redis sliding window"
+      ],
+      "exact_support": true,
+      "clause_recall": 1.0
+    },
+    {
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "query_id": "q15",
+      "family": "temporal",
+      "prompt": "What JSON indexing pattern is used for semi-structured data?",
+      "required_phrases": [
+        "jsonb",
+        "gin"
+      ],
+      "retrieved_ids": [
+        "w3_db",
+        "w2_back",
+        "w1_front"
+      ],
+      "retrieved_contents": [
+        "Database stack summary: PostgreSQL/PostGIS with Alembic migrations and JSONB storage.",
+        "Backend stack summary: FastAPI API, JWT auth, Redis sliding window at 100 req/min.",
+        "Frontend stack summary: React, TypeScript, Zustand, react-hook-form."
+      ],
+      "matched_phrases": [
+        "jsonb"
+      ],
+      "exact_support": false,
+      "clause_recall": 0.5
+    },
+    {
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "query_id": "q1",
+      "family": "single_hop",
+      "prompt": "What state management library does the project use?",
+      "required_phrases": [
+        "zustand"
+      ],
+      "retrieved_ids": [
+        "s1_store",
+        "s5_migrate",
+        "s1_forms",
+        "s3_db",
+        "s5_e2e"
+      ],
+      "retrieved_contents": [
+        "State management uses Zustand v4 and store modules live in src/stores.",
+        "The frontend state migration away from Redux is complete. All Redux code removed.",
+        "Forms use react-hook-form v7 together with zod schemas for validation.",
+        "PostgreSQL 16 with the PostGIS extension is deployed behind PgBouncer pooling.",
+        "End-to-end tests use Playwright in headless CI mode."
+      ],
+      "matched_phrases": [
+        "zustand"
+      ],
+      "exact_support": true,
+      "clause_recall": 1.0
+    },
+    {
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "query_id": "q2",
+      "family": "single_hop",
+      "prompt": "What API framework is the backend built with?",
+      "required_phrases": [
+        "fastapi"
+      ],
+      "retrieved_ids": [
+        "s2_api",
+        "s3_db",
+        "s5_tests",
+        "s2_rate",
+        "s5_migrate"
+      ],
+      "retrieved_contents": [
+        "Backend API is built with FastAPI and all endpoints are async Pydantic responses.",
+        "PostgreSQL 16 with the PostGIS extension is deployed behind PgBouncer pooling.",
+        "Backend tests use pytest plus pytest-asyncio, with shared fixtures in conftest.py.",
+        "Rate limiting uses a Redis sliding window with a 100 req/min default.",
+        "The frontend state migration away from Redux is complete. All Redux code removed."
+      ],
+      "matched_phrases": [
+        "fastapi"
+      ],
+      "exact_support": true,
+      "clause_recall": 1.0
+    },
+    {
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "query_id": "q3",
+      "family": "single_hop",
+      "prompt": "What database version and extension are used?",
+      "required_phrases": [
+        "postgresql 16",
+        "postgis"
+      ],
+      "retrieved_ids": [
+        "s3_mig",
+        "s3_db",
+        "s2_api",
+        "s1_store",
+        "s4_ci"
+      ],
+      "retrieved_contents": [
+        "Schema migrations are managed by Alembic and production tables are never edited manually.",
+        "PostgreSQL 16 with the PostGIS extension is deployed behind PgBouncer pooling.",
+        "Backend API is built with FastAPI and all endpoints are async Pydantic responses.",
+        "State management uses Zustand v4 and store modules live in src/stores.",
+        "CI runs on GitHub Actions with lint, typecheck, test, and build gates."
+      ],
+      "matched_phrases": [
+        "postgresql 16",
+        "postgis"
+      ],
+      "exact_support": true,
+      "clause_recall": 1.0
+    },
+    {
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "query_id": "q4",
+      "family": "single_hop",
+      "prompt": "What CI platform does the project use?",
+      "required_phrases": [
+        "github actions"
+      ],
+      "retrieved_ids": [
+        "s4_ci",
+        "s5_e2e",
+        "s3_db",
+        "s5_migrate",
+        "s1_forms"
+      ],
+      "retrieved_contents": [
+        "CI runs on GitHub Actions with lint, typecheck, test, and build gates.",
+        "End-to-end tests use Playwright in headless CI mode.",
+        "PostgreSQL 16 with the PostGIS extension is deployed behind PgBouncer pooling.",
+        "The frontend state migration away from Redux is complete. All Redux code removed.",
+        "Forms use react-hook-form v7 together with zod schemas for validation."
+      ],
+      "matched_phrases": [
+        "github actions"
+      ],
+      "exact_support": true,
+      "clause_recall": 1.0
+    },
+    {
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "query_id": "q5",
+      "family": "single_hop",
+      "prompt": "What end-to-end testing framework is used?",
+      "required_phrases": [
+        "playwright"
+      ],
+      "retrieved_ids": [
+        "s5_e2e",
+        "s3_db",
+        "s4_k8s",
+        "s5_migrate",
+        "s2_api"
+      ],
+      "retrieved_contents": [
+        "End-to-end tests use Playwright in headless CI mode.",
+        "PostgreSQL 16 with the PostGIS extension is deployed behind PgBouncer pooling.",
+        "Kubernetes runs on EKS 1.29 and HPA scales from 2 to 10 pods when CPU is above 70 percent.",
+        "The frontend state migration away from Redux is complete. All Redux code removed.",
+        "Backend API is built with FastAPI and all endpoints are async Pydantic responses."
+      ],
+      "matched_phrases": [
+        "playwright"
+      ],
+      "exact_support": true,
+      "clause_recall": 1.0
+    },
+    {
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "query_id": "q6",
+      "family": "multi_hop",
+      "prompt": "How should forms be validated in the frontend?",
+      "required_phrases": [
+        "react-hook-form",
+        "zod"
+      ],
+      "retrieved_ids": [
+        "s1_forms",
+        "s5_migrate",
+        "s1_store",
+        "s3_db",
+        "s5_e2e"
+      ],
+      "retrieved_contents": [
+        "Forms use react-hook-form v7 together with zod schemas for validation.",
+        "The frontend state migration away from Redux is complete. All Redux code removed.",
+        "State management uses Zustand v4 and store modules live in src/stores.",
+        "PostgreSQL 16 with the PostGIS extension is deployed behind PgBouncer pooling.",
+        "End-to-end tests use Playwright in headless CI mode."
+      ],
+      "matched_phrases": [
+        "react-hook-form",
+        "zod"
+      ],
+      "exact_support": true,
+      "clause_recall": 1.0
+    },
+    {
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "query_id": "q7",
+      "family": "multi_hop",
+      "prompt": "What authentication mechanism is used and how long do access tokens last?",
+      "required_phrases": [
+        "refresh-token rotation",
+        "15 minutes"
+      ],
+      "retrieved_ids": [
+        "s2_auth",
+        "s2_api",
+        "s3_db",
+        "s5_migrate",
+        "s2_rate"
+      ],
+      "retrieved_contents": [
+        "JWT auth uses refresh-token rotation and access tokens expire in 15 minutes.",
+        "Backend API is built with FastAPI and all endpoints are async Pydantic responses.",
+        "PostgreSQL 16 with the PostGIS extension is deployed behind PgBouncer pooling.",
+        "The frontend state migration away from Redux is complete. All Redux code removed.",
+        "Rate limiting uses a Redis sliding window with a 100 req/min default."
+      ],
+      "matched_phrases": [
+        "refresh-token rotation",
+        "15 minutes"
+      ],
+      "exact_support": true,
+      "clause_recall": 1.0
+    },
+    {
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "query_id": "q8",
+      "family": "multi_hop",
+      "prompt": "What scaling policy does Kubernetes use?",
+      "required_phrases": [
+        "2 to 10 pods",
+        "70 percent"
+      ],
+      "retrieved_ids": [
+        "s4_k8s",
+        "s4_docker",
+        "s5_e2e",
+        "s1_forms",
+        "s5_tests"
+      ],
+      "retrieved_contents": [
+        "Kubernetes runs on EKS 1.29 and HPA scales from 2 to 10 pods when CPU is above 70 percent.",
+        "Docker images use a multi-stage python:3.12-slim base build.",
+        "End-to-end tests use Playwright in headless CI mode.",
+        "Forms use react-hook-form v7 together with zod schemas for validation.",
+        "Backend tests use pytest plus pytest-asyncio, with shared fixtures in conftest.py."
+      ],
+      "matched_phrases": [
+        "2 to 10 pods",
+        "70 percent"
+      ],
+      "exact_support": true,
+      "clause_recall": 1.0
+    },
+    {
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "query_id": "q9",
+      "family": "multi_hop",
+      "prompt": "Which async backend test stack is recommended and where are shared fixtures kept?",
+      "required_phrases": [
+        "pytest-asyncio",
+        "conftest.py"
+      ],
+      "retrieved_ids": [
+        "s2_api",
+        "s5_tests",
+        "s3_mig",
+        "s4_ci",
+        "s2_auth"
+      ],
+      "retrieved_contents": [
+        "Backend API is built with FastAPI and all endpoints are async Pydantic responses.",
+        "Backend tests use pytest plus pytest-asyncio, with shared fixtures in conftest.py.",
+        "Schema migrations are managed by Alembic and production tables are never edited manually.",
+        "CI runs on GitHub Actions with lint, typecheck, test, and build gates.",
+        "JWT auth uses refresh-token rotation and access tokens expire in 15 minutes."
+      ],
+      "matched_phrases": [
+        "pytest-asyncio",
+        "conftest.py"
+      ],
+      "exact_support": true,
+      "clause_recall": 1.0
+    },
+    {
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "query_id": "q10",
+      "family": "multi_hop",
+      "prompt": "How is the database deployed and pooled?",
+      "required_phrases": [
+        "postgresql 16",
+        "pgbouncer"
+      ],
+      "retrieved_ids": [
+        "s3_db",
+        "s3_mig",
+        "s5_migrate",
+        "s2_api",
+        "s4_k8s"
+      ],
+      "retrieved_contents": [
+        "PostgreSQL 16 with the PostGIS extension is deployed behind PgBouncer pooling.",
+        "Schema migrations are managed by Alembic and production tables are never edited manually.",
+        "The frontend state migration away from Redux is complete. All Redux code removed.",
+        "Backend API is built with FastAPI and all endpoints are async Pydantic responses.",
+        "Kubernetes runs on EKS 1.29 and HPA scales from 2 to 10 pods when CPU is above 70 percent."
+      ],
+      "matched_phrases": [
+        "postgresql 16",
+        "pgbouncer"
+      ],
+      "exact_support": true,
+      "clause_recall": 1.0
+    },
+    {
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "query_id": "q11",
+      "family": "temporal",
+      "prompt": "Is Redux still used for state management?",
+      "required_phrases": [
+        "all redux code removed"
+      ],
+      "retrieved_ids": [
+        "s5_migrate",
+        "s1_store",
+        "s1_forms",
+        "s3_db",
+        "s2_api"
+      ],
+      "retrieved_contents": [
+        "The frontend state migration away from Redux is complete. All Redux code removed.",
+        "State management uses Zustand v4 and store modules live in src/stores.",
+        "Forms use react-hook-form v7 together with zod schemas for validation.",
+        "PostgreSQL 16 with the PostGIS extension is deployed behind PgBouncer pooling.",
+        "Backend API is built with FastAPI and all endpoints are async Pydantic responses."
+      ],
+      "matched_phrases": [
+        "all redux code removed"
+      ],
+      "exact_support": true,
+      "clause_recall": 1.0
+    },
+    {
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "query_id": "q12",
+      "family": "temporal",
+      "prompt": "Should production tables be edited manually?",
+      "required_phrases": [
+        "never edited manually"
+      ],
+      "retrieved_ids": [
+        "s3_mig",
+        "s3_db",
+        "s4_k8s"
+      ],
+      "retrieved_contents": [
+        "Schema migrations are managed by Alembic and production tables are never edited manually.",
+        "PostgreSQL 16 with the PostGIS extension is deployed behind PgBouncer pooling.",
+        "Kubernetes runs on EKS 1.29 and HPA scales from 2 to 10 pods when CPU is above 70 percent."
+      ],
+      "matched_phrases": [
+        "never edited manually"
+      ],
+      "exact_support": true,
+      "clause_recall": 1.0
+    },
+    {
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "query_id": "q13",
+      "family": "temporal",
+      "prompt": "What is the current Docker base image?",
+      "required_phrases": [
+        "python:3.12-slim"
+      ],
+      "retrieved_ids": [
+        "s4_docker",
+        "s3_db",
+        "s4_k8s",
+        "s5_migrate",
+        "s2_api"
+      ],
+      "retrieved_contents": [
+        "Docker images use a multi-stage python:3.12-slim base build.",
+        "PostgreSQL 16 with the PostGIS extension is deployed behind PgBouncer pooling.",
+        "Kubernetes runs on EKS 1.29 and HPA scales from 2 to 10 pods when CPU is above 70 percent.",
+        "The frontend state migration away from Redux is complete. All Redux code removed.",
+        "Backend API is built with FastAPI and all endpoints are async Pydantic responses."
+      ],
+      "matched_phrases": [
+        "python:3.12-slim"
+      ],
+      "exact_support": true,
+      "clause_recall": 1.0
+    },
+    {
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "query_id": "q14",
+      "family": "temporal",
+      "prompt": "What is the default backend rate limit policy?",
+      "required_phrases": [
+        "100 req/min",
+        "redis sliding window"
+      ],
+      "retrieved_ids": [
+        "s2_rate",
+        "s2_api",
+        "s3_db",
+        "s5_migrate",
+        "s5_tests"
+      ],
+      "retrieved_contents": [
+        "Rate limiting uses a Redis sliding window with a 100 req/min default.",
+        "Backend API is built with FastAPI and all endpoints are async Pydantic responses.",
+        "PostgreSQL 16 with the PostGIS extension is deployed behind PgBouncer pooling.",
+        "The frontend state migration away from Redux is complete. All Redux code removed.",
+        "Backend tests use pytest plus pytest-asyncio, with shared fixtures in conftest.py."
+      ],
+      "matched_phrases": [
+        "100 req/min",
+        "redis sliding window"
+      ],
+      "exact_support": true,
+      "clause_recall": 1.0
+    },
+    {
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "query_id": "q15",
+      "family": "temporal",
+      "prompt": "What JSON indexing pattern is used for semi-structured data?",
+      "required_phrases": [
+        "jsonb",
+        "gin"
+      ],
+      "retrieved_ids": [
+        "s3_jsonb",
+        "s3_db",
+        "s1_forms",
+        "s5_migrate",
+        "s2_api"
+      ],
+      "retrieved_contents": [
+        "Semi-structured payloads live in JSONB columns with GIN indexes.",
+        "PostgreSQL 16 with the PostGIS extension is deployed behind PgBouncer pooling.",
+        "Forms use react-hook-form v7 together with zod schemas for validation.",
+        "The frontend state migration away from Redux is complete. All Redux code removed.",
+        "Backend API is built with FastAPI and all endpoints are async Pydantic responses."
+      ],
+      "matched_phrases": [
+        "jsonb",
+        "gin"
+      ],
+      "exact_support": true,
+      "clause_recall": 1.0
+    }
+  ],
+  "summary": [
+    {
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "family": "single_hop",
+      "exact_support_rate": 0.0,
+      "clause_recall": 0.0,
+      "query_count": 5
+    },
+    {
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "family": "multi_hop",
+      "exact_support_rate": 0.0,
+      "clause_recall": 0.0,
+      "query_count": 5
+    },
+    {
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "family": "temporal",
+      "exact_support_rate": 0.0,
+      "clause_recall": 0.0,
+      "query_count": 5
+    },
+    {
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "family": "overall",
+      "exact_support_rate": 0.0,
+      "clause_recall": 0.0,
+      "query_count": 15
+    },
+    {
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "family": "single_hop",
+      "exact_support_rate": 0.6,
+      "clause_recall": 0.7,
+      "query_count": 5
+    },
+    {
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "family": "multi_hop",
+      "exact_support_rate": 0.0,
+      "clause_recall": 0.1,
+      "query_count": 5
+    },
+    {
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "family": "temporal",
+      "exact_support_rate": 0.4,
+      "clause_recall": 0.5,
+      "query_count": 5
+    },
+    {
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "family": "overall",
+      "exact_support_rate": 0.3333333333333333,
+      "clause_recall": 0.43333333333333335,
+      "query_count": 15
+    },
+    {
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "family": "single_hop",
+      "exact_support_rate": 1.0,
+      "clause_recall": 1.0,
+      "query_count": 5
+    },
+    {
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "family": "multi_hop",
+      "exact_support_rate": 1.0,
+      "clause_recall": 1.0,
+      "query_count": 5
+    },
+    {
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "family": "temporal",
+      "exact_support_rate": 1.0,
+      "clause_recall": 1.0,
+      "query_count": 5
+    },
+    {
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "family": "overall",
+      "exact_support_rate": 1.0,
+      "clause_recall": 1.0,
+      "query_count": 15
+    }
+  ],
+  "condition_summary": {
+    "memory_off": {
+      "single_hop": {
+        "label": "Memory-Off",
+        "exact_support_rate": 0.0,
+        "clause_recall": 0.0,
+        "query_count": 5
+      },
+      "multi_hop": {
+        "label": "Memory-Off",
+        "exact_support_rate": 0.0,
+        "clause_recall": 0.0,
+        "query_count": 5
+      },
+      "temporal": {
+        "label": "Memory-Off",
+        "exact_support_rate": 0.0,
+        "clause_recall": 0.0,
+        "query_count": 5
+      },
+      "overall": {
+        "label": "Memory-Off",
+        "exact_support_rate": 0.0,
+        "clause_recall": 0.0,
+        "query_count": 15
+      }
+    },
+    "weak_session": {
+      "single_hop": {
+        "label": "Weak-Session",
+        "exact_support_rate": 0.6,
+        "clause_recall": 0.7,
+        "query_count": 5
+      },
+      "multi_hop": {
+        "label": "Weak-Session",
+        "exact_support_rate": 0.0,
+        "clause_recall": 0.1,
+        "query_count": 5
+      },
+      "temporal": {
+        "label": "Weak-Session",
+        "exact_support_rate": 0.4,
+        "clause_recall": 0.5,
+        "query_count": 5
+      },
+      "overall": {
+        "label": "Weak-Session",
+        "exact_support_rate": 0.3333333333333333,
+        "clause_recall": 0.43333333333333335,
+        "query_count": 15
+      }
+    },
+    "memory_backed_continuity": {
+      "single_hop": {
+        "label": "Memory-Backed Continuity",
+        "exact_support_rate": 1.0,
+        "clause_recall": 1.0,
+        "query_count": 5
+      },
+      "multi_hop": {
+        "label": "Memory-Backed Continuity",
+        "exact_support_rate": 1.0,
+        "clause_recall": 1.0,
+        "query_count": 5
+      },
+      "temporal": {
+        "label": "Memory-Backed Continuity",
+        "exact_support_rate": 1.0,
+        "clause_recall": 1.0,
+        "query_count": 5
+      },
+      "overall": {
+        "label": "Memory-Backed Continuity",
+        "exact_support_rate": 1.0,
+        "clause_recall": 1.0,
+        "query_count": 15
+      }
+    }
+  },
+  "query_count": 15,
+  "session_count": 5,
+  "generated_at": "2026-06-21T09:01:48.436689+00:00"
+}

@@ -25,7 +25,7 @@ DEFAULT_TASK_COMPLETION_METRIC = (
 )
 DEFAULT_TASK_COMPLETION_INTERPRETATION: tuple[str, ...] = (
     "Weak session access completes transcript-only tasks, but it still fails when the resumed task depends on checkpoint restoration or readiness state.",
-    "Memory-backed continuity is the only condition that completes all five long-track tasks end to end.",
+    "Memory-backed continuity is the only condition that completes every matched long-track task in the suite end to end.",
     "The completion gap appears after answer support, not before it: answer-facing summaries are not enough when the resumed task also depends on durable operational state.",
 )
 ABLATION_TASK_COMPLETION_INTERPRETATION: tuple[str, ...] = (
@@ -174,6 +174,47 @@ TASK_COMPLETION_SCENARIOS: tuple[TaskScenario, ...] = (
         ),
     ),
     TaskScenario(
+        slug="paper-abstract",
+        title="Paper abstract revision recovery",
+        family="transcript",
+        task_anchor="TASK: recover the abstract revision that reframes MiniCode around task completion",
+        durable_anchor="STATE: abstract must foreground continuity-first task completion over answer-only support",
+        transcript_anchor="TRACE: abstract revision now centers task completion and durable operational state",
+        goals=(
+            TaskGoal(
+                id="abstract-angle",
+                label="Write the abstract angle note",
+                kind="transcript_write",
+                target_relative_path="paper/abstract-angle.txt",
+                expected_content=(
+                    "angle=continuity-first task completion benchmark\n"
+                    "contrast=answer support alone is insufficient\n"
+                ),
+                seed_content="angle=unclear\ncontrast=missing\n",
+                replay_phrases=(
+                    "TASK: recover the abstract revision that reframes MiniCode around task completion",
+                    "STATE: abstract must foreground continuity-first task completion over answer-only support",
+                    "TRACE: abstract revision now centers task completion and durable operational state",
+                ),
+            ),
+            TaskGoal(
+                id="abstract-claim",
+                label="Write the abstract claim note",
+                kind="transcript_write",
+                target_relative_path="paper/abstract-claim.txt",
+                expected_content=(
+                    "claim=task completion requires transcript plus durable operational state\n"
+                    "scope=matched interrupted coding tasks only\n"
+                ),
+                seed_content="claim=tbd\nscope=tbd\n",
+                replay_phrases=(
+                    "TASK: recover the abstract revision that reframes MiniCode around task completion",
+                    "TRACE: abstract revision now centers task completion and durable operational state",
+                ),
+            ),
+        ),
+    ),
+    TaskScenario(
         slug="conversion-repair",
         title="Conversion repair continuity recovery",
         family="checkpoint",
@@ -202,6 +243,39 @@ TASK_COMPLETION_SCENARIOS: tuple[TaskScenario, ...] = (
                 replay_phrases=(
                     "STATE: durable state and rewind checkpoints must survive the conversion",
                     "TRACE: conversion patch kept the durable-state contract and follow-up audit",
+                ),
+            ),
+        ),
+    ),
+    TaskScenario(
+        slug="benchmark-packaging",
+        title="Benchmark packaging recovery",
+        family="checkpoint",
+        task_anchor="TASK: finish the benchmark packaging repair without losing the evidence manifest",
+        durable_anchor="STATE: benchmark manifests and rerun instructions must survive the interruption",
+        transcript_anchor="TRACE: repaired the benchmark package and queued the verification rerun",
+        goals=(
+            TaskGoal(
+                id="restore-benchmark-manifest",
+                label="Restore the benchmark evidence manifest",
+                kind="checkpoint_restore",
+                target_relative_path="benchmarks/evidence-manifest.txt",
+                expected_content="manifest=matched-evidence\nstatus=checkpoint-restorable\n",
+                seed_content="manifest=missing\nstatus=manual-rebuild\n",
+            ),
+            TaskGoal(
+                id="benchmark-rerun-note",
+                label="Write the benchmark rerun note",
+                kind="transcript_write",
+                target_relative_path="benchmarks/evidence-rerun-note.txt",
+                expected_content=(
+                    "rerun=verify benchmark package after manifest restore\n"
+                    "constraint=do not rebuild evidence from memory only\n"
+                ),
+                seed_content="rerun=pending\nconstraint=unknown\n",
+                replay_phrases=(
+                    "STATE: benchmark manifests and rerun instructions must survive the interruption",
+                    "TRACE: repaired the benchmark package and queued the verification rerun",
                 ),
             ),
         ),
@@ -250,6 +324,49 @@ TASK_COMPLETION_SCENARIOS: tuple[TaskScenario, ...] = (
         ),
     ),
     TaskScenario(
+        slug="offline-fallback",
+        title="Offline fallback readiness recovery",
+        family="readiness",
+        task_anchor="TASK: keep the offline evaluation fallback package reproducible after interruption",
+        durable_anchor="STATE: fallback routing and manual validation guidance must stay attached to the run",
+        transcript_anchor="TRACE: validated the offline fallback ladder and manual validation gate",
+        readiness_issue="ISSUE: offline evaluation fallback matrix requires validation",
+        readiness_guidance="Keep fallback routing visible before resuming the interrupted run.",
+        goals=(
+            TaskGoal(
+                id="offline-fallback-note",
+                label="Write the offline fallback note",
+                kind="transcript_write",
+                target_relative_path="runtime/offline-fallback-note.txt",
+                expected_content=(
+                    "fallback=offline-eval ladder preserved\n"
+                    "constraint=validation guidance stays attached to run\n"
+                ),
+                seed_content="fallback=unknown\nconstraint=missing\n",
+                replay_phrases=(
+                    "TASK: keep the offline evaluation fallback package reproducible after interruption",
+                    "TRACE: validated the offline fallback ladder and manual validation gate",
+                ),
+            ),
+            TaskGoal(
+                id="offline-fallback-audit",
+                label="Write the offline fallback audit",
+                kind="readiness_write",
+                target_relative_path="runtime/offline-fallback-audit.txt",
+                expected_content=(
+                    "audit=offline evaluation fallback matrix requires validation\n"
+                    "guidance=keep fallback routing visible before resuming the interrupted run\n"
+                ),
+                seed_content="audit=pending\nguidance=pending\n",
+                inspect_phrases=(
+                    "ISSUE: offline evaluation fallback matrix requires validation",
+                    "Keep fallback routing visible before resuming the interrupted run.",
+                    "fallback coverage",
+                ),
+            ),
+        ),
+    ),
+    TaskScenario(
         slug="release-bundle",
         title="Release bundle completion recovery",
         family="cross_surface",
@@ -287,6 +404,238 @@ TASK_COMPLETION_SCENARIOS: tuple[TaskScenario, ...] = (
                 ),
                 preview_phrases=("release-package.txt",),
                 restored_relative_paths=("release/release-package.txt",),
+            ),
+        ),
+    ),
+    TaskScenario(
+        slug="figure-package",
+        title="Figure package completion recovery",
+        family="cross_surface",
+        task_anchor="TASK: finish the figure package after the benchmark interruption",
+        durable_anchor="STATE: figure manifest and verification handback must stay coupled",
+        transcript_anchor="TRACE: rebuilt the figure package around matched traces and verification notes",
+        readiness_issue="ISSUE: figure artifact package needs final evidence check",
+        readiness_guidance="Verify matched trace support before exporting the figure package.",
+        goals=(
+            TaskGoal(
+                id="restore-figure-manifest",
+                label="Restore the figure package manifest",
+                kind="checkpoint_restore",
+                target_relative_path="paper/figure-package-manifest.txt",
+                expected_content="figures=matched-traces\nstatus=ready-for-evidence-check\n",
+                seed_content="figures=lost\nstatus=needs-regeneration\n",
+            ),
+            TaskGoal(
+                id="figure-handback",
+                label="Write the figure package handback",
+                kind="cross_surface_write",
+                target_relative_path="paper/figure-package-handback.txt",
+                expected_content=(
+                    "package=matched figure evidence bundle\n"
+                    "next_step=final evidence check only after manifest restore and readiness review\n"
+                ),
+                seed_content="package=pending\nnext_step=pending\n",
+                replay_phrases=(
+                    "TASK: finish the figure package after the benchmark interruption",
+                    "TRACE: rebuilt the figure package around matched traces and verification notes",
+                ),
+                inspect_phrases=(
+                    "ISSUE: figure artifact package needs final evidence check",
+                    "Verify matched trace support before exporting the figure package.",
+                ),
+                preview_phrases=("figure-package-manifest.txt",),
+                restored_relative_paths=("paper/figure-package-manifest.txt",),
+            ),
+        ),
+    ),
+    TaskScenario(
+        slug="failure-boundary",
+        title="Failure boundary recovery",
+        family="transcript",
+        task_anchor="TASK: recover the paper failure boundary note without overstating the evidence",
+        durable_anchor="STATE: claim boundaries must stay attached to the matched task-completion evidence",
+        transcript_anchor="TRACE: rewrote the failure boundary note around matched evidence and explicit scope control",
+        goals=(
+            TaskGoal(
+                id="failure-boundary-note",
+                label="Write the failure boundary note",
+                kind="transcript_write",
+                target_relative_path="paper/failure-boundary.txt",
+                expected_content=(
+                    "boundary=matched interrupted coding tasks only\n"
+                    "unsupported=broader autonomy claims remain future work\n"
+                ),
+                seed_content="boundary=unclear\nunsupported=missing\n",
+                replay_phrases=(
+                    "TASK: recover the paper failure boundary note without overstating the evidence",
+                    "STATE: claim boundaries must stay attached to the matched task-completion evidence",
+                    "TRACE: rewrote the failure boundary note around matched evidence and explicit scope control",
+                ),
+            ),
+            TaskGoal(
+                id="failure-boundary-followup",
+                label="Write the failure boundary follow-up",
+                kind="transcript_write",
+                target_relative_path="paper/failure-boundary-followup.txt",
+                expected_content=(
+                    "next_step=separate supported claims from future-work conjectures\n"
+                    "constraint=do not generalize beyond matched evidence\n"
+                ),
+                seed_content="next_step=tbd\nconstraint=tbd\n",
+                replay_phrases=(
+                    "TASK: recover the paper failure boundary note without overstating the evidence",
+                    "TRACE: rewrote the failure boundary note around matched evidence and explicit scope control",
+                ),
+            ),
+        ),
+    ),
+    TaskScenario(
+        slug="task-completion-table",
+        title="Task completion table recovery",
+        family="checkpoint",
+        task_anchor="TASK: restore the task-completion table package after the interruption",
+        durable_anchor="STATE: the exact-completion table source must survive as a checkpoint-restorable artifact",
+        transcript_anchor="TRACE: restored the table source and queued a clean recompute of the published summary",
+        goals=(
+            TaskGoal(
+                id="restore-task-table",
+                label="Restore the task completion table source",
+                kind="checkpoint_restore",
+                target_relative_path="paper/task-completion-table.txt",
+                expected_content="table=task-completion-summary\nstatus=checkpoint-restorable\n",
+                seed_content="table=lost\nstatus=hand-reconstruct\n",
+            ),
+            TaskGoal(
+                id="task-table-followup",
+                label="Write the task table follow-up",
+                kind="transcript_write",
+                target_relative_path="paper/task-completion-table-followup.txt",
+                expected_content=(
+                    "rerun=recompute task-completion summary after table restore\n"
+                    "constraint=do not hand-reconstruct the published table from prose\n"
+                ),
+                seed_content="rerun=pending\nconstraint=unknown\n",
+                replay_phrases=(
+                    "STATE: the exact-completion table source must survive as a checkpoint-restorable artifact",
+                    "TRACE: restored the table source and queued a clean recompute of the published summary",
+                ),
+            ),
+        ),
+    ),
+    TaskScenario(
+        slug="submission-compile",
+        title="Submission compile recovery",
+        family="checkpoint",
+        task_anchor="TASK: finish the AAAI submission compile package without losing the restored source bundle",
+        durable_anchor="STATE: compile inputs and rerun instructions must survive the interruption together",
+        transcript_anchor="TRACE: restored the compile bundle and queued a deterministic resubmission build",
+        goals=(
+            TaskGoal(
+                id="restore-submission-compile",
+                label="Restore the submission compile bundle",
+                kind="checkpoint_restore",
+                target_relative_path="paper/submission-compile-bundle.txt",
+                expected_content="bundle=aaai-compile-inputs\nstatus=checkpoint-restorable\n",
+                seed_content="bundle=missing\nstatus=manual-assembly\n",
+            ),
+            TaskGoal(
+                id="submission-compile-followup",
+                label="Write the submission compile follow-up",
+                kind="transcript_write",
+                target_relative_path="paper/submission-compile-followup.txt",
+                expected_content=(
+                    "rerun=execute deterministic submission compile after bundle restore\n"
+                    "constraint=keep restored sources and compile instructions coupled\n"
+                ),
+                seed_content="rerun=pending\nconstraint=unknown\n",
+                replay_phrases=(
+                    "STATE: compile inputs and rerun instructions must survive the interruption together",
+                    "TRACE: restored the compile bundle and queued a deterministic resubmission build",
+                ),
+            ),
+        ),
+    ),
+    TaskScenario(
+        slug="repro-checklist",
+        title="Repro checklist readiness recovery",
+        family="readiness",
+        task_anchor="TASK: keep the reproducibility checklist actionable after the interruption",
+        durable_anchor="STATE: reproducibility guidance must stay attached to provider routing and output paths",
+        transcript_anchor="TRACE: rebuilt the repro checklist around provider routing and artifact paths",
+        readiness_issue="ISSUE: reproducibility checklist requires environment verification",
+        readiness_guidance="Verify provider routing and artifact output paths before marking the run reproducible.",
+        goals=(
+            TaskGoal(
+                id="repro-checklist-note",
+                label="Write the repro checklist note",
+                kind="transcript_write",
+                target_relative_path="runtime/repro-checklist-note.txt",
+                expected_content=(
+                    "repro=checklist preserved across interruption\n"
+                    "constraint=provider routing stays visible with artifact paths\n"
+                ),
+                seed_content="repro=unknown\nconstraint=missing\n",
+                replay_phrases=(
+                    "TASK: keep the reproducibility checklist actionable after the interruption",
+                    "TRACE: rebuilt the repro checklist around provider routing and artifact paths",
+                ),
+            ),
+            TaskGoal(
+                id="repro-checklist-audit",
+                label="Write the repro checklist audit",
+                kind="readiness_write",
+                target_relative_path="runtime/repro-checklist-audit.txt",
+                expected_content=(
+                    "audit=reproducibility checklist requires environment verification\n"
+                    "guidance=verify provider routing and artifact output paths before marking the run reproducible\n"
+                ),
+                seed_content="audit=pending\nguidance=pending\n",
+                inspect_phrases=(
+                    "ISSUE: reproducibility checklist requires environment verification",
+                    "Verify provider routing and artifact output paths before marking the run reproducible.",
+                    "fallback coverage",
+                ),
+            ),
+        ),
+    ),
+    TaskScenario(
+        slug="reviewer-response-bundle",
+        title="Reviewer response bundle recovery",
+        family="cross_surface",
+        task_anchor="TASK: finish the reviewer response bundle after the interruption",
+        durable_anchor="STATE: reviewer-facing claims and restored evidence manifests must stay coupled",
+        transcript_anchor="TRACE: rebuilt the reviewer response bundle around matched claims and restored evidence",
+        readiness_issue="ISSUE: reviewer response bundle needs evidence reconciliation",
+        readiness_guidance="Keep reviewer-facing claim wording aligned with the matched benchmark scope.",
+        goals=(
+            TaskGoal(
+                id="restore-reviewer-bundle",
+                label="Restore the reviewer response manifest",
+                kind="checkpoint_restore",
+                target_relative_path="paper/reviewer-response-manifest.txt",
+                expected_content="bundle=reviewer-response-evidence\nstatus=ready-for-reconciliation\n",
+                seed_content="bundle=lost\nstatus=needs-rebuild\n",
+            ),
+            TaskGoal(
+                id="reviewer-response-handback",
+                label="Write the reviewer response handback",
+                kind="cross_surface_write",
+                target_relative_path="paper/reviewer-response-handback.txt",
+                expected_content=(
+                    "bundle=matched reviewer response package\n"
+                    "next_step=reconcile claims only after manifest restore and readiness review\n"
+                ),
+                seed_content="bundle=pending\nnext_step=pending\n",
+                replay_phrases=(
+                    "TASK: finish the reviewer response bundle after the interruption",
+                    "TRACE: rebuilt the reviewer response bundle around matched claims and restored evidence",
+                ),
+                inspect_phrases=(
+                    "ISSUE: reviewer response bundle needs evidence reconciliation",
+                    "Keep reviewer-facing claim wording aligned with the matched benchmark scope.",
+                ),
+                preview_phrases=("reviewer-response-manifest.txt",),
+                restored_relative_paths=("paper/reviewer-response-manifest.txt",),
             ),
         ),
     ),

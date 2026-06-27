@@ -1,0 +1,2469 @@
+{
+  "generated_at": "2026-06-21T18:51:15.876848+00:00",
+  "repo_root": "D:\\Desktop\\minicode",
+  "output_root": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval",
+  "title": "Paper A Continuity Causal Ladder",
+  "scenario_count": 4,
+  "scenarios": [
+    {
+      "slug": "conversion-repair",
+      "title": "Conversion repair continuity",
+      "task_anchor": "TASK: repair single-session conversion continuity",
+      "durable_anchor": "STATE: keep durable state and rewind checkpoints",
+      "transcript_anchor": "TRACE: patched conversion map without dropping anchors",
+      "readiness_issue": "ISSUE: continuity fallback audit still pending",
+      "target_relative_path": "state/conversion-continuity.txt",
+      "before_content": "mode=before\nanchor_policy=durable\n",
+      "after_content": "mode=after\nanchor_policy=regressed\n"
+    },
+    {
+      "slug": "demo-readme",
+      "title": "Demo and README recovery",
+      "task_anchor": "TASK: restore the real frontend demo surface",
+      "durable_anchor": "STATE: hero must show memory session rewind readiness",
+      "transcript_anchor": "TRACE: captured terminal hero and updated product copy",
+      "readiness_issue": "ISSUE: release hero artifact has not been reverified",
+      "target_relative_path": "docs/readme-hero.txt",
+      "before_content": "hero=real-demo\nsurface=memory-session-rewind-readiness\n",
+      "after_content": "hero=placeholder\nsurface=missing\n"
+    },
+    {
+      "slug": "provider-readiness",
+      "title": "Provider readiness recovery",
+      "task_anchor": "TASK: keep the provider switch reproducible",
+      "durable_anchor": "STATE: preserve fallback guidance with the session",
+      "transcript_anchor": "TRACE: validated provider channel and fallback coverage",
+      "readiness_issue": "ISSUE: provider fallback path requires manual audit",
+      "target_relative_path": "runtime/provider-readiness.txt",
+      "before_content": "provider=gpt-5.5\nfallback=ready\n",
+      "after_content": "provider=unknown\nfallback=lost\n"
+    },
+    {
+      "slug": "paper-results",
+      "title": "Paper result package recovery",
+      "task_anchor": "TASK: regenerate the matched continuity paper table",
+      "durable_anchor": "STATE: keep the same-model controls matched",
+      "transcript_anchor": "TRACE: wrote continuity table and trace artifacts",
+      "readiness_issue": "ISSUE: paper artifact bundle needs final verification",
+      "target_relative_path": "paper/matched-continuity-table.txt",
+      "before_content": "table=matched\nclaim=bounded\n",
+      "after_content": "table=missing\nclaim=unsupported\n"
+    }
+  ],
+  "conditions": [
+    {
+      "key": "memory_off",
+      "label": "Memory-Off",
+      "include_history": false,
+      "include_transcript": false,
+      "include_checkpoint": false,
+      "include_readiness": false,
+      "stale_checkpoint": false,
+      "stale_readiness": false
+    },
+    {
+      "key": "history_only",
+      "label": "History-Only",
+      "include_history": true,
+      "include_transcript": false,
+      "include_checkpoint": false,
+      "include_readiness": false,
+      "stale_checkpoint": false,
+      "stale_readiness": false
+    },
+    {
+      "key": "weak_session",
+      "label": "Weak-Session",
+      "include_history": true,
+      "include_transcript": true,
+      "include_checkpoint": false,
+      "include_readiness": false,
+      "stale_checkpoint": false,
+      "stale_readiness": false
+    },
+    {
+      "key": "session_plus_checkpoint",
+      "label": "Session+Checkpoint",
+      "include_history": true,
+      "include_transcript": true,
+      "include_checkpoint": true,
+      "include_readiness": false,
+      "stale_checkpoint": false,
+      "stale_readiness": false
+    },
+    {
+      "key": "session_plus_readiness",
+      "label": "Session+Readiness",
+      "include_history": true,
+      "include_transcript": true,
+      "include_checkpoint": false,
+      "include_readiness": true,
+      "stale_checkpoint": false,
+      "stale_readiness": false
+    },
+    {
+      "key": "stale_continuity_package",
+      "label": "Stale-Continuity-Package",
+      "include_history": true,
+      "include_transcript": true,
+      "include_checkpoint": true,
+      "include_readiness": true,
+      "stale_checkpoint": true,
+      "stale_readiness": true
+    },
+    {
+      "key": "memory_backed_continuity",
+      "label": "Memory-Backed Continuity",
+      "include_history": true,
+      "include_transcript": true,
+      "include_checkpoint": true,
+      "include_readiness": true,
+      "stale_checkpoint": false,
+      "stale_readiness": false
+    }
+  ],
+  "aggregates": [
+    {
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "scenario_count": 4,
+      "anchor_retention": 0.0,
+      "interruption_recovery": 0.0,
+      "rewind_success": 0.0,
+      "readiness_visibility": 0.0,
+      "context_loss_rate": 1.0,
+      "anchor_hits": 0,
+      "anchor_total": 20,
+      "recovery_hits": 0,
+      "recovery_total": 16,
+      "rewind_hits": 0,
+      "rewind_total": 4,
+      "readiness_hits": 0,
+      "readiness_total": 4
+    },
+    {
+      "condition": "history_only",
+      "condition_label": "History-Only",
+      "scenario_count": 4,
+      "anchor_retention": 0.4,
+      "interruption_recovery": 0.25,
+      "rewind_success": 0.0,
+      "readiness_visibility": 0.0,
+      "context_loss_rate": 0.6,
+      "anchor_hits": 8,
+      "anchor_total": 20,
+      "recovery_hits": 4,
+      "recovery_total": 16,
+      "rewind_hits": 0,
+      "rewind_total": 4,
+      "readiness_hits": 0,
+      "readiness_total": 4
+    },
+    {
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "scenario_count": 4,
+      "anchor_retention": 0.6,
+      "interruption_recovery": 0.5,
+      "rewind_success": 0.0,
+      "readiness_visibility": 0.0,
+      "context_loss_rate": 0.4,
+      "anchor_hits": 12,
+      "anchor_total": 20,
+      "recovery_hits": 8,
+      "recovery_total": 16,
+      "rewind_hits": 0,
+      "rewind_total": 4,
+      "readiness_hits": 0,
+      "readiness_total": 4
+    },
+    {
+      "condition": "session_plus_checkpoint",
+      "condition_label": "Session+Checkpoint",
+      "scenario_count": 4,
+      "anchor_retention": 0.8,
+      "interruption_recovery": 0.75,
+      "rewind_success": 1.0,
+      "readiness_visibility": 0.0,
+      "context_loss_rate": 0.19999999999999996,
+      "anchor_hits": 16,
+      "anchor_total": 20,
+      "recovery_hits": 12,
+      "recovery_total": 16,
+      "rewind_hits": 4,
+      "rewind_total": 4,
+      "readiness_hits": 0,
+      "readiness_total": 4
+    },
+    {
+      "condition": "session_plus_readiness",
+      "condition_label": "Session+Readiness",
+      "scenario_count": 4,
+      "anchor_retention": 0.8,
+      "interruption_recovery": 0.75,
+      "rewind_success": 0.0,
+      "readiness_visibility": 1.0,
+      "context_loss_rate": 0.19999999999999996,
+      "anchor_hits": 16,
+      "anchor_total": 20,
+      "recovery_hits": 12,
+      "recovery_total": 16,
+      "rewind_hits": 0,
+      "rewind_total": 4,
+      "readiness_hits": 4,
+      "readiness_total": 4
+    },
+    {
+      "condition": "stale_continuity_package",
+      "condition_label": "Stale-Continuity-Package",
+      "scenario_count": 4,
+      "anchor_retention": 0.8,
+      "interruption_recovery": 0.75,
+      "rewind_success": 0.0,
+      "readiness_visibility": 0.0,
+      "context_loss_rate": 0.19999999999999996,
+      "anchor_hits": 16,
+      "anchor_total": 20,
+      "recovery_hits": 12,
+      "recovery_total": 16,
+      "rewind_hits": 0,
+      "rewind_total": 4,
+      "readiness_hits": 0,
+      "readiness_total": 4
+    },
+    {
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "scenario_count": 4,
+      "anchor_retention": 1.0,
+      "interruption_recovery": 1.0,
+      "rewind_success": 1.0,
+      "readiness_visibility": 1.0,
+      "context_loss_rate": 0.0,
+      "anchor_hits": 20,
+      "anchor_total": 20,
+      "recovery_hits": 16,
+      "recovery_total": 16,
+      "rewind_hits": 4,
+      "rewind_total": 4,
+      "readiness_hits": 4,
+      "readiness_total": 4
+    }
+  ],
+  "condition_summary": {
+    "memory_off": {
+      "anchor_retention": 0.0,
+      "interruption_recovery": 0.0,
+      "rewind_success": 0.0,
+      "readiness_visibility": 0.0,
+      "context_loss_rate": 1.0,
+      "scenario_count": 4,
+      "anchor_hits": 0,
+      "anchor_total": 20,
+      "recovery_hits": 0,
+      "recovery_total": 16,
+      "rewind_hits": 0,
+      "rewind_total": 4,
+      "readiness_hits": 0,
+      "readiness_total": 4
+    },
+    "history_only": {
+      "anchor_retention": 0.4,
+      "interruption_recovery": 0.25,
+      "rewind_success": 0.0,
+      "readiness_visibility": 0.0,
+      "context_loss_rate": 0.6,
+      "scenario_count": 4,
+      "anchor_hits": 8,
+      "anchor_total": 20,
+      "recovery_hits": 4,
+      "recovery_total": 16,
+      "rewind_hits": 0,
+      "rewind_total": 4,
+      "readiness_hits": 0,
+      "readiness_total": 4
+    },
+    "weak_session": {
+      "anchor_retention": 0.6,
+      "interruption_recovery": 0.5,
+      "rewind_success": 0.0,
+      "readiness_visibility": 0.0,
+      "context_loss_rate": 0.4,
+      "scenario_count": 4,
+      "anchor_hits": 12,
+      "anchor_total": 20,
+      "recovery_hits": 8,
+      "recovery_total": 16,
+      "rewind_hits": 0,
+      "rewind_total": 4,
+      "readiness_hits": 0,
+      "readiness_total": 4
+    },
+    "session_plus_checkpoint": {
+      "anchor_retention": 0.8,
+      "interruption_recovery": 0.75,
+      "rewind_success": 1.0,
+      "readiness_visibility": 0.0,
+      "context_loss_rate": 0.19999999999999996,
+      "scenario_count": 4,
+      "anchor_hits": 16,
+      "anchor_total": 20,
+      "recovery_hits": 12,
+      "recovery_total": 16,
+      "rewind_hits": 4,
+      "rewind_total": 4,
+      "readiness_hits": 0,
+      "readiness_total": 4
+    },
+    "session_plus_readiness": {
+      "anchor_retention": 0.8,
+      "interruption_recovery": 0.75,
+      "rewind_success": 0.0,
+      "readiness_visibility": 1.0,
+      "context_loss_rate": 0.19999999999999996,
+      "scenario_count": 4,
+      "anchor_hits": 16,
+      "anchor_total": 20,
+      "recovery_hits": 12,
+      "recovery_total": 16,
+      "rewind_hits": 0,
+      "rewind_total": 4,
+      "readiness_hits": 4,
+      "readiness_total": 4
+    },
+    "stale_continuity_package": {
+      "anchor_retention": 0.8,
+      "interruption_recovery": 0.75,
+      "rewind_success": 0.0,
+      "readiness_visibility": 0.0,
+      "context_loss_rate": 0.19999999999999996,
+      "scenario_count": 4,
+      "anchor_hits": 16,
+      "anchor_total": 20,
+      "recovery_hits": 12,
+      "recovery_total": 16,
+      "rewind_hits": 0,
+      "rewind_total": 4,
+      "readiness_hits": 0,
+      "readiness_total": 4
+    },
+    "memory_backed_continuity": {
+      "anchor_retention": 1.0,
+      "interruption_recovery": 1.0,
+      "rewind_success": 1.0,
+      "readiness_visibility": 1.0,
+      "context_loss_rate": 0.0,
+      "scenario_count": 4,
+      "anchor_hits": 20,
+      "anchor_total": 20,
+      "recovery_hits": 16,
+      "recovery_total": 16,
+      "rewind_hits": 4,
+      "rewind_total": 4,
+      "readiness_hits": 4,
+      "readiness_total": 4
+    }
+  },
+  "results": [
+    {
+      "scenario": "conversion-repair",
+      "scenario_title": "Conversion repair continuity",
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "session_id": "9d9803b90410",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\memory_off\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\memory_off",
+      "seed_profile": {
+        "include_history": false,
+        "include_transcript": false,
+        "include_checkpoint": false,
+        "include_readiness": false,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 0.0,
+        "interruption_recovery": 0.0,
+        "rewind_success": 0.0,
+        "readiness_visibility": 0.0,
+        "context_loss_rate": 1.0
+      },
+      "counts": {
+        "anchor_hits": 0,
+        "anchor_total": 5,
+        "recovery_hits": 0,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": false,
+        "durable_anchor": false,
+        "transcript_anchor": false,
+        "checkpoint_anchor": false,
+        "readiness_anchor": false
+      },
+      "recovery_hits": {
+        "history_recovered": false,
+        "transcript_recovered": false,
+        "checkpoint_recovered": false,
+        "readiness_recovered": false
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session 9d9803b90410",
+          "exit_code": 0,
+          "stdout": "Session inspect: 9d9803b9\n  Created: 2026-06-21 18:51:15\n  Updated: 2026-06-21 18:51:15\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\memory_off\\workspace\n  Messages: 1\n  Transcript entries: 0\n  History entries: 0\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 0\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: none\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  (none)\n\nRecent transcript (0 shown):\n  (none)\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session 9d9803b90410",
+          "exit_code": 0,
+          "stdout": "Session replay: 9d9803b9\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\memory_off\\workspace\n  Created: 2026-06-21 18:51:15\n  Updated: 2026-06-21 18:51:15\n  Runtime: (none)\n  Checkpoints: 0\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (0 shown):\n  (none)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (0 shown):\n  (none)\n\nTranscript timeline (0 shown):\n  (none)\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind 9d9803b90410",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for session 9d9803b9.\n"
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind 9d9803b90410",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for that session.\n"
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\memory_off\\workspace\\state\\conversion-continuity.txt",
+      "final_file_content": "mode=after\nanchor_policy=regressed\n"
+    },
+    {
+      "scenario": "conversion-repair",
+      "scenario_title": "Conversion repair continuity",
+      "condition": "history_only",
+      "condition_label": "History-Only",
+      "session_id": "8b7209ae0342",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\history_only\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\history_only",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": false,
+        "include_checkpoint": false,
+        "include_readiness": false,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 0.4,
+        "interruption_recovery": 0.25,
+        "rewind_success": 0.0,
+        "readiness_visibility": 0.0,
+        "context_loss_rate": 0.6
+      },
+      "counts": {
+        "anchor_hits": 2,
+        "anchor_total": 5,
+        "recovery_hits": 1,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": false,
+        "checkpoint_anchor": false,
+        "readiness_anchor": false
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": false,
+        "checkpoint_recovered": false,
+        "readiness_recovered": false
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session 8b7209ae0342",
+          "exit_code": 0,
+          "stdout": "Session inspect: 8b7209ae\n  Created: 2026-06-21 18:51:17\n  Updated: 2026-06-21 18:51:17\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\history_only\\workspace\n  Messages: 1\n  Transcript entries: 0\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 0\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: none\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  (none)\n\nRecent transcript (0 shown):\n  (none)\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session 8b7209ae0342",
+          "exit_code": 0,
+          "stdout": "Session replay: 8b7209ae\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\history_only\\workspace\n  Created: 2026-06-21 18:51:17\n  Updated: 2026-06-21 18:51:17\n  Runtime: (none)\n  Checkpoints: 0\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (0 shown):\n  (none)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: repair single-session conversion continuity\n  2. STATE: keep durable state and rewind checkpoints\n\nTranscript timeline (0 shown):\n  (none)\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind 8b7209ae0342",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for session 8b7209ae.\n"
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind 8b7209ae0342",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for that session.\n"
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\history_only\\workspace\\state\\conversion-continuity.txt",
+      "final_file_content": "mode=after\nanchor_policy=regressed\n"
+    },
+    {
+      "scenario": "conversion-repair",
+      "scenario_title": "Conversion repair continuity",
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "session_id": "eb04a457c74a",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\weak_session\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\weak_session",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": true,
+        "include_checkpoint": false,
+        "include_readiness": false,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 0.6,
+        "interruption_recovery": 0.5,
+        "rewind_success": 0.0,
+        "readiness_visibility": 0.0,
+        "context_loss_rate": 0.4
+      },
+      "counts": {
+        "anchor_hits": 3,
+        "anchor_total": 5,
+        "recovery_hits": 2,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": true,
+        "checkpoint_anchor": false,
+        "readiness_anchor": false
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": true,
+        "checkpoint_recovered": false,
+        "readiness_recovered": false
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session eb04a457c74a",
+          "exit_code": 0,
+          "stdout": "Session inspect: eb04a457\n  Created: 2026-06-21 18:51:19\n  Updated: 2026-06-21 18:51:19\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\weak_session\\workspace\n  Messages: 1\n  Transcript entries: 2\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 0\n  Runtime: phase:verify@2\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: none\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  (none)\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: patched conversion map without dropping anchors\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session eb04a457c74a",
+          "exit_code": 0,
+          "stdout": "Session replay: eb04a457\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\weak_session\\workspace\n  Created: 2026-06-21 18:51:19\n  Updated: 2026-06-21 18:51:19\n  Runtime: phase:verify@2\n  Checkpoints: 0\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (0 shown):\n  (none)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: repair single-session conversion continuity\n  2. STATE: keep durable state and rewind checkpoints\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: patched conversion map without dropping anchors\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind eb04a457c74a",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for session eb04a457.\n"
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind eb04a457c74a",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for that session.\n"
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\weak_session\\workspace\\state\\conversion-continuity.txt",
+      "final_file_content": "mode=after\nanchor_policy=regressed\n"
+    },
+    {
+      "scenario": "conversion-repair",
+      "scenario_title": "Conversion repair continuity",
+      "condition": "session_plus_checkpoint",
+      "condition_label": "Session+Checkpoint",
+      "session_id": "0568d6de7093",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\session_plus_checkpoint\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\session_plus_checkpoint",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": true,
+        "include_checkpoint": true,
+        "include_readiness": false,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 0.8,
+        "interruption_recovery": 0.75,
+        "rewind_success": 1.0,
+        "readiness_visibility": 0.0,
+        "context_loss_rate": 0.19999999999999996
+      },
+      "counts": {
+        "anchor_hits": 4,
+        "anchor_total": 5,
+        "recovery_hits": 3,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": true,
+        "checkpoint_anchor": true,
+        "readiness_anchor": false
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": true,
+        "checkpoint_recovered": true,
+        "readiness_recovered": false
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session 0568d6de7093",
+          "exit_code": 0,
+          "stdout": "Session inspect: 0568d6de\n  Created: 2026-06-21 18:51:20\n  Updated: 2026-06-21 18:51:20\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\session_plus_checkpoint\\workspace\n  Messages: 1\n  Transcript entries: 2\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 1\n  Runtime: phase:verify@2\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: 1 saved; latest [f1bd9dd0] conversion-continuity.txt\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  (none)\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: patched conversion map without dropping anchors\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session 0568d6de7093",
+          "exit_code": 0,
+          "stdout": "Session replay: 0568d6de\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\session_plus_checkpoint\\workspace\n  Created: 2026-06-21 18:51:20\n  Updated: 2026-06-21 18:51:20\n  Runtime: phase:verify@2\n  Checkpoints: 1\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (1 shown):\n  - [f1bd9dd0] 2026-06-21 18:51:20 :: conversion-continuity.txt (edit)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: repair single-session conversion continuity\n  2. STATE: keep durable state and rewind checkpoints\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: patched conversion map without dropping anchors\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind 0568d6de7093",
+          "exit_code": 0,
+          "stdout": "Rewind preview for session 0568d6de:\n\nWould restore 1 checkpoint(s) across 1 file(s).\nMode: restore pre-edit file snapshots.\n\nPlanned restores:\n  1. [f1bd9dd0] 2026-06-21 18:51:20 - D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\session_plus_checkpoint\\workspace\\state\\conversion-continuity.txt\n     Restores: existing file\n     Type: edit\n",
+          "stderr": ""
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind 0568d6de7093",
+          "exit_code": 0,
+          "stdout": "Rewound 1 checkpoint(s) for session 0568d6de.\n  - [f1bd9dd0] D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\session_plus_checkpoint\\workspace\\state\\conversion-continuity.txt\nResuming session 0568d6de\n  Created: 2026-06-21 18:51:20\n  Updated: 2026-06-21 18:51:22\n  Messages: 1\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\session_plus_checkpoint\\workspace\n  Checkpoints: 1\n  Recent checkpoints: 1 saved; latest [5415fda9] conversion-continuity.txt [rewind]\n  Runtime: phase:verify@2\n  Delegation: 0 running, 0 slot(s) open\n",
+          "stderr": ""
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\session_plus_checkpoint\\workspace\\state\\conversion-continuity.txt",
+      "final_file_content": "mode=before\nanchor_policy=durable\n"
+    },
+    {
+      "scenario": "conversion-repair",
+      "scenario_title": "Conversion repair continuity",
+      "condition": "session_plus_readiness",
+      "condition_label": "Session+Readiness",
+      "session_id": "f76c50cef73c",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\session_plus_readiness\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\session_plus_readiness",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": true,
+        "include_checkpoint": false,
+        "include_readiness": true,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 0.8,
+        "interruption_recovery": 0.75,
+        "rewind_success": 0.0,
+        "readiness_visibility": 1.0,
+        "context_loss_rate": 0.19999999999999996
+      },
+      "counts": {
+        "anchor_hits": 4,
+        "anchor_total": 5,
+        "recovery_hits": 3,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": true,
+        "checkpoint_anchor": false,
+        "readiness_anchor": true
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": true,
+        "checkpoint_recovered": false,
+        "readiness_recovered": true
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session f76c50cef73c",
+          "exit_code": 0,
+          "stdout": "Session inspect: f76c50ce\n  Created: 2026-06-21 18:51:22\n  Updated: 2026-06-21 18:51:22\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\session_plus_readiness\\workspace\n  Messages: 1\n  Transcript entries: 2\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 0\n  Runtime: phase:verify@2\n  Readiness: ready via continuity-benchmark\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: none\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  ready via continuity-benchmark (ready)\n  channel: deterministic-harness\n  fallback coverage: 1/2 locally ready\n  - fallback local-mock [ready]\n  - fallback offline-review [not-ready]\n  - guidance: Keep continuity surfaces visible after interruption.\n  - ISSUE: continuity fallback audit still pending\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: patched conversion map without dropping anchors\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session f76c50cef73c",
+          "exit_code": 0,
+          "stdout": "Session replay: f76c50ce\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\session_plus_readiness\\workspace\n  Created: 2026-06-21 18:51:22\n  Updated: 2026-06-21 18:51:22\n  Runtime: phase:verify@2\n  Checkpoints: 0\n  Readiness: ready via continuity-benchmark\n  channel: deterministic-harness\n  fallback coverage: 1/2 locally ready\n  - fallback local-mock [ready]\n  - fallback offline-review [not-ready]\n  - guidance: Keep continuity surfaces visible after interruption.\n  - ISSUE: continuity fallback audit still pending\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (0 shown):\n  (none)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: repair single-session conversion continuity\n  2. STATE: keep durable state and rewind checkpoints\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: patched conversion map without dropping anchors\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind f76c50cef73c",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for session f76c50ce.\n"
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind f76c50cef73c",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for that session.\n"
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\session_plus_readiness\\workspace\\state\\conversion-continuity.txt",
+      "final_file_content": "mode=after\nanchor_policy=regressed\n"
+    },
+    {
+      "scenario": "conversion-repair",
+      "scenario_title": "Conversion repair continuity",
+      "condition": "stale_continuity_package",
+      "condition_label": "Stale-Continuity-Package",
+      "session_id": "d628c240b611",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\stale_continuity_package\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\stale_continuity_package",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": true,
+        "include_checkpoint": true,
+        "include_readiness": true,
+        "stale_checkpoint": true,
+        "stale_readiness": true
+      },
+      "metrics": {
+        "anchor_retention": 0.8,
+        "interruption_recovery": 0.75,
+        "rewind_success": 0.0,
+        "readiness_visibility": 0.0,
+        "context_loss_rate": 0.19999999999999996
+      },
+      "counts": {
+        "anchor_hits": 4,
+        "anchor_total": 5,
+        "recovery_hits": 3,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": true,
+        "checkpoint_anchor": true,
+        "readiness_anchor": false
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": true,
+        "checkpoint_recovered": true,
+        "readiness_recovered": false
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session d628c240b611",
+          "exit_code": 0,
+          "stdout": "Session inspect: d628c240\n  Created: 2026-06-21 18:51:24\n  Updated: 2026-06-21 18:51:24\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\stale_continuity_package\\workspace\n  Messages: 1\n  Transcript entries: 2\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 1\n  Runtime: phase:verify@2\n  Readiness: stale via continuity-benchmark\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: 1 saved; latest [241c5869] conversion-continuity.txt\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  stale via continuity-benchmark (not-ready)\n  channel: deterministic-harness\n  fallback coverage: 0/2 locally ready\n  - fallback local-mock [not-ready]\n  - fallback offline-review [not-ready]\n  - guidance: Archived guidance detected; refresh readiness before resuming.\n  - ISSUE: archived readiness report is stale\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: patched conversion map without dropping anchors\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session d628c240b611",
+          "exit_code": 0,
+          "stdout": "Session replay: d628c240\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\stale_continuity_package\\workspace\n  Created: 2026-06-21 18:51:24\n  Updated: 2026-06-21 18:51:24\n  Runtime: phase:verify@2\n  Checkpoints: 1\n  Readiness: stale via continuity-benchmark\n  channel: deterministic-harness\n  fallback coverage: 0/2 locally ready\n  - fallback local-mock [not-ready]\n  - fallback offline-review [not-ready]\n  - guidance: Archived guidance detected; refresh readiness before resuming.\n  - ISSUE: archived readiness report is stale\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (1 shown):\n  - [241c5869] 2026-06-21 18:51:24 :: conversion-continuity.txt (edit)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: repair single-session conversion continuity\n  2. STATE: keep durable state and rewind checkpoints\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: patched conversion map without dropping anchors\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind d628c240b611",
+          "exit_code": 0,
+          "stdout": "Rewind preview for session d628c240:\n\nWould restore 1 checkpoint(s) across 1 file(s).\nMode: restore pre-edit file snapshots.\n\nPlanned restores:\n  1. [241c5869] 2026-06-21 18:51:24 - D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\stale_continuity_package\\workspace\\state\\conversion-continuity.txt\n     Restores: existing file\n     Type: edit\n",
+          "stderr": ""
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind d628c240b611",
+          "exit_code": 0,
+          "stdout": "Rewound 1 checkpoint(s) for session d628c240.\n  - [241c5869] D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\stale_continuity_package\\workspace\\state\\conversion-continuity.txt\nResuming session d628c240\n  Created: 2026-06-21 18:51:24\n  Updated: 2026-06-21 18:51:26\n  Messages: 1\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\stale_continuity_package\\workspace\n  Checkpoints: 1\n  Recent checkpoints: 1 saved; latest [00d8db49] conversion-continuity.txt [rewind]\n  Runtime: phase:verify@2\n  Readiness: stale via continuity-benchmark\n  Delegation: 0 running, 0 slot(s) open\n",
+          "stderr": ""
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\stale_continuity_package\\workspace\\state\\conversion-continuity.txt",
+      "final_file_content": "mode=stale\nanchor_policy=archived\n"
+    },
+    {
+      "scenario": "conversion-repair",
+      "scenario_title": "Conversion repair continuity",
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "session_id": "985f6f1edf50",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\memory_backed_continuity\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\memory_backed_continuity",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": true,
+        "include_checkpoint": true,
+        "include_readiness": true,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 1.0,
+        "interruption_recovery": 1.0,
+        "rewind_success": 1.0,
+        "readiness_visibility": 1.0,
+        "context_loss_rate": 0.0
+      },
+      "counts": {
+        "anchor_hits": 5,
+        "anchor_total": 5,
+        "recovery_hits": 4,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": true,
+        "checkpoint_anchor": true,
+        "readiness_anchor": true
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": true,
+        "checkpoint_recovered": true,
+        "readiness_recovered": true
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session 985f6f1edf50",
+          "exit_code": 0,
+          "stdout": "Session inspect: 985f6f1e\n  Created: 2026-06-21 18:51:26\n  Updated: 2026-06-21 18:51:26\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\memory_backed_continuity\\workspace\n  Messages: 1\n  Transcript entries: 2\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 1\n  Runtime: phase:verify@2\n  Readiness: ready via continuity-benchmark\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: 1 saved; latest [0964738b] conversion-continuity.txt\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  ready via continuity-benchmark (ready)\n  channel: deterministic-harness\n  fallback coverage: 1/2 locally ready\n  - fallback local-mock [ready]\n  - fallback offline-review [not-ready]\n  - guidance: Keep continuity surfaces visible after interruption.\n  - ISSUE: continuity fallback audit still pending\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: patched conversion map without dropping anchors\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session 985f6f1edf50",
+          "exit_code": 0,
+          "stdout": "Session replay: 985f6f1e\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\memory_backed_continuity\\workspace\n  Created: 2026-06-21 18:51:26\n  Updated: 2026-06-21 18:51:26\n  Runtime: phase:verify@2\n  Checkpoints: 1\n  Readiness: ready via continuity-benchmark\n  channel: deterministic-harness\n  fallback coverage: 1/2 locally ready\n  - fallback local-mock [ready]\n  - fallback offline-review [not-ready]\n  - guidance: Keep continuity surfaces visible after interruption.\n  - ISSUE: continuity fallback audit still pending\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (1 shown):\n  - [0964738b] 2026-06-21 18:51:26 :: conversion-continuity.txt (edit)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: repair single-session conversion continuity\n  2. STATE: keep durable state and rewind checkpoints\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: patched conversion map without dropping anchors\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind 985f6f1edf50",
+          "exit_code": 0,
+          "stdout": "Rewind preview for session 985f6f1e:\n\nWould restore 1 checkpoint(s) across 1 file(s).\nMode: restore pre-edit file snapshots.\n\nPlanned restores:\n  1. [0964738b] 2026-06-21 18:51:26 - D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\memory_backed_continuity\\workspace\\state\\conversion-continuity.txt\n     Restores: existing file\n     Type: edit\n",
+          "stderr": ""
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind 985f6f1edf50",
+          "exit_code": 0,
+          "stdout": "Rewound 1 checkpoint(s) for session 985f6f1e.\n  - [0964738b] D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\memory_backed_continuity\\workspace\\state\\conversion-continuity.txt\nResuming session 985f6f1e\n  Created: 2026-06-21 18:51:26\n  Updated: 2026-06-21 18:51:28\n  Messages: 1\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\memory_backed_continuity\\workspace\n  Checkpoints: 1\n  Recent checkpoints: 1 saved; latest [9ff30a48] conversion-continuity.txt [rewind]\n  Runtime: phase:verify@2\n  Readiness: ready via continuity-benchmark\n  Delegation: 0 running, 0 slot(s) open\n",
+          "stderr": ""
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\conversion-repair\\memory_backed_continuity\\workspace\\state\\conversion-continuity.txt",
+      "final_file_content": "mode=before\nanchor_policy=durable\n"
+    },
+    {
+      "scenario": "demo-readme",
+      "scenario_title": "Demo and README recovery",
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "session_id": "0ec19ad75bf1",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\memory_off\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\memory_off",
+      "seed_profile": {
+        "include_history": false,
+        "include_transcript": false,
+        "include_checkpoint": false,
+        "include_readiness": false,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 0.0,
+        "interruption_recovery": 0.0,
+        "rewind_success": 0.0,
+        "readiness_visibility": 0.0,
+        "context_loss_rate": 1.0
+      },
+      "counts": {
+        "anchor_hits": 0,
+        "anchor_total": 5,
+        "recovery_hits": 0,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": false,
+        "durable_anchor": false,
+        "transcript_anchor": false,
+        "checkpoint_anchor": false,
+        "readiness_anchor": false
+      },
+      "recovery_hits": {
+        "history_recovered": false,
+        "transcript_recovered": false,
+        "checkpoint_recovered": false,
+        "readiness_recovered": false
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session 0ec19ad75bf1",
+          "exit_code": 0,
+          "stdout": "Session inspect: 0ec19ad7\n  Created: 2026-06-21 18:51:28\n  Updated: 2026-06-21 18:51:28\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\memory_off\\workspace\n  Messages: 1\n  Transcript entries: 0\n  History entries: 0\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 0\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: none\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  (none)\n\nRecent transcript (0 shown):\n  (none)\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session 0ec19ad75bf1",
+          "exit_code": 0,
+          "stdout": "Session replay: 0ec19ad7\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\memory_off\\workspace\n  Created: 2026-06-21 18:51:28\n  Updated: 2026-06-21 18:51:28\n  Runtime: (none)\n  Checkpoints: 0\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (0 shown):\n  (none)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (0 shown):\n  (none)\n\nTranscript timeline (0 shown):\n  (none)\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind 0ec19ad75bf1",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for session 0ec19ad7.\n"
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind 0ec19ad75bf1",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for that session.\n"
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\memory_off\\workspace\\docs\\readme-hero.txt",
+      "final_file_content": "hero=placeholder\nsurface=missing\n"
+    },
+    {
+      "scenario": "demo-readme",
+      "scenario_title": "Demo and README recovery",
+      "condition": "history_only",
+      "condition_label": "History-Only",
+      "session_id": "64eb62969681",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\history_only\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\history_only",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": false,
+        "include_checkpoint": false,
+        "include_readiness": false,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 0.4,
+        "interruption_recovery": 0.25,
+        "rewind_success": 0.0,
+        "readiness_visibility": 0.0,
+        "context_loss_rate": 0.6
+      },
+      "counts": {
+        "anchor_hits": 2,
+        "anchor_total": 5,
+        "recovery_hits": 1,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": false,
+        "checkpoint_anchor": false,
+        "readiness_anchor": false
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": false,
+        "checkpoint_recovered": false,
+        "readiness_recovered": false
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session 64eb62969681",
+          "exit_code": 0,
+          "stdout": "Session inspect: 64eb6296\n  Created: 2026-06-21 18:51:30\n  Updated: 2026-06-21 18:51:30\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\history_only\\workspace\n  Messages: 1\n  Transcript entries: 0\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 0\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: none\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  (none)\n\nRecent transcript (0 shown):\n  (none)\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session 64eb62969681",
+          "exit_code": 0,
+          "stdout": "Session replay: 64eb6296\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\history_only\\workspace\n  Created: 2026-06-21 18:51:30\n  Updated: 2026-06-21 18:51:30\n  Runtime: (none)\n  Checkpoints: 0\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (0 shown):\n  (none)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: restore the real frontend demo surface\n  2. STATE: hero must show memory session rewind readiness\n\nTranscript timeline (0 shown):\n  (none)\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind 64eb62969681",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for session 64eb6296.\n"
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind 64eb62969681",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for that session.\n"
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\history_only\\workspace\\docs\\readme-hero.txt",
+      "final_file_content": "hero=placeholder\nsurface=missing\n"
+    },
+    {
+      "scenario": "demo-readme",
+      "scenario_title": "Demo and README recovery",
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "session_id": "4fa128f51795",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\weak_session\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\weak_session",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": true,
+        "include_checkpoint": false,
+        "include_readiness": false,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 0.6,
+        "interruption_recovery": 0.5,
+        "rewind_success": 0.0,
+        "readiness_visibility": 0.0,
+        "context_loss_rate": 0.4
+      },
+      "counts": {
+        "anchor_hits": 3,
+        "anchor_total": 5,
+        "recovery_hits": 2,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": true,
+        "checkpoint_anchor": false,
+        "readiness_anchor": false
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": true,
+        "checkpoint_recovered": false,
+        "readiness_recovered": false
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session 4fa128f51795",
+          "exit_code": 0,
+          "stdout": "Session inspect: 4fa128f5\n  Created: 2026-06-21 18:51:32\n  Updated: 2026-06-21 18:51:32\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\weak_session\\workspace\n  Messages: 1\n  Transcript entries: 2\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 0\n  Runtime: phase:verify@2\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: none\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  (none)\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: captured terminal hero and updated product copy\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session 4fa128f51795",
+          "exit_code": 0,
+          "stdout": "Session replay: 4fa128f5\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\weak_session\\workspace\n  Created: 2026-06-21 18:51:32\n  Updated: 2026-06-21 18:51:32\n  Runtime: phase:verify@2\n  Checkpoints: 0\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (0 shown):\n  (none)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: restore the real frontend demo surface\n  2. STATE: hero must show memory session rewind readiness\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: captured terminal hero and updated product copy\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind 4fa128f51795",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for session 4fa128f5.\n"
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind 4fa128f51795",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for that session.\n"
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\weak_session\\workspace\\docs\\readme-hero.txt",
+      "final_file_content": "hero=placeholder\nsurface=missing\n"
+    },
+    {
+      "scenario": "demo-readme",
+      "scenario_title": "Demo and README recovery",
+      "condition": "session_plus_checkpoint",
+      "condition_label": "Session+Checkpoint",
+      "session_id": "f0db98fcfc75",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\session_plus_checkpoint\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\session_plus_checkpoint",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": true,
+        "include_checkpoint": true,
+        "include_readiness": false,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 0.8,
+        "interruption_recovery": 0.75,
+        "rewind_success": 1.0,
+        "readiness_visibility": 0.0,
+        "context_loss_rate": 0.19999999999999996
+      },
+      "counts": {
+        "anchor_hits": 4,
+        "anchor_total": 5,
+        "recovery_hits": 3,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": true,
+        "checkpoint_anchor": true,
+        "readiness_anchor": false
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": true,
+        "checkpoint_recovered": true,
+        "readiness_recovered": false
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session f0db98fcfc75",
+          "exit_code": 0,
+          "stdout": "Session inspect: f0db98fc\n  Created: 2026-06-21 18:51:34\n  Updated: 2026-06-21 18:51:34\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\session_plus_checkpoint\\workspace\n  Messages: 1\n  Transcript entries: 2\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 1\n  Runtime: phase:verify@2\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: 1 saved; latest [f7c63df6] readme-hero.txt\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  (none)\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: captured terminal hero and updated product copy\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session f0db98fcfc75",
+          "exit_code": 0,
+          "stdout": "Session replay: f0db98fc\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\session_plus_checkpoint\\workspace\n  Created: 2026-06-21 18:51:34\n  Updated: 2026-06-21 18:51:34\n  Runtime: phase:verify@2\n  Checkpoints: 1\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (1 shown):\n  - [f7c63df6] 2026-06-21 18:51:34 :: readme-hero.txt (edit)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: restore the real frontend demo surface\n  2. STATE: hero must show memory session rewind readiness\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: captured terminal hero and updated product copy\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind f0db98fcfc75",
+          "exit_code": 0,
+          "stdout": "Rewind preview for session f0db98fc:\n\nWould restore 1 checkpoint(s) across 1 file(s).\nMode: restore pre-edit file snapshots.\n\nPlanned restores:\n  1. [f7c63df6] 2026-06-21 18:51:34 - D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\session_plus_checkpoint\\workspace\\docs\\readme-hero.txt\n     Restores: existing file\n     Type: edit\n",
+          "stderr": ""
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind f0db98fcfc75",
+          "exit_code": 0,
+          "stdout": "Rewound 1 checkpoint(s) for session f0db98fc.\n  - [f7c63df6] D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\session_plus_checkpoint\\workspace\\docs\\readme-hero.txt\nResuming session f0db98fc\n  Created: 2026-06-21 18:51:34\n  Updated: 2026-06-21 18:51:35\n  Messages: 1\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\session_plus_checkpoint\\workspace\n  Checkpoints: 1\n  Recent checkpoints: 1 saved; latest [94445d9a] readme-hero.txt [rewind]\n  Runtime: phase:verify@2\n  Delegation: 0 running, 0 slot(s) open\n",
+          "stderr": ""
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\session_plus_checkpoint\\workspace\\docs\\readme-hero.txt",
+      "final_file_content": "hero=real-demo\nsurface=memory-session-rewind-readiness\n"
+    },
+    {
+      "scenario": "demo-readme",
+      "scenario_title": "Demo and README recovery",
+      "condition": "session_plus_readiness",
+      "condition_label": "Session+Readiness",
+      "session_id": "3232b34cc4d8",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\session_plus_readiness\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\session_plus_readiness",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": true,
+        "include_checkpoint": false,
+        "include_readiness": true,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 0.8,
+        "interruption_recovery": 0.75,
+        "rewind_success": 0.0,
+        "readiness_visibility": 1.0,
+        "context_loss_rate": 0.19999999999999996
+      },
+      "counts": {
+        "anchor_hits": 4,
+        "anchor_total": 5,
+        "recovery_hits": 3,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": true,
+        "checkpoint_anchor": false,
+        "readiness_anchor": true
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": true,
+        "checkpoint_recovered": false,
+        "readiness_recovered": true
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session 3232b34cc4d8",
+          "exit_code": 0,
+          "stdout": "Session inspect: 3232b34c\n  Created: 2026-06-21 18:51:35\n  Updated: 2026-06-21 18:51:35\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\session_plus_readiness\\workspace\n  Messages: 1\n  Transcript entries: 2\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 0\n  Runtime: phase:verify@2\n  Readiness: ready via continuity-benchmark\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: none\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  ready via continuity-benchmark (ready)\n  channel: deterministic-harness\n  fallback coverage: 1/2 locally ready\n  - fallback local-mock [ready]\n  - fallback offline-review [not-ready]\n  - guidance: Keep continuity surfaces visible after interruption.\n  - ISSUE: release hero artifact has not been reverified\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: captured terminal hero and updated product copy\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session 3232b34cc4d8",
+          "exit_code": 0,
+          "stdout": "Session replay: 3232b34c\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\session_plus_readiness\\workspace\n  Created: 2026-06-21 18:51:35\n  Updated: 2026-06-21 18:51:35\n  Runtime: phase:verify@2\n  Checkpoints: 0\n  Readiness: ready via continuity-benchmark\n  channel: deterministic-harness\n  fallback coverage: 1/2 locally ready\n  - fallback local-mock [ready]\n  - fallback offline-review [not-ready]\n  - guidance: Keep continuity surfaces visible after interruption.\n  - ISSUE: release hero artifact has not been reverified\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (0 shown):\n  (none)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: restore the real frontend demo surface\n  2. STATE: hero must show memory session rewind readiness\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: captured terminal hero and updated product copy\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind 3232b34cc4d8",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for session 3232b34c.\n"
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind 3232b34cc4d8",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for that session.\n"
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\session_plus_readiness\\workspace\\docs\\readme-hero.txt",
+      "final_file_content": "hero=placeholder\nsurface=missing\n"
+    },
+    {
+      "scenario": "demo-readme",
+      "scenario_title": "Demo and README recovery",
+      "condition": "stale_continuity_package",
+      "condition_label": "Stale-Continuity-Package",
+      "session_id": "325e737e4926",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\stale_continuity_package\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\stale_continuity_package",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": true,
+        "include_checkpoint": true,
+        "include_readiness": true,
+        "stale_checkpoint": true,
+        "stale_readiness": true
+      },
+      "metrics": {
+        "anchor_retention": 0.8,
+        "interruption_recovery": 0.75,
+        "rewind_success": 0.0,
+        "readiness_visibility": 0.0,
+        "context_loss_rate": 0.19999999999999996
+      },
+      "counts": {
+        "anchor_hits": 4,
+        "anchor_total": 5,
+        "recovery_hits": 3,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": true,
+        "checkpoint_anchor": true,
+        "readiness_anchor": false
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": true,
+        "checkpoint_recovered": true,
+        "readiness_recovered": false
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session 325e737e4926",
+          "exit_code": 0,
+          "stdout": "Session inspect: 325e737e\n  Created: 2026-06-21 18:51:37\n  Updated: 2026-06-21 18:51:37\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\stale_continuity_package\\workspace\n  Messages: 1\n  Transcript entries: 2\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 1\n  Runtime: phase:verify@2\n  Readiness: stale via continuity-benchmark\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: 1 saved; latest [e2da097c] readme-hero.txt\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  stale via continuity-benchmark (not-ready)\n  channel: deterministic-harness\n  fallback coverage: 0/2 locally ready\n  - fallback local-mock [not-ready]\n  - fallback offline-review [not-ready]\n  - guidance: Archived guidance detected; refresh readiness before resuming.\n  - ISSUE: archived readiness report is stale\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: captured terminal hero and updated product copy\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session 325e737e4926",
+          "exit_code": 0,
+          "stdout": "Session replay: 325e737e\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\stale_continuity_package\\workspace\n  Created: 2026-06-21 18:51:37\n  Updated: 2026-06-21 18:51:37\n  Runtime: phase:verify@2\n  Checkpoints: 1\n  Readiness: stale via continuity-benchmark\n  channel: deterministic-harness\n  fallback coverage: 0/2 locally ready\n  - fallback local-mock [not-ready]\n  - fallback offline-review [not-ready]\n  - guidance: Archived guidance detected; refresh readiness before resuming.\n  - ISSUE: archived readiness report is stale\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (1 shown):\n  - [e2da097c] 2026-06-21 18:51:37 :: readme-hero.txt (edit)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: restore the real frontend demo surface\n  2. STATE: hero must show memory session rewind readiness\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: captured terminal hero and updated product copy\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind 325e737e4926",
+          "exit_code": 0,
+          "stdout": "Rewind preview for session 325e737e:\n\nWould restore 1 checkpoint(s) across 1 file(s).\nMode: restore pre-edit file snapshots.\n\nPlanned restores:\n  1. [e2da097c] 2026-06-21 18:51:37 - D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\stale_continuity_package\\workspace\\docs\\readme-hero.txt\n     Restores: existing file\n     Type: edit\n",
+          "stderr": ""
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind 325e737e4926",
+          "exit_code": 0,
+          "stdout": "Rewound 1 checkpoint(s) for session 325e737e.\n  - [e2da097c] D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\stale_continuity_package\\workspace\\docs\\readme-hero.txt\nResuming session 325e737e\n  Created: 2026-06-21 18:51:37\n  Updated: 2026-06-21 18:51:39\n  Messages: 1\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\stale_continuity_package\\workspace\n  Checkpoints: 1\n  Recent checkpoints: 1 saved; latest [b50c4d8f] readme-hero.txt [rewind]\n  Runtime: phase:verify@2\n  Readiness: stale via continuity-benchmark\n  Delegation: 0 running, 0 slot(s) open\n",
+          "stderr": ""
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\stale_continuity_package\\workspace\\docs\\readme-hero.txt",
+      "final_file_content": "mode=stale\nanchor_policy=archived\n"
+    },
+    {
+      "scenario": "demo-readme",
+      "scenario_title": "Demo and README recovery",
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "session_id": "837a79974907",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\memory_backed_continuity\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\memory_backed_continuity",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": true,
+        "include_checkpoint": true,
+        "include_readiness": true,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 1.0,
+        "interruption_recovery": 1.0,
+        "rewind_success": 1.0,
+        "readiness_visibility": 1.0,
+        "context_loss_rate": 0.0
+      },
+      "counts": {
+        "anchor_hits": 5,
+        "anchor_total": 5,
+        "recovery_hits": 4,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": true,
+        "checkpoint_anchor": true,
+        "readiness_anchor": true
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": true,
+        "checkpoint_recovered": true,
+        "readiness_recovered": true
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session 837a79974907",
+          "exit_code": 0,
+          "stdout": "Session inspect: 837a7997\n  Created: 2026-06-21 18:51:39\n  Updated: 2026-06-21 18:51:39\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\memory_backed_continuity\\workspace\n  Messages: 1\n  Transcript entries: 2\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 1\n  Runtime: phase:verify@2\n  Readiness: ready via continuity-benchmark\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: 1 saved; latest [31ef2351] readme-hero.txt\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  ready via continuity-benchmark (ready)\n  channel: deterministic-harness\n  fallback coverage: 1/2 locally ready\n  - fallback local-mock [ready]\n  - fallback offline-review [not-ready]\n  - guidance: Keep continuity surfaces visible after interruption.\n  - ISSUE: release hero artifact has not been reverified\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: captured terminal hero and updated product copy\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session 837a79974907",
+          "exit_code": 0,
+          "stdout": "Session replay: 837a7997\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\memory_backed_continuity\\workspace\n  Created: 2026-06-21 18:51:39\n  Updated: 2026-06-21 18:51:39\n  Runtime: phase:verify@2\n  Checkpoints: 1\n  Readiness: ready via continuity-benchmark\n  channel: deterministic-harness\n  fallback coverage: 1/2 locally ready\n  - fallback local-mock [ready]\n  - fallback offline-review [not-ready]\n  - guidance: Keep continuity surfaces visible after interruption.\n  - ISSUE: release hero artifact has not been reverified\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (1 shown):\n  - [31ef2351] 2026-06-21 18:51:39 :: readme-hero.txt (edit)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: restore the real frontend demo surface\n  2. STATE: hero must show memory session rewind readiness\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: captured terminal hero and updated product copy\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind 837a79974907",
+          "exit_code": 0,
+          "stdout": "Rewind preview for session 837a7997:\n\nWould restore 1 checkpoint(s) across 1 file(s).\nMode: restore pre-edit file snapshots.\n\nPlanned restores:\n  1. [31ef2351] 2026-06-21 18:51:39 - D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\memory_backed_continuity\\workspace\\docs\\readme-hero.txt\n     Restores: existing file\n     Type: edit\n",
+          "stderr": ""
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind 837a79974907",
+          "exit_code": 0,
+          "stdout": "Rewound 1 checkpoint(s) for session 837a7997.\n  - [31ef2351] D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\memory_backed_continuity\\workspace\\docs\\readme-hero.txt\nResuming session 837a7997\n  Created: 2026-06-21 18:51:39\n  Updated: 2026-06-21 18:51:41\n  Messages: 1\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\memory_backed_continuity\\workspace\n  Checkpoints: 1\n  Recent checkpoints: 1 saved; latest [e3c67bd6] readme-hero.txt [rewind]\n  Runtime: phase:verify@2\n  Readiness: ready via continuity-benchmark\n  Delegation: 0 running, 0 slot(s) open\n",
+          "stderr": ""
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\demo-readme\\memory_backed_continuity\\workspace\\docs\\readme-hero.txt",
+      "final_file_content": "hero=real-demo\nsurface=memory-session-rewind-readiness\n"
+    },
+    {
+      "scenario": "provider-readiness",
+      "scenario_title": "Provider readiness recovery",
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "session_id": "bf6ddf6afb51",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\memory_off\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\memory_off",
+      "seed_profile": {
+        "include_history": false,
+        "include_transcript": false,
+        "include_checkpoint": false,
+        "include_readiness": false,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 0.0,
+        "interruption_recovery": 0.0,
+        "rewind_success": 0.0,
+        "readiness_visibility": 0.0,
+        "context_loss_rate": 1.0
+      },
+      "counts": {
+        "anchor_hits": 0,
+        "anchor_total": 5,
+        "recovery_hits": 0,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": false,
+        "durable_anchor": false,
+        "transcript_anchor": false,
+        "checkpoint_anchor": false,
+        "readiness_anchor": false
+      },
+      "recovery_hits": {
+        "history_recovered": false,
+        "transcript_recovered": false,
+        "checkpoint_recovered": false,
+        "readiness_recovered": false
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session bf6ddf6afb51",
+          "exit_code": 0,
+          "stdout": "Session inspect: bf6ddf6a\n  Created: 2026-06-21 18:51:41\n  Updated: 2026-06-21 18:51:41\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\memory_off\\workspace\n  Messages: 1\n  Transcript entries: 0\n  History entries: 0\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 0\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: none\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  (none)\n\nRecent transcript (0 shown):\n  (none)\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session bf6ddf6afb51",
+          "exit_code": 0,
+          "stdout": "Session replay: bf6ddf6a\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\memory_off\\workspace\n  Created: 2026-06-21 18:51:41\n  Updated: 2026-06-21 18:51:41\n  Runtime: (none)\n  Checkpoints: 0\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (0 shown):\n  (none)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (0 shown):\n  (none)\n\nTranscript timeline (0 shown):\n  (none)\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind bf6ddf6afb51",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for session bf6ddf6a.\n"
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind bf6ddf6afb51",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for that session.\n"
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\memory_off\\workspace\\runtime\\provider-readiness.txt",
+      "final_file_content": "provider=unknown\nfallback=lost\n"
+    },
+    {
+      "scenario": "provider-readiness",
+      "scenario_title": "Provider readiness recovery",
+      "condition": "history_only",
+      "condition_label": "History-Only",
+      "session_id": "f1222bb3db6a",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\history_only\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\history_only",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": false,
+        "include_checkpoint": false,
+        "include_readiness": false,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 0.4,
+        "interruption_recovery": 0.25,
+        "rewind_success": 0.0,
+        "readiness_visibility": 0.0,
+        "context_loss_rate": 0.6
+      },
+      "counts": {
+        "anchor_hits": 2,
+        "anchor_total": 5,
+        "recovery_hits": 1,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": false,
+        "checkpoint_anchor": false,
+        "readiness_anchor": false
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": false,
+        "checkpoint_recovered": false,
+        "readiness_recovered": false
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session f1222bb3db6a",
+          "exit_code": 0,
+          "stdout": "Session inspect: f1222bb3\n  Created: 2026-06-21 18:51:43\n  Updated: 2026-06-21 18:51:43\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\history_only\\workspace\n  Messages: 1\n  Transcript entries: 0\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 0\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: none\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  (none)\n\nRecent transcript (0 shown):\n  (none)\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session f1222bb3db6a",
+          "exit_code": 0,
+          "stdout": "Session replay: f1222bb3\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\history_only\\workspace\n  Created: 2026-06-21 18:51:43\n  Updated: 2026-06-21 18:51:43\n  Runtime: (none)\n  Checkpoints: 0\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (0 shown):\n  (none)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: keep the provider switch reproducible\n  2. STATE: preserve fallback guidance with the session\n\nTranscript timeline (0 shown):\n  (none)\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind f1222bb3db6a",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for session f1222bb3.\n"
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind f1222bb3db6a",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for that session.\n"
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\history_only\\workspace\\runtime\\provider-readiness.txt",
+      "final_file_content": "provider=unknown\nfallback=lost\n"
+    },
+    {
+      "scenario": "provider-readiness",
+      "scenario_title": "Provider readiness recovery",
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "session_id": "8d768f3e08c4",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\weak_session\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\weak_session",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": true,
+        "include_checkpoint": false,
+        "include_readiness": false,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 0.6,
+        "interruption_recovery": 0.5,
+        "rewind_success": 0.0,
+        "readiness_visibility": 0.0,
+        "context_loss_rate": 0.4
+      },
+      "counts": {
+        "anchor_hits": 3,
+        "anchor_total": 5,
+        "recovery_hits": 2,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": true,
+        "checkpoint_anchor": false,
+        "readiness_anchor": false
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": true,
+        "checkpoint_recovered": false,
+        "readiness_recovered": false
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session 8d768f3e08c4",
+          "exit_code": 0,
+          "stdout": "Session inspect: 8d768f3e\n  Created: 2026-06-21 18:51:45\n  Updated: 2026-06-21 18:51:45\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\weak_session\\workspace\n  Messages: 1\n  Transcript entries: 2\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 0\n  Runtime: phase:verify@2\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: none\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  (none)\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: validated provider channel and fallback coverage\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session 8d768f3e08c4",
+          "exit_code": 0,
+          "stdout": "Session replay: 8d768f3e\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\weak_session\\workspace\n  Created: 2026-06-21 18:51:45\n  Updated: 2026-06-21 18:51:45\n  Runtime: phase:verify@2\n  Checkpoints: 0\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (0 shown):\n  (none)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: keep the provider switch reproducible\n  2. STATE: preserve fallback guidance with the session\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: validated provider channel and fallback coverage\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind 8d768f3e08c4",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for session 8d768f3e.\n"
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind 8d768f3e08c4",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for that session.\n"
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\weak_session\\workspace\\runtime\\provider-readiness.txt",
+      "final_file_content": "provider=unknown\nfallback=lost\n"
+    },
+    {
+      "scenario": "provider-readiness",
+      "scenario_title": "Provider readiness recovery",
+      "condition": "session_plus_checkpoint",
+      "condition_label": "Session+Checkpoint",
+      "session_id": "53086d89fc91",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\session_plus_checkpoint\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\session_plus_checkpoint",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": true,
+        "include_checkpoint": true,
+        "include_readiness": false,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 0.8,
+        "interruption_recovery": 0.75,
+        "rewind_success": 1.0,
+        "readiness_visibility": 0.0,
+        "context_loss_rate": 0.19999999999999996
+      },
+      "counts": {
+        "anchor_hits": 4,
+        "anchor_total": 5,
+        "recovery_hits": 3,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": true,
+        "checkpoint_anchor": true,
+        "readiness_anchor": false
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": true,
+        "checkpoint_recovered": true,
+        "readiness_recovered": false
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session 53086d89fc91",
+          "exit_code": 0,
+          "stdout": "Session inspect: 53086d89\n  Created: 2026-06-21 18:51:46\n  Updated: 2026-06-21 18:51:46\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\session_plus_checkpoint\\workspace\n  Messages: 1\n  Transcript entries: 2\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 1\n  Runtime: phase:verify@2\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: 1 saved; latest [8bee8f09] provider-readiness.txt\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  (none)\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: validated provider channel and fallback coverage\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session 53086d89fc91",
+          "exit_code": 0,
+          "stdout": "Session replay: 53086d89\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\session_plus_checkpoint\\workspace\n  Created: 2026-06-21 18:51:46\n  Updated: 2026-06-21 18:51:46\n  Runtime: phase:verify@2\n  Checkpoints: 1\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (1 shown):\n  - [8bee8f09] 2026-06-21 18:51:46 :: provider-readiness.txt (edit)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: keep the provider switch reproducible\n  2. STATE: preserve fallback guidance with the session\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: validated provider channel and fallback coverage\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind 53086d89fc91",
+          "exit_code": 0,
+          "stdout": "Rewind preview for session 53086d89:\n\nWould restore 1 checkpoint(s) across 1 file(s).\nMode: restore pre-edit file snapshots.\n\nPlanned restores:\n  1. [8bee8f09] 2026-06-21 18:51:46 - D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\session_plus_checkpoint\\workspace\\runtime\\provider-readiness.txt\n     Restores: existing file\n     Type: edit\n",
+          "stderr": ""
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind 53086d89fc91",
+          "exit_code": 0,
+          "stdout": "Rewound 1 checkpoint(s) for session 53086d89.\n  - [8bee8f09] D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\session_plus_checkpoint\\workspace\\runtime\\provider-readiness.txt\nResuming session 53086d89\n  Created: 2026-06-21 18:51:46\n  Updated: 2026-06-21 18:51:48\n  Messages: 1\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\session_plus_checkpoint\\workspace\n  Checkpoints: 1\n  Recent checkpoints: 1 saved; latest [9fe981df] provider-readiness.txt [rewind]\n  Runtime: phase:verify@2\n  Delegation: 0 running, 0 slot(s) open\n",
+          "stderr": ""
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\session_plus_checkpoint\\workspace\\runtime\\provider-readiness.txt",
+      "final_file_content": "provider=gpt-5.5\nfallback=ready\n"
+    },
+    {
+      "scenario": "provider-readiness",
+      "scenario_title": "Provider readiness recovery",
+      "condition": "session_plus_readiness",
+      "condition_label": "Session+Readiness",
+      "session_id": "f5b78f5fea9a",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\session_plus_readiness\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\session_plus_readiness",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": true,
+        "include_checkpoint": false,
+        "include_readiness": true,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 0.8,
+        "interruption_recovery": 0.75,
+        "rewind_success": 0.0,
+        "readiness_visibility": 1.0,
+        "context_loss_rate": 0.19999999999999996
+      },
+      "counts": {
+        "anchor_hits": 4,
+        "anchor_total": 5,
+        "recovery_hits": 3,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": true,
+        "checkpoint_anchor": false,
+        "readiness_anchor": true
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": true,
+        "checkpoint_recovered": false,
+        "readiness_recovered": true
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session f5b78f5fea9a",
+          "exit_code": 0,
+          "stdout": "Session inspect: f5b78f5f\n  Created: 2026-06-21 18:51:48\n  Updated: 2026-06-21 18:51:48\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\session_plus_readiness\\workspace\n  Messages: 1\n  Transcript entries: 2\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 0\n  Runtime: phase:verify@2\n  Readiness: ready via continuity-benchmark\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: none\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  ready via continuity-benchmark (ready)\n  channel: deterministic-harness\n  fallback coverage: 1/2 locally ready\n  - fallback local-mock [ready]\n  - fallback offline-review [not-ready]\n  - guidance: Keep continuity surfaces visible after interruption.\n  - ISSUE: provider fallback path requires manual audit\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: validated provider channel and fallback coverage\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session f5b78f5fea9a",
+          "exit_code": 0,
+          "stdout": "Session replay: f5b78f5f\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\session_plus_readiness\\workspace\n  Created: 2026-06-21 18:51:48\n  Updated: 2026-06-21 18:51:48\n  Runtime: phase:verify@2\n  Checkpoints: 0\n  Readiness: ready via continuity-benchmark\n  channel: deterministic-harness\n  fallback coverage: 1/2 locally ready\n  - fallback local-mock [ready]\n  - fallback offline-review [not-ready]\n  - guidance: Keep continuity surfaces visible after interruption.\n  - ISSUE: provider fallback path requires manual audit\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (0 shown):\n  (none)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: keep the provider switch reproducible\n  2. STATE: preserve fallback guidance with the session\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: validated provider channel and fallback coverage\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind f5b78f5fea9a",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for session f5b78f5f.\n"
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind f5b78f5fea9a",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for that session.\n"
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\session_plus_readiness\\workspace\\runtime\\provider-readiness.txt",
+      "final_file_content": "provider=unknown\nfallback=lost\n"
+    },
+    {
+      "scenario": "provider-readiness",
+      "scenario_title": "Provider readiness recovery",
+      "condition": "stale_continuity_package",
+      "condition_label": "Stale-Continuity-Package",
+      "session_id": "c5d18d2599fe",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\stale_continuity_package\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\stale_continuity_package",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": true,
+        "include_checkpoint": true,
+        "include_readiness": true,
+        "stale_checkpoint": true,
+        "stale_readiness": true
+      },
+      "metrics": {
+        "anchor_retention": 0.8,
+        "interruption_recovery": 0.75,
+        "rewind_success": 0.0,
+        "readiness_visibility": 0.0,
+        "context_loss_rate": 0.19999999999999996
+      },
+      "counts": {
+        "anchor_hits": 4,
+        "anchor_total": 5,
+        "recovery_hits": 3,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": true,
+        "checkpoint_anchor": true,
+        "readiness_anchor": false
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": true,
+        "checkpoint_recovered": true,
+        "readiness_recovered": false
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session c5d18d2599fe",
+          "exit_code": 0,
+          "stdout": "Session inspect: c5d18d25\n  Created: 2026-06-21 18:51:50\n  Updated: 2026-06-21 18:51:50\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\stale_continuity_package\\workspace\n  Messages: 1\n  Transcript entries: 2\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 1\n  Runtime: phase:verify@2\n  Readiness: stale via continuity-benchmark\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: 1 saved; latest [64f78ae9] provider-readiness.txt\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  stale via continuity-benchmark (not-ready)\n  channel: deterministic-harness\n  fallback coverage: 0/2 locally ready\n  - fallback local-mock [not-ready]\n  - fallback offline-review [not-ready]\n  - guidance: Archived guidance detected; refresh readiness before resuming.\n  - ISSUE: archived readiness report is stale\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: validated provider channel and fallback coverage\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session c5d18d2599fe",
+          "exit_code": 0,
+          "stdout": "Session replay: c5d18d25\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\stale_continuity_package\\workspace\n  Created: 2026-06-21 18:51:50\n  Updated: 2026-06-21 18:51:50\n  Runtime: phase:verify@2\n  Checkpoints: 1\n  Readiness: stale via continuity-benchmark\n  channel: deterministic-harness\n  fallback coverage: 0/2 locally ready\n  - fallback local-mock [not-ready]\n  - fallback offline-review [not-ready]\n  - guidance: Archived guidance detected; refresh readiness before resuming.\n  - ISSUE: archived readiness report is stale\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (1 shown):\n  - [64f78ae9] 2026-06-21 18:51:50 :: provider-readiness.txt (edit)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: keep the provider switch reproducible\n  2. STATE: preserve fallback guidance with the session\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: validated provider channel and fallback coverage\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind c5d18d2599fe",
+          "exit_code": 0,
+          "stdout": "Rewind preview for session c5d18d25:\n\nWould restore 1 checkpoint(s) across 1 file(s).\nMode: restore pre-edit file snapshots.\n\nPlanned restores:\n  1. [64f78ae9] 2026-06-21 18:51:50 - D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\stale_continuity_package\\workspace\\runtime\\provider-readiness.txt\n     Restores: existing file\n     Type: edit\n",
+          "stderr": ""
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind c5d18d2599fe",
+          "exit_code": 0,
+          "stdout": "Rewound 1 checkpoint(s) for session c5d18d25.\n  - [64f78ae9] D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\stale_continuity_package\\workspace\\runtime\\provider-readiness.txt\nResuming session c5d18d25\n  Created: 2026-06-21 18:51:50\n  Updated: 2026-06-21 18:51:52\n  Messages: 1\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\stale_continuity_package\\workspace\n  Checkpoints: 1\n  Recent checkpoints: 1 saved; latest [39e2936b] provider-readiness.txt [rewind]\n  Runtime: phase:verify@2\n  Readiness: stale via continuity-benchmark\n  Delegation: 0 running, 0 slot(s) open\n",
+          "stderr": ""
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\stale_continuity_package\\workspace\\runtime\\provider-readiness.txt",
+      "final_file_content": "mode=stale\nanchor_policy=archived\n"
+    },
+    {
+      "scenario": "provider-readiness",
+      "scenario_title": "Provider readiness recovery",
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "session_id": "1b23486ff051",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\memory_backed_continuity\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\memory_backed_continuity",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": true,
+        "include_checkpoint": true,
+        "include_readiness": true,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 1.0,
+        "interruption_recovery": 1.0,
+        "rewind_success": 1.0,
+        "readiness_visibility": 1.0,
+        "context_loss_rate": 0.0
+      },
+      "counts": {
+        "anchor_hits": 5,
+        "anchor_total": 5,
+        "recovery_hits": 4,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": true,
+        "checkpoint_anchor": true,
+        "readiness_anchor": true
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": true,
+        "checkpoint_recovered": true,
+        "readiness_recovered": true
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session 1b23486ff051",
+          "exit_code": 0,
+          "stdout": "Session inspect: 1b23486f\n  Created: 2026-06-21 18:51:52\n  Updated: 2026-06-21 18:51:52\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\memory_backed_continuity\\workspace\n  Messages: 1\n  Transcript entries: 2\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 1\n  Runtime: phase:verify@2\n  Readiness: ready via continuity-benchmark\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: 1 saved; latest [e04f908a] provider-readiness.txt\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  ready via continuity-benchmark (ready)\n  channel: deterministic-harness\n  fallback coverage: 1/2 locally ready\n  - fallback local-mock [ready]\n  - fallback offline-review [not-ready]\n  - guidance: Keep continuity surfaces visible after interruption.\n  - ISSUE: provider fallback path requires manual audit\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: validated provider channel and fallback coverage\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session 1b23486ff051",
+          "exit_code": 0,
+          "stdout": "Session replay: 1b23486f\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\memory_backed_continuity\\workspace\n  Created: 2026-06-21 18:51:52\n  Updated: 2026-06-21 18:51:52\n  Runtime: phase:verify@2\n  Checkpoints: 1\n  Readiness: ready via continuity-benchmark\n  channel: deterministic-harness\n  fallback coverage: 1/2 locally ready\n  - fallback local-mock [ready]\n  - fallback offline-review [not-ready]\n  - guidance: Keep continuity surfaces visible after interruption.\n  - ISSUE: provider fallback path requires manual audit\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (1 shown):\n  - [e04f908a] 2026-06-21 18:51:52 :: provider-readiness.txt (edit)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: keep the provider switch reproducible\n  2. STATE: preserve fallback guidance with the session\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: validated provider channel and fallback coverage\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind 1b23486ff051",
+          "exit_code": 0,
+          "stdout": "Rewind preview for session 1b23486f:\n\nWould restore 1 checkpoint(s) across 1 file(s).\nMode: restore pre-edit file snapshots.\n\nPlanned restores:\n  1. [e04f908a] 2026-06-21 18:51:52 - D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\memory_backed_continuity\\workspace\\runtime\\provider-readiness.txt\n     Restores: existing file\n     Type: edit\n",
+          "stderr": ""
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind 1b23486ff051",
+          "exit_code": 0,
+          "stdout": "Rewound 1 checkpoint(s) for session 1b23486f.\n  - [e04f908a] D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\memory_backed_continuity\\workspace\\runtime\\provider-readiness.txt\nResuming session 1b23486f\n  Created: 2026-06-21 18:51:52\n  Updated: 2026-06-21 18:51:54\n  Messages: 1\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\memory_backed_continuity\\workspace\n  Checkpoints: 1\n  Recent checkpoints: 1 saved; latest [90a1e277] provider-readiness.txt [rewind]\n  Runtime: phase:verify@2\n  Readiness: ready via continuity-benchmark\n  Delegation: 0 running, 0 slot(s) open\n",
+          "stderr": ""
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\provider-readiness\\memory_backed_continuity\\workspace\\runtime\\provider-readiness.txt",
+      "final_file_content": "provider=gpt-5.5\nfallback=ready\n"
+    },
+    {
+      "scenario": "paper-results",
+      "scenario_title": "Paper result package recovery",
+      "condition": "memory_off",
+      "condition_label": "Memory-Off",
+      "session_id": "5dbb969b06b3",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\memory_off\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\memory_off",
+      "seed_profile": {
+        "include_history": false,
+        "include_transcript": false,
+        "include_checkpoint": false,
+        "include_readiness": false,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 0.0,
+        "interruption_recovery": 0.0,
+        "rewind_success": 0.0,
+        "readiness_visibility": 0.0,
+        "context_loss_rate": 1.0
+      },
+      "counts": {
+        "anchor_hits": 0,
+        "anchor_total": 5,
+        "recovery_hits": 0,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": false,
+        "durable_anchor": false,
+        "transcript_anchor": false,
+        "checkpoint_anchor": false,
+        "readiness_anchor": false
+      },
+      "recovery_hits": {
+        "history_recovered": false,
+        "transcript_recovered": false,
+        "checkpoint_recovered": false,
+        "readiness_recovered": false
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session 5dbb969b06b3",
+          "exit_code": 0,
+          "stdout": "Session inspect: 5dbb969b\n  Created: 2026-06-21 18:51:54\n  Updated: 2026-06-21 18:51:54\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\memory_off\\workspace\n  Messages: 1\n  Transcript entries: 0\n  History entries: 0\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 0\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: none\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  (none)\n\nRecent transcript (0 shown):\n  (none)\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session 5dbb969b06b3",
+          "exit_code": 0,
+          "stdout": "Session replay: 5dbb969b\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\memory_off\\workspace\n  Created: 2026-06-21 18:51:54\n  Updated: 2026-06-21 18:51:54\n  Runtime: (none)\n  Checkpoints: 0\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (0 shown):\n  (none)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (0 shown):\n  (none)\n\nTranscript timeline (0 shown):\n  (none)\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind 5dbb969b06b3",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for session 5dbb969b.\n"
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind 5dbb969b06b3",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for that session.\n"
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\memory_off\\workspace\\paper\\matched-continuity-table.txt",
+      "final_file_content": "table=missing\nclaim=unsupported\n"
+    },
+    {
+      "scenario": "paper-results",
+      "scenario_title": "Paper result package recovery",
+      "condition": "history_only",
+      "condition_label": "History-Only",
+      "session_id": "ec8911675f12",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\history_only\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\history_only",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": false,
+        "include_checkpoint": false,
+        "include_readiness": false,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 0.4,
+        "interruption_recovery": 0.25,
+        "rewind_success": 0.0,
+        "readiness_visibility": 0.0,
+        "context_loss_rate": 0.6
+      },
+      "counts": {
+        "anchor_hits": 2,
+        "anchor_total": 5,
+        "recovery_hits": 1,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": false,
+        "checkpoint_anchor": false,
+        "readiness_anchor": false
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": false,
+        "checkpoint_recovered": false,
+        "readiness_recovered": false
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session ec8911675f12",
+          "exit_code": 0,
+          "stdout": "Session inspect: ec891167\n  Created: 2026-06-21 18:51:57\n  Updated: 2026-06-21 18:51:57\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\history_only\\workspace\n  Messages: 1\n  Transcript entries: 0\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 0\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: none\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  (none)\n\nRecent transcript (0 shown):\n  (none)\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session ec8911675f12",
+          "exit_code": 0,
+          "stdout": "Session replay: ec891167\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\history_only\\workspace\n  Created: 2026-06-21 18:51:57\n  Updated: 2026-06-21 18:51:57\n  Runtime: (none)\n  Checkpoints: 0\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (0 shown):\n  (none)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: regenerate the matched continuity paper table\n  2. STATE: keep the same-model controls matched\n\nTranscript timeline (0 shown):\n  (none)\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind ec8911675f12",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for session ec891167.\n"
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind ec8911675f12",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for that session.\n"
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\history_only\\workspace\\paper\\matched-continuity-table.txt",
+      "final_file_content": "table=missing\nclaim=unsupported\n"
+    },
+    {
+      "scenario": "paper-results",
+      "scenario_title": "Paper result package recovery",
+      "condition": "weak_session",
+      "condition_label": "Weak-Session",
+      "session_id": "460997051530",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\weak_session\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\weak_session",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": true,
+        "include_checkpoint": false,
+        "include_readiness": false,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 0.6,
+        "interruption_recovery": 0.5,
+        "rewind_success": 0.0,
+        "readiness_visibility": 0.0,
+        "context_loss_rate": 0.4
+      },
+      "counts": {
+        "anchor_hits": 3,
+        "anchor_total": 5,
+        "recovery_hits": 2,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": true,
+        "checkpoint_anchor": false,
+        "readiness_anchor": false
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": true,
+        "checkpoint_recovered": false,
+        "readiness_recovered": false
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session 460997051530",
+          "exit_code": 0,
+          "stdout": "Session inspect: 46099705\n  Created: 2026-06-21 18:51:58\n  Updated: 2026-06-21 18:51:58\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\weak_session\\workspace\n  Messages: 1\n  Transcript entries: 2\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 0\n  Runtime: phase:verify@2\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: none\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  (none)\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: wrote continuity table and trace artifacts\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session 460997051530",
+          "exit_code": 0,
+          "stdout": "Session replay: 46099705\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\weak_session\\workspace\n  Created: 2026-06-21 18:51:58\n  Updated: 2026-06-21 18:51:58\n  Runtime: phase:verify@2\n  Checkpoints: 0\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (0 shown):\n  (none)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: regenerate the matched continuity paper table\n  2. STATE: keep the same-model controls matched\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: wrote continuity table and trace artifacts\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind 460997051530",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for session 46099705.\n"
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind 460997051530",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for that session.\n"
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\weak_session\\workspace\\paper\\matched-continuity-table.txt",
+      "final_file_content": "table=missing\nclaim=unsupported\n"
+    },
+    {
+      "scenario": "paper-results",
+      "scenario_title": "Paper result package recovery",
+      "condition": "session_plus_checkpoint",
+      "condition_label": "Session+Checkpoint",
+      "session_id": "e5f86181d5f4",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\session_plus_checkpoint\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\session_plus_checkpoint",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": true,
+        "include_checkpoint": true,
+        "include_readiness": false,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 0.8,
+        "interruption_recovery": 0.75,
+        "rewind_success": 1.0,
+        "readiness_visibility": 0.0,
+        "context_loss_rate": 0.19999999999999996
+      },
+      "counts": {
+        "anchor_hits": 4,
+        "anchor_total": 5,
+        "recovery_hits": 3,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": true,
+        "checkpoint_anchor": true,
+        "readiness_anchor": false
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": true,
+        "checkpoint_recovered": true,
+        "readiness_recovered": false
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session e5f86181d5f4",
+          "exit_code": 0,
+          "stdout": "Session inspect: e5f86181\n  Created: 2026-06-21 18:52:00\n  Updated: 2026-06-21 18:52:00\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\session_plus_checkpoint\\workspace\n  Messages: 1\n  Transcript entries: 2\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 1\n  Runtime: phase:verify@2\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: 1 saved; latest [0f6775af] matched-continuity-table.txt\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  (none)\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: wrote continuity table and trace artifacts\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session e5f86181d5f4",
+          "exit_code": 0,
+          "stdout": "Session replay: e5f86181\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\session_plus_checkpoint\\workspace\n  Created: 2026-06-21 18:52:00\n  Updated: 2026-06-21 18:52:00\n  Runtime: phase:verify@2\n  Checkpoints: 1\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (1 shown):\n  - [0f6775af] 2026-06-21 18:52:00 :: matched-continuity-table.txt (edit)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: regenerate the matched continuity paper table\n  2. STATE: keep the same-model controls matched\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: wrote continuity table and trace artifacts\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind e5f86181d5f4",
+          "exit_code": 0,
+          "stdout": "Rewind preview for session e5f86181:\n\nWould restore 1 checkpoint(s) across 1 file(s).\nMode: restore pre-edit file snapshots.\n\nPlanned restores:\n  1. [0f6775af] 2026-06-21 18:52:00 - D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\session_plus_checkpoint\\workspace\\paper\\matched-continuity-table.txt\n     Restores: existing file\n     Type: edit\n",
+          "stderr": ""
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind e5f86181d5f4",
+          "exit_code": 0,
+          "stdout": "Rewound 1 checkpoint(s) for session e5f86181.\n  - [0f6775af] D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\session_plus_checkpoint\\workspace\\paper\\matched-continuity-table.txt\nResuming session e5f86181\n  Created: 2026-06-21 18:52:00\n  Updated: 2026-06-21 18:52:02\n  Messages: 1\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\session_plus_checkpoint\\workspace\n  Checkpoints: 1\n  Recent checkpoints: 1 saved; latest [84ce7cf2] matched-continuity-table.txt [rewind]\n  Runtime: phase:verify@2\n  Delegation: 0 running, 0 slot(s) open\n",
+          "stderr": ""
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\session_plus_checkpoint\\workspace\\paper\\matched-continuity-table.txt",
+      "final_file_content": "table=matched\nclaim=bounded\n"
+    },
+    {
+      "scenario": "paper-results",
+      "scenario_title": "Paper result package recovery",
+      "condition": "session_plus_readiness",
+      "condition_label": "Session+Readiness",
+      "session_id": "8a92b54d5df9",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\session_plus_readiness\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\session_plus_readiness",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": true,
+        "include_checkpoint": false,
+        "include_readiness": true,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 0.8,
+        "interruption_recovery": 0.75,
+        "rewind_success": 0.0,
+        "readiness_visibility": 1.0,
+        "context_loss_rate": 0.19999999999999996
+      },
+      "counts": {
+        "anchor_hits": 4,
+        "anchor_total": 5,
+        "recovery_hits": 3,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": true,
+        "checkpoint_anchor": false,
+        "readiness_anchor": true
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": true,
+        "checkpoint_recovered": false,
+        "readiness_recovered": true
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session 8a92b54d5df9",
+          "exit_code": 0,
+          "stdout": "Session inspect: 8a92b54d\n  Created: 2026-06-21 18:52:02\n  Updated: 2026-06-21 18:52:02\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\session_plus_readiness\\workspace\n  Messages: 1\n  Transcript entries: 2\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 0\n  Runtime: phase:verify@2\n  Readiness: ready via continuity-benchmark\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: none\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  ready via continuity-benchmark (ready)\n  channel: deterministic-harness\n  fallback coverage: 1/2 locally ready\n  - fallback local-mock [ready]\n  - fallback offline-review [not-ready]\n  - guidance: Keep continuity surfaces visible after interruption.\n  - ISSUE: paper artifact bundle needs final verification\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: wrote continuity table and trace artifacts\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session 8a92b54d5df9",
+          "exit_code": 0,
+          "stdout": "Session replay: 8a92b54d\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\session_plus_readiness\\workspace\n  Created: 2026-06-21 18:52:02\n  Updated: 2026-06-21 18:52:02\n  Runtime: phase:verify@2\n  Checkpoints: 0\n  Readiness: ready via continuity-benchmark\n  channel: deterministic-harness\n  fallback coverage: 1/2 locally ready\n  - fallback local-mock [ready]\n  - fallback offline-review [not-ready]\n  - guidance: Keep continuity surfaces visible after interruption.\n  - ISSUE: paper artifact bundle needs final verification\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (0 shown):\n  (none)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: regenerate the matched continuity paper table\n  2. STATE: keep the same-model controls matched\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: wrote continuity table and trace artifacts\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind 8a92b54d5df9",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for session 8a92b54d.\n"
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind 8a92b54d5df9",
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "No checkpoints available to rewind for that session.\n"
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\session_plus_readiness\\workspace\\paper\\matched-continuity-table.txt",
+      "final_file_content": "table=missing\nclaim=unsupported\n"
+    },
+    {
+      "scenario": "paper-results",
+      "scenario_title": "Paper result package recovery",
+      "condition": "stale_continuity_package",
+      "condition_label": "Stale-Continuity-Package",
+      "session_id": "68ddc691459e",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\stale_continuity_package\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\stale_continuity_package",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": true,
+        "include_checkpoint": true,
+        "include_readiness": true,
+        "stale_checkpoint": true,
+        "stale_readiness": true
+      },
+      "metrics": {
+        "anchor_retention": 0.8,
+        "interruption_recovery": 0.75,
+        "rewind_success": 0.0,
+        "readiness_visibility": 0.0,
+        "context_loss_rate": 0.19999999999999996
+      },
+      "counts": {
+        "anchor_hits": 4,
+        "anchor_total": 5,
+        "recovery_hits": 3,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": true,
+        "checkpoint_anchor": true,
+        "readiness_anchor": false
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": true,
+        "checkpoint_recovered": true,
+        "readiness_recovered": false
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session 68ddc691459e",
+          "exit_code": 0,
+          "stdout": "Session inspect: 68ddc691\n  Created: 2026-06-21 18:52:04\n  Updated: 2026-06-21 18:52:04\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\stale_continuity_package\\workspace\n  Messages: 1\n  Transcript entries: 2\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 1\n  Runtime: phase:verify@2\n  Readiness: stale via continuity-benchmark\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: 1 saved; latest [fe62ecaf] matched-continuity-table.txt\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  stale via continuity-benchmark (not-ready)\n  channel: deterministic-harness\n  fallback coverage: 0/2 locally ready\n  - fallback local-mock [not-ready]\n  - fallback offline-review [not-ready]\n  - guidance: Archived guidance detected; refresh readiness before resuming.\n  - ISSUE: archived readiness report is stale\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: wrote continuity table and trace artifacts\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session 68ddc691459e",
+          "exit_code": 0,
+          "stdout": "Session replay: 68ddc691\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\stale_continuity_package\\workspace\n  Created: 2026-06-21 18:52:04\n  Updated: 2026-06-21 18:52:04\n  Runtime: phase:verify@2\n  Checkpoints: 1\n  Readiness: stale via continuity-benchmark\n  channel: deterministic-harness\n  fallback coverage: 0/2 locally ready\n  - fallback local-mock [not-ready]\n  - fallback offline-review [not-ready]\n  - guidance: Archived guidance detected; refresh readiness before resuming.\n  - ISSUE: archived readiness report is stale\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (1 shown):\n  - [fe62ecaf] 2026-06-21 18:52:04 :: matched-continuity-table.txt (edit)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: regenerate the matched continuity paper table\n  2. STATE: keep the same-model controls matched\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: wrote continuity table and trace artifacts\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind 68ddc691459e",
+          "exit_code": 0,
+          "stdout": "Rewind preview for session 68ddc691:\n\nWould restore 1 checkpoint(s) across 1 file(s).\nMode: restore pre-edit file snapshots.\n\nPlanned restores:\n  1. [fe62ecaf] 2026-06-21 18:52:04 - D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\stale_continuity_package\\workspace\\paper\\matched-continuity-table.txt\n     Restores: existing file\n     Type: edit\n",
+          "stderr": ""
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind 68ddc691459e",
+          "exit_code": 0,
+          "stdout": "Rewound 1 checkpoint(s) for session 68ddc691.\n  - [fe62ecaf] D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\stale_continuity_package\\workspace\\paper\\matched-continuity-table.txt\nResuming session 68ddc691\n  Created: 2026-06-21 18:52:04\n  Updated: 2026-06-21 18:52:06\n  Messages: 1\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\stale_continuity_package\\workspace\n  Checkpoints: 1\n  Recent checkpoints: 1 saved; latest [bec554b5] matched-continuity-table.txt [rewind]\n  Runtime: phase:verify@2\n  Readiness: stale via continuity-benchmark\n  Delegation: 0 running, 0 slot(s) open\n",
+          "stderr": ""
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\stale_continuity_package\\workspace\\paper\\matched-continuity-table.txt",
+      "final_file_content": "mode=stale\nanchor_policy=archived\n"
+    },
+    {
+      "scenario": "paper-results",
+      "scenario_title": "Paper result package recovery",
+      "condition": "memory_backed_continuity",
+      "condition_label": "Memory-Backed Continuity",
+      "session_id": "b45a3778a3a0",
+      "workspace": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\memory_backed_continuity\\workspace",
+      "trace_dir": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\memory_backed_continuity",
+      "seed_profile": {
+        "include_history": true,
+        "include_transcript": true,
+        "include_checkpoint": true,
+        "include_readiness": true,
+        "stale_checkpoint": false,
+        "stale_readiness": false
+      },
+      "metrics": {
+        "anchor_retention": 1.0,
+        "interruption_recovery": 1.0,
+        "rewind_success": 1.0,
+        "readiness_visibility": 1.0,
+        "context_loss_rate": 0.0
+      },
+      "counts": {
+        "anchor_hits": 5,
+        "anchor_total": 5,
+        "recovery_hits": 4,
+        "recovery_total": 4
+      },
+      "anchor_hits": {
+        "task_anchor": true,
+        "durable_anchor": true,
+        "transcript_anchor": true,
+        "checkpoint_anchor": true,
+        "readiness_anchor": true
+      },
+      "recovery_hits": {
+        "history_recovered": true,
+        "transcript_recovered": true,
+        "checkpoint_recovered": true,
+        "readiness_recovered": true
+      },
+      "commands": {
+        "inspect": {
+          "label": "inspect-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --inspect-session b45a3778a3a0",
+          "exit_code": 0,
+          "stdout": "Session inspect: b45a3778\n  Created: 2026-06-21 18:52:06\n  Updated: 2026-06-21 18:52:06\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\memory_backed_continuity\\workspace\n  Messages: 1\n  Transcript entries: 2\n  History entries: 2\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 1\n  Runtime: phase:verify@2\n  Readiness: ready via continuity-benchmark\n  Delegation: 0 running, 0 slot(s) open\n\nRecent checkpoints: 1 saved; latest [66cd0e4d] matched-continuity-table.txt\n\nInstruction layers:\n  (none)\n\nHook surface:\n  (none)\n\nDelegation surface:\n  0 running, 0 slot(s) open\n\nExtensions:\n  (none)\n\nReadiness:\n  ready via continuity-benchmark (ready)\n  channel: deterministic-harness\n  fallback coverage: 1/2 locally ready\n  - fallback local-mock [ready]\n  - fallback offline-review [not-ready]\n  - guidance: Keep continuity surfaces visible after interruption.\n  - ISSUE: paper artifact bundle needs final verification\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: wrote continuity table and trace artifacts\n",
+          "stderr": ""
+        },
+        "replay": {
+          "label": "replay-session",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --replay-session b45a3778a3a0",
+          "exit_code": 0,
+          "stdout": "Session replay: b45a3778\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\memory_backed_continuity\\workspace\n  Created: 2026-06-21 18:52:06\n  Updated: 2026-06-21 18:52:06\n  Runtime: phase:verify@2\n  Checkpoints: 1\n  Readiness: ready via continuity-benchmark\n  channel: deterministic-harness\n  fallback coverage: 1/2 locally ready\n  - fallback local-mock [ready]\n  - fallback offline-review [not-ready]\n  - guidance: Keep continuity surfaces visible after interruption.\n  - ISSUE: paper artifact bundle needs final verification\n  Delegation: 0 running, 0 slot(s) open\n\nCheckpoint trail (1 shown):\n  - [66cd0e4d] 2026-06-21 18:52:06 :: matched-continuity-table.txt (edit)\n\nInstruction layers:\n  (none)\n\nExtensions:\n  (none)\n\nPrompt history (2 shown):\n  1. TASK: regenerate the matched continuity paper table\n  2. STATE: keep the same-model controls matched\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] TRACE: wrote continuity table and trace artifacts\n",
+          "stderr": ""
+        },
+        "preview_rewind": {
+          "label": "preview-rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --preview-rewind b45a3778a3a0",
+          "exit_code": 0,
+          "stdout": "Rewind preview for session b45a3778:\n\nWould restore 1 checkpoint(s) across 1 file(s).\nMode: restore pre-edit file snapshots.\n\nPlanned restores:\n  1. [66cd0e4d] 2026-06-21 18:52:06 - D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\memory_backed_continuity\\workspace\\paper\\matched-continuity-table.txt\n     Restores: existing file\n     Type: edit\n",
+          "stderr": ""
+        },
+        "rewind": {
+          "label": "rewind",
+          "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.main --rewind b45a3778a3a0",
+          "exit_code": 0,
+          "stdout": "Rewound 1 checkpoint(s) for session b45a3778.\n  - [66cd0e4d] D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\memory_backed_continuity\\workspace\\paper\\matched-continuity-table.txt\nResuming session b45a3778\n  Created: 2026-06-21 18:52:06\n  Updated: 2026-06-21 18:52:08\n  Messages: 1\n  Workspace: D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\memory_backed_continuity\\workspace\n  Checkpoints: 1\n  Recent checkpoints: 1 saved; latest [844e6bab] matched-continuity-table.txt [rewind]\n  Runtime: phase:verify@2\n  Readiness: ready via continuity-benchmark\n  Delegation: 0 running, 0 slot(s) open\n",
+          "stderr": ""
+        }
+      },
+      "target_file": "D:\\Desktop\\minicode\\outputs\\paper_a_continuity_ablation_eval\\paper-results\\memory_backed_continuity\\workspace\\paper\\matched-continuity-table.txt",
+      "final_file_content": "table=matched\nclaim=bounded\n"
+    }
+  ]
+}
