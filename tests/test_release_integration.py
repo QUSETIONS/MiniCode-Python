@@ -473,12 +473,84 @@ def test_readiness_simulates_selected_patch_without_writing_settings(tmp_path: P
     )
 
     payload = json.loads(completed.stdout)
-    assert completed.returncode == 0, completed.stderr
-    assert payload["status"] == "requires-credentials"
+    assert completed.returncode == 1, completed.stderr
+    assert payload["status"] == "invalid"
     assert payload["simulation_only"] is True
     assert payload["live_provider_claim"] is False
     assert json.loads(output_path.read_text(encoding="utf-8")) == payload
     assert not target_path.exists()
+
+
+def test_readiness_simulation_no_model_emits_redacted_invalid_artifact(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    preview_path = tmp_path / "preview.json"
+    output_path = tmp_path / "simulation.json"
+    preview_path.write_text(
+        json.dumps(
+            {
+                "status": "warning",
+                "risk_scope": "no-fallback-configured",
+                "fallback_settings_patch_preview": [
+                    {
+                        "label": "OpenAI fallback",
+                        "target_path": str(tmp_path / "settings.json"),
+                        "merge_patch": {"fallbackModels": ["gpt-4o"]},
+                        "safety": "preview-only; no settings are modified",
+                        "apply_notes": [
+                            "Review the selected provider patch before applying it.",
+                            "Replace placeholder credentials locally.",
+                            "Merge only one selected patch into the target settings file.",
+                            "Run minicode-readiness --json --fail-on blocked after applying.",
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    env = _release_env(tmp_path)
+    env.update(
+        {
+            "MINI_CODE_MODEL": "",
+            "OPENAI_API_KEY": "sk-real-secret-1234567890",
+        }
+    )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "minicode.readiness",
+            "--cwd",
+            str(workspace),
+            "--simulate-fallback-patch",
+            str(preview_path),
+            "--fallback-label",
+            "OpenAI fallback",
+            "--simulation-out",
+            str(output_path),
+        ],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=20,
+        check=False,
+    )
+
+    payload = json.loads(completed.stdout)
+    assert completed.returncode == 1
+    assert payload["status"] == "invalid"
+    assert payload["simulation_only"] is True
+    assert payload["live_provider_claim"] is False
+    assert json.loads(output_path.read_text(encoding="utf-8")) == payload
+    assert "Traceback" not in completed.stderr
+    assert "sk-real-secret" not in completed.stdout
+    assert "sk-real-secret" not in completed.stderr
 
 
 def test_readiness_simulation_threshold_and_missing_label_are_deterministic(tmp_path: Path) -> None:
@@ -510,6 +582,7 @@ def test_readiness_simulation_threshold_and_missing_label_are_deterministic(tmp_
     )
     env = _release_env(tmp_path)
     env["OPENAI_API_KEY"] = ""
+    env["ANTHROPIC_AUTH_TOKEN"] = "primary-auth-token"
     command = [
         sys.executable,
         "-m",

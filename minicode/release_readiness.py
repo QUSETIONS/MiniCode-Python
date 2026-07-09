@@ -47,6 +47,13 @@ _SAFE_PLACEHOLDERS = {
     "<redacted>",
     "[redacted]",
 }
+_SENSITIVE_STRUCTURED_KEY_NAMES = (
+    "apikey",
+    "password",
+    "token",
+    "secret",
+    "authtoken",
+)
 _SECRET_TEXT_PATTERNS = (
     re.compile(r"\bsk-or-[A-Za-z0-9_-]{8,}\b"),
     re.compile(r"\bsk-[A-Za-z0-9_-]{8,}\b"),
@@ -69,6 +76,43 @@ def _looks_sensitive_key(key: str) -> bool:
     if normalized.endswith("base_url") or normalized.endswith("baseurl"):
         return False
     return any(part in normalized for part in _SENSITIVE_KEY_PARTS)
+
+
+def _is_sensitive_structured_key(key: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]", "", str(key).casefold())
+    return any(
+        normalized == name or normalized.endswith(name)
+        for name in _SENSITIVE_STRUCTURED_KEY_NAMES
+    )
+
+
+def _is_safe_placeholder(value: Any) -> bool:
+    return isinstance(value, str) and value.strip().casefold() in _SAFE_PLACEHOLDERS
+
+
+def find_sensitive_payload_leaks(value: Any, *, limit: int = 5) -> list[str]:
+    findings: list[str] = []
+
+    def visit(item: Any, path: str) -> None:
+        if len(findings) >= limit:
+            return
+        if isinstance(item, dict):
+            for raw_key, nested in item.items():
+                key = str(raw_key)
+                nested_path = f"{path}.{key}" if path else key
+                if _is_sensitive_structured_key(key) and not _is_safe_placeholder(nested):
+                    findings.append(f"sensitive value at {nested_path}")
+                    if len(findings) >= limit:
+                        return
+                visit(nested, nested_path)
+        elif isinstance(item, (list, tuple)):
+            for index, nested in enumerate(item):
+                visit(nested, f"{path}[{index}]")
+                if len(findings) >= limit:
+                    return
+
+    visit(value, "")
+    return findings
 
 
 def redact_sensitive_text(text: str) -> str:
@@ -1175,29 +1219,45 @@ def check_fallback_simulation_payload(payload: Any) -> ReleaseCheck:
     if payload.get("live_provider_claim") is not False:
         errors.append("fallback simulation must not claim a live provider result")
 
-    list_fields = (
-        "fallback_candidates",
-        "viable_fallbacks",
-        "issues",
-        "next_actions",
-    )
-    for field in list_fields:
+    for field in ("issues", "next_actions"):
         if not isinstance(payload.get(field), list):
             errors.append(f"fallback simulation missing {field} list")
 
+    fallback_candidates = payload.get("fallback_candidates")
     viable_fallbacks = payload.get("viable_fallbacks")
+    for field, values in (
+        ("fallback_candidates", fallback_candidates),
+        ("viable_fallbacks", viable_fallbacks),
+    ):
+        if not isinstance(values, list):
+            errors.append(f"fallback simulation missing {field} list")
+        elif any(not isinstance(item, str) or not item.strip() for item in values):
+            errors.append(f"fallback simulation has invalid {field} entries")
+
     if status == "ready" and (
         credential_state != "existing-local"
+        or not isinstance(fallback_candidates, list)
+        or not fallback_candidates
         or not isinstance(viable_fallbacks, list)
         or not viable_fallbacks
     ):
-        errors.append("ready fallback simulation requires existing-local credentials and viable fallbacks")
+        errors.append("ready fallback simulation requires existing-local credentials and fallback coverage")
+    elif (
+        status == "ready"
+        and isinstance(fallback_candidates, list)
+        and isinstance(viable_fallbacks, list)
+        and not set(viable_fallbacks).issubset(fallback_candidates)
+    ):
+        errors.append("ready fallback simulation has viable fallbacks outside fallback_candidates")
 
     redaction_findings = find_sensitive_text_leaks(
         json.dumps(payload, ensure_ascii=False, sort_keys=True)
     )
     if redaction_findings:
         errors.append(redaction_findings[0])
+    structured_findings = find_sensitive_payload_leaks(payload)
+    if structured_findings:
+        errors.append(structured_findings[0])
 
     if errors:
         return ReleaseCheck(

@@ -596,11 +596,24 @@ def test_release_readiness_fallback_simulation_validator_rejects_unsafe_payloads
         **payload,
         "effective_config": {"OPENAI_API_KEY": "sk-real-secret-1234567890"},
     }
+    unprefixed_structured_secret = {
+        **payload,
+        "effective_config": {"api_key": "long-unprefixed-secret-value"},
+    }
+    none_candidates = {**payload, "fallback_candidates": None}
+    object_viable_fallbacks = {**payload, "viable_fallbacks": {"gpt-4o": True}}
+    empty_candidate = {**payload, "fallback_candidates": [""]}
+    missing_candidate = {**payload, "viable_fallbacks": ["gpt-4o-mini"]}
 
     assert release_readiness.check_fallback_simulation_payload(placeholder_ready).status == "failed"
     assert release_readiness.check_fallback_simulation_payload(live_claim).status == "failed"
     assert release_readiness.check_fallback_simulation_payload(missing_label).status == "failed"
     assert release_readiness.check_fallback_simulation_payload(leaked_secret).status == "failed"
+    assert release_readiness.check_fallback_simulation_payload(unprefixed_structured_secret).status == "failed"
+    assert release_readiness.check_fallback_simulation_payload(none_candidates).status == "failed"
+    assert release_readiness.check_fallback_simulation_payload(object_viable_fallbacks).status == "failed"
+    assert release_readiness.check_fallback_simulation_payload(empty_candidate).status == "failed"
+    assert release_readiness.check_fallback_simulation_payload(missing_candidate).status == "failed"
 
 
 def test_release_readiness_release_report_check_cli_allows_provider_at_risk(tmp_path, capsys) -> None:

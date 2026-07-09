@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from dataclasses import asdict
 from pathlib import Path
 
@@ -56,18 +55,16 @@ def _invalid_simulation_payload(label: str, issue: str) -> dict:
 
 
 def _load_runtime_for_simulation(cwd: str) -> dict:
-    try:
-        return load_runtime_config(cwd)
-    except RuntimeError as exc:
-        if not str(exc).startswith("No auth configured."):
-            raise
-    return {
-        "model": os.environ.get("MINI_CODE_MODEL", "").strip(),
-        "baseUrl": os.environ.get("ANTHROPIC_BASE_URL", "https://api.anthropic.com").strip(),
-        "openaiBaseUrl": os.environ.get("OPENAI_BASE_URL", "https://api.openai.com").strip(),
-        "openrouterBaseUrl": os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api").strip(),
-        "customBaseUrl": os.environ.get("CUSTOM_API_BASE_URL", "").strip(),
-    }
+    return load_runtime_config(cwd)
+
+
+def _runtime_simulation_issue(exc: RuntimeError) -> str:
+    message = str(exc)
+    if message.startswith("No auth configured."):
+        return "No auth configured for local fallback simulation."
+    if message.startswith("No model configured."):
+        return "No model configured for local fallback simulation."
+    return "Unable to load local runtime configuration for fallback simulation."
 
 
 def _simulate_fallback_patch(cwd: str, preview_path: str, label: str) -> dict:
@@ -84,7 +81,10 @@ def _simulate_fallback_patch(cwd: str, preview_path: str, label: str) -> dict:
     if selection_error:
         return _invalid_simulation_payload(label, selection_error)
 
-    runtime = _load_runtime_for_simulation(cwd)
+    try:
+        runtime = _load_runtime_for_simulation(cwd)
+    except RuntimeError as exc:
+        return _invalid_simulation_payload(label, _runtime_simulation_issue(exc))
     return asdict(simulate_fallback_patch(cwd, runtime, preview))
 
 
