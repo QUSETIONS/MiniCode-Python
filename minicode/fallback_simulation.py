@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlsplit
 
-from minicode.config import validate_provider_runtime
-from minicode.model_registry import detect_provider
-from minicode.product_surfaces import build_readiness_report
+from minicode.model_registry import BUILTIN_MODELS, Provider
 
 
 ALLOWED_PATCH_ROOTS = {
@@ -36,6 +35,19 @@ _FALLBACK_ROOTS = (
     "customFallbackModels",
 )
 _CREDENTIAL_RUNTIME_KEYS = {"apiKey", "authToken", "openaiApiKey", "openrouterApiKey", "customApiKey"}
+_OPENAI_PREFIXES = ("gpt-5", "gpt-4", "gpt-3.5", "gpt5", "o1-", "o3-", "chatgpt-")
+_OPENAI_EXACT_MODELS = {"gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-5.5", "gpt5.5", "o1", "o1-mini", "o3-mini"}
+_OPENROUTER_PREFIXES = (
+    "openrouter/",
+    "anthropic/",
+    "openai/",
+    "google/",
+    "meta-llama/",
+    "deepseek/",
+    "qwen/",
+    "minimax/",
+    "mistralai/",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,10 +107,74 @@ def _patch_fallback_models(merge_patch: dict[str, Any]) -> list[str] | None:
     return models
 
 
+def _static_provider(model: str) -> str:
+    normalized = model.strip()
+    model_info = BUILTIN_MODELS.get(normalized)
+    if model_info is not None:
+        return model_info.provider.value
+
+    normalized_lower = normalized.lower()
+    for known_model, known_info in BUILTIN_MODELS.items():
+        if known_model.lower() == normalized_lower:
+            return known_info.provider.value
+    if normalized_lower.startswith(_OPENROUTER_PREFIXES):
+        return Provider.OPENROUTER.value
+    if normalized_lower in _OPENAI_EXACT_MODELS or normalized_lower.startswith(_OPENAI_PREFIXES):
+        return Provider.OPENAI.value
+    if normalized_lower.startswith("claude-"):
+        return Provider.ANTHROPIC.value
+    return Provider.CUSTOM.value
+
+
+def _is_valid_http_url(value: Any) -> bool:
+    if not isinstance(value, str) or not value.strip():
+        return False
+    try:
+        parsed = urlsplit(value.strip())
+        _ = parsed.port
+        return parsed.scheme in {"http", "https"} and bool(parsed.hostname)
+    except ValueError:
+        return False
+
+
+def _safe_origin(value: Any) -> str:
+    if not _is_valid_http_url(value):
+        return ""
+    parsed = urlsplit(str(value).strip())
+    hostname = parsed.hostname
+    if not hostname:
+        return ""
+    host = f"[{hostname}]" if ":" in hostname else hostname
+    port = parsed.port
+    suffix = f":{port}" if port is not None else ""
+    return f"{parsed.scheme.lower()}://{host}{suffix}"
+
+
+def _candidate_validation_errors(runtime: dict[str, Any], candidate: str) -> list[str]:
+    provider = _static_provider(candidate)
+    provider_requirements = {
+        Provider.ANTHROPIC.value: (("apiKey", "authToken"), "baseUrl"),
+        Provider.OPENAI.value: (("openaiApiKey",), "openaiBaseUrl"),
+        Provider.OPENROUTER.value: (("openrouterApiKey",), "openrouterBaseUrl"),
+        Provider.CUSTOM.value: (("customApiKey",), "customBaseUrl"),
+    }
+    requirements = provider_requirements.get(provider)
+    if requirements is None:
+        return [f"Fallback '{candidate}' uses unsupported provider '{provider}'."]
+
+    credential_keys, base_url_key = requirements
+    errors: list[str] = []
+    if not any(_is_real_credential(runtime.get(key)) for key in credential_keys):
+        errors.append("credential")
+    if not _is_valid_http_url(runtime.get(base_url_key)):
+        errors.append("base URL")
+    return errors
+
+
 def _credential_state(runtime: dict[str, Any], candidates: list[str]) -> str:
     credential_keys: set[str] = set()
     for candidate in candidates:
-        provider = detect_provider(candidate, runtime).value
+        provider = _static_provider(candidate)
         if provider == "anthropic":
             credential_keys.update({"apiKey", "authToken"})
         elif provider == "openai":
@@ -117,13 +193,13 @@ def _credential_state(runtime: dict[str, Any], candidates: list[str]) -> str:
 
 def _effective_config(runtime: dict[str, Any], candidates: list[str]) -> dict[str, Any]:
     return {
-        "primary_provider": detect_provider(str(runtime.get("model", "")), runtime).value,
+        "primary_provider": _static_provider(str(runtime.get("model", ""))),
         "fallback_candidates": list(candidates),
         "base_urls": {
-            "anthropic": str(runtime.get("baseUrl", "")),
-            "openai": str(runtime.get("openaiBaseUrl", "")),
-            "openrouter": str(runtime.get("openrouterBaseUrl", "")),
-            "custom": str(runtime.get("customBaseUrl", "")),
+            "anthropic": _safe_origin(runtime.get("baseUrl")),
+            "openai": _safe_origin(runtime.get("openaiBaseUrl")),
+            "openrouter": _safe_origin(runtime.get("openrouterBaseUrl")),
+            "custom": _safe_origin(runtime.get("customBaseUrl")),
         },
         "credential_present": {
             "anthropic": any(_is_real_credential(runtime.get(key)) for key in ("apiKey", "authToken")),
@@ -134,14 +210,12 @@ def _effective_config(runtime: dict[str, Any], candidates: list[str]) -> dict[st
     }
 
 
-def _credentials_are_the_only_blockers(runtime: dict[str, Any], candidates: list[str]) -> bool:
-    for candidate in candidates:
-        candidate_runtime = dict(runtime)
-        candidate_runtime["model"] = candidate
-        errors = validate_provider_runtime(candidate_runtime)
-        if not errors or any("API_KEY" not in error and "AUTH_TOKEN" not in error for error in errors):
-            return False
-    return bool(candidates)
+def _next_actions(status: str) -> list[str]:
+    if status == "ready":
+        return ["Keep fallback coverage in release readiness checks."]
+    if status == "requires-credentials":
+        return ["Configure a real local credential for the selected fallback provider."]
+    return ["Review the selected fallback model and provider configuration."]
 
 
 def simulate_fallback_patch(
@@ -192,10 +266,11 @@ def simulate_fallback_patch(
         if not _is_real_credential(effective_runtime.get(runtime_key)):
             effective_runtime[runtime_key] = ""
 
-    report = build_readiness_report(cwd, runtime=effective_runtime)
-    viable_fallbacks = [
-        candidate for candidate in candidates if candidate in report.viable_fallbacks
-    ]
+    candidate_errors = {
+        candidate: _candidate_validation_errors(effective_runtime, candidate)
+        for candidate in candidates
+    }
+    viable_fallbacks = [candidate for candidate in candidates if not candidate_errors[candidate]]
     credential_state = _credential_state(effective_runtime, candidates)
     effective_config = _effective_config(effective_runtime, candidates)
 
@@ -207,12 +282,12 @@ def simulate_fallback_patch(
             fallback_candidates=candidates,
             viable_fallbacks=viable_fallbacks,
             issues=[],
-            next_actions=report.next_actions,
+            next_actions=_next_actions("ready"),
             effective_config=effective_config,
         )
 
-    if credential_state in {"missing", "placeholder"} and _credentials_are_the_only_blockers(
-        effective_runtime, candidates
+    if credential_state in {"missing", "placeholder"} and all(
+        errors == ["credential"] for errors in candidate_errors.values()
     ):
         return FallbackSimulation(
             status="requires-credentials",
@@ -220,7 +295,7 @@ def simulate_fallback_patch(
             credential_state=credential_state,
             fallback_candidates=candidates,
             issues=[],
-            next_actions=["Configure a real local credential for the selected fallback provider."],
+            next_actions=_next_actions("requires-credentials"),
             effective_config=effective_config,
         )
 
@@ -230,6 +305,6 @@ def simulate_fallback_patch(
         credential_state=credential_state,
         fallback_candidates=candidates,
         issues=["Selected fallback models are not locally viable."],
-        next_actions=report.next_actions,
+        next_actions=_next_actions("invalid"),
         effective_config=effective_config,
     )

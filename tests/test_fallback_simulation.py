@@ -1,3 +1,7 @@
+import urllib.request
+
+import pytest
+
 from minicode.fallback_simulation import (
     select_fallback_preview,
     simulate_fallback_patch,
@@ -53,6 +57,55 @@ def test_existing_real_runtime_credential_can_be_ready() -> None:
     assert result.status == "ready"
     assert result.credential_state == "existing-local"
     assert result.viable_fallbacks == ["gpt-4o"]
+
+
+def test_existing_local_openai_credential_never_probes_or_calls_network(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_probe(*args: object, **kwargs: object) -> tuple[str, ...]:
+        raise AssertionError("fallback simulation must not probe providers")
+
+    def fail_network(*args: object, **kwargs: object) -> object:
+        raise AssertionError("fallback simulation must not make network calls")
+
+    monkeypatch.setattr("minicode.model_registry.probe_openai_exposed_models", fail_probe)
+    monkeypatch.setattr(urllib.request, "urlopen", fail_network)
+    preview = _openai_preview(key="[REDACTED]")
+    preview["merge_patch"]["env"]["OPENAI_BASE_URL"] = "https://preview.example.test/v1"
+
+    result = simulate_fallback_patch(
+        ".",
+        runtime={
+            "model": "claude-sonnet-4-20250514",
+            "openaiApiKey": "existing-local-secret",
+        },
+        preview=preview,
+    )
+
+    assert result.status == "ready"
+    assert result.viable_fallbacks == ["gpt-4o"]
+
+
+def test_effective_config_redacts_base_url_userinfo_and_components() -> None:
+    preview = _openai_preview(key="[REDACTED]")
+    preview["merge_patch"]["env"]["OPENAI_BASE_URL"] = (
+        "https://preview-user:preview-password@preview.example.test:8443/v1/models"
+        "?token=preview-token#fragment"
+    )
+
+    result = simulate_fallback_patch(
+        ".",
+        runtime={
+            "model": "claude-sonnet-4-20250514",
+            "openaiApiKey": "existing-local-secret",
+        },
+        preview=preview,
+    )
+
+    assert result.status == "ready"
+    assert result.effective_config["base_urls"]["openai"] == "https://preview.example.test:8443"
+    assert "preview-user" not in str(result.effective_config)
+    assert "preview-token" not in str(result.effective_config)
 
 
 def test_redacted_runtime_credential_without_preview_key_requires_credentials() -> None:
