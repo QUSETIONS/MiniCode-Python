@@ -445,7 +445,14 @@ def test_readiness_simulates_selected_patch_without_writing_settings(tmp_path: P
         encoding="utf-8",
     )
     env = _release_env(tmp_path)
-    env["OPENAI_API_KEY"] = ""
+    env.update(
+        {
+            "MINI_CODE_MODEL": "claude-sonnet-4-20250514",
+            "ANTHROPIC_AUTH_TOKEN": "primary-auth-token",
+            "ANTHROPIC_BASE_URL": "https://api.anthropic.com",
+            "OPENAI_API_KEY": "",
+        }
+    )
 
     completed = subprocess.run(
         [
@@ -473,8 +480,8 @@ def test_readiness_simulates_selected_patch_without_writing_settings(tmp_path: P
     )
 
     payload = json.loads(completed.stdout)
-    assert completed.returncode == 1, completed.stderr
-    assert payload["status"] == "invalid"
+    assert completed.returncode == 0, completed.stderr
+    assert payload["status"] == "requires-credentials"
     assert payload["simulation_only"] is True
     assert payload["live_provider_claim"] is False
     assert json.loads(output_path.read_text(encoding="utf-8")) == payload
