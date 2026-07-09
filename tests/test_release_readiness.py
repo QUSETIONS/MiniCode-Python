@@ -639,6 +639,69 @@ def test_release_readiness_fallback_simulation_validator_rejects_unsafe_payloads
     assert release_readiness.check_fallback_simulation_payload(missing_candidate).status == "failed"
 
 
+def test_release_readiness_fallback_simulation_requires_native_nonempty_selected_label() -> None:
+    payload = {
+        "status": "ready",
+        "selected_label": "OpenAI fallback",
+        "credential_state": "existing-local",
+        "fallback_candidates": ["gpt-4o"],
+        "viable_fallbacks": ["gpt-4o"],
+        "issues": [],
+        "next_actions": [],
+        "simulation_only": True,
+        "live_provider_claim": False,
+    }
+
+    for selected_label in (None, 42, {"label": "OpenAI fallback"}):
+        check = release_readiness.check_fallback_simulation_payload(
+            {**payload, "selected_label": selected_label}
+        )
+
+        assert check.status == "failed"
+
+
+def test_release_readiness_fallback_simulation_requires_nonempty_string_issue_entries() -> None:
+    payload = {
+        "status": "ready",
+        "selected_label": "OpenAI fallback",
+        "credential_state": "existing-local",
+        "fallback_candidates": ["gpt-4o"],
+        "viable_fallbacks": ["gpt-4o"],
+        "issues": [],
+        "next_actions": [],
+        "simulation_only": True,
+        "live_provider_claim": False,
+    }
+
+    for issues in ([None], [""], [42]):
+        check = release_readiness.check_fallback_simulation_payload(
+            {**payload, "issues": issues}
+        )
+
+        assert check.status == "failed"
+
+
+def test_release_readiness_fallback_simulation_requires_nonempty_string_next_action_entries() -> None:
+    payload = {
+        "status": "ready",
+        "selected_label": "OpenAI fallback",
+        "credential_state": "existing-local",
+        "fallback_candidates": ["gpt-4o"],
+        "viable_fallbacks": ["gpt-4o"],
+        "issues": [],
+        "next_actions": [],
+        "simulation_only": True,
+        "live_provider_claim": False,
+    }
+
+    for next_actions in ([""], [42]):
+        check = release_readiness.check_fallback_simulation_payload(
+            {**payload, "next_actions": next_actions}
+        )
+
+        assert check.status == "failed"
+
+
 def test_release_readiness_fallback_simulation_requires_viable_subset_for_nonready_statuses() -> None:
     payload = {
         "selected_label": "OpenAI fallback",

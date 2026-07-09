@@ -92,6 +92,14 @@ def _is_safe_placeholder(value: Any) -> bool:
     return isinstance(value, str) and value.strip().casefold() in _SAFE_PLACEHOLDERS
 
 
+def _is_nonempty_string(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _is_nonempty_string_list(value: Any) -> bool:
+    return isinstance(value, list) and all(_is_nonempty_string(item) for item in value)
+
+
 def find_sensitive_payload_leaks(value: Any, *, limit: int = 5) -> list[str]:
     findings: list[str] = []
 
@@ -1208,11 +1216,11 @@ def check_fallback_simulation_payload(payload: Any) -> ReleaseCheck:
         payload = {}
 
     status = str(payload.get("status") or "").strip()
-    selected_label = str(payload.get("selected_label") or "").strip()
+    selected_label = payload.get("selected_label")
     credential_state = str(payload.get("credential_state") or "").strip()
     if status not in {"ready", "requires-credentials", "invalid"}:
         errors.append(f"fallback simulation has invalid status: {status}")
-    if not selected_label:
+    if not _is_nonempty_string(selected_label):
         errors.append("fallback simulation missing selected_label")
     if credential_state not in {"existing-local", "placeholder", "missing", "invalid"}:
         errors.append(f"fallback simulation has invalid credential_state: {credential_state}")
@@ -1222,32 +1230,28 @@ def check_fallback_simulation_payload(payload: Any) -> ReleaseCheck:
         errors.append("fallback simulation must not claim a live provider result")
 
     for field in ("issues", "next_actions"):
-        if not isinstance(payload.get(field), list):
+        values = payload.get(field)
+        if not isinstance(values, list):
             errors.append(f"fallback simulation missing {field} list")
+        elif not _is_nonempty_string_list(values):
+            errors.append(f"fallback simulation has invalid {field} entries")
 
     fallback_candidates = payload.get("fallback_candidates")
     viable_fallbacks = payload.get("viable_fallbacks")
-    fallback_candidates_valid = isinstance(fallback_candidates, list) and all(
-        isinstance(item, str) and item.strip() for item in fallback_candidates
-    )
-    viable_fallbacks_valid = isinstance(viable_fallbacks, list) and all(
-        isinstance(item, str) and item.strip() for item in viable_fallbacks
-    )
+    fallback_candidates_valid = _is_nonempty_string_list(fallback_candidates)
+    viable_fallbacks_valid = _is_nonempty_string_list(viable_fallbacks)
     for field, values in (
         ("fallback_candidates", fallback_candidates),
         ("viable_fallbacks", viable_fallbacks),
     ):
         if not isinstance(values, list):
             errors.append(f"fallback simulation missing {field} list")
-        elif any(not isinstance(item, str) or not item.strip() for item in values):
+        elif not _is_nonempty_string_list(values):
             errors.append(f"fallback simulation has invalid {field} entries")
 
-    if (
-        fallback_candidates_valid
-        and viable_fallbacks_valid
-        and not set(viable_fallbacks).issubset(fallback_candidates)
-    ):
-        errors.append("fallback simulation has viable fallbacks outside fallback_candidates")
+    if fallback_candidates_valid and viable_fallbacks_valid:
+        if not set(viable_fallbacks).issubset(fallback_candidates):
+            errors.append("fallback simulation has viable fallbacks outside fallback_candidates")
 
     if status == "ready" and (
         credential_state != "existing-local"
