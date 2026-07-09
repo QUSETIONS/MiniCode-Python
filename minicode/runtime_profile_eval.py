@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
+import re
 from typing import Any, Callable
 
 from minicode.agent_loop import run_agent_turn
@@ -55,6 +56,14 @@ class RuntimeEvalRow:
 
 
 @dataclass(frozen=True, slots=True)
+class ProviderFailureClassification:
+    category: str
+    retryable: bool
+    ownership: str
+    recovery_action: str
+
+
+@dataclass(frozen=True, slots=True)
 class ProviderDiagnostic:
     label: str
     outcome: str
@@ -63,6 +72,115 @@ class ProviderDiagnostic:
     summary: str
     stdout: str = ""
     stderr: str = ""
+    risk_scope: str = "unknown"
+    error_code: str = ""
+    request_id: str = ""
+    failure_category: str = "unknown"
+    retryable: bool = False
+    ownership: str = "unknown"
+    recovery_action: str = ""
+    readiness_status: str = ""
+    repair_step_count: int = 0
+    trace_artifact: str = ""
+    guidance: list[str] = field(default_factory=list)
+
+
+_ERROR_CODE_PATTERNS = (
+    re.compile(r"\berror\s+code\s*[:=]\s*([A-Za-z0-9_.:-]+)", re.IGNORECASE),
+    re.compile(r"\bcode\s*[:=]\s*([A-Za-z0-9_.:-]+)", re.IGNORECASE),
+)
+_REQUEST_ID_PATTERNS = (
+    re.compile(r"\brequest[\s_-]*id\s*[:=]\s*([A-Za-z0-9_.:-]+)", re.IGNORECASE),
+    re.compile(r"\bx-request-id\s*[:=]\s*([A-Za-z0-9_.:-]+)", re.IGNORECASE),
+)
+
+
+def extract_provider_error_context(*parts: str) -> dict[str, str]:
+    text = "\n".join(part for part in parts if part)
+    error_code = ""
+    request_id = ""
+    for pattern in _ERROR_CODE_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            error_code = match.group(1).strip(".,; ")
+            break
+    for pattern in _REQUEST_ID_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            request_id = match.group(1).strip(".,; ")
+            break
+    return {
+        "error_code": error_code,
+        "request_id": request_id,
+    }
+
+
+def classify_provider_failure(
+    outcome: str,
+    error_code: str = "",
+    summary: str = "",
+    risk_scope: str = "unknown",
+) -> ProviderFailureClassification:
+    code = str(error_code).strip().lower()
+    if outcome == "answered":
+        return ProviderFailureClassification(
+            "none", False, "none", "No recovery action required."
+        )
+    if code in {"401", "403"}:
+        return ProviderFailureClassification(
+            "authentication",
+            False,
+            "local-configuration",
+            "Verify the configured provider credential and endpoint.",
+        )
+    if code == "429":
+        return ProviderFailureClassification(
+            "rate-limited",
+            True,
+            "external-provider",
+            "Honor provider retry guidance or switch to a ready fallback.",
+        )
+    if outcome == "provider_api_error" and code == "1010":
+        return ProviderFailureClassification(
+            "provider-rejected-request",
+            False,
+            "external-provider",
+            "Inspect the provider contract, selected model, and sanitized request evidence.",
+        )
+    if outcome == "provider_outage" or code.startswith("5"):
+        return ProviderFailureClassification(
+            "provider-unavailable",
+            True,
+            "external-provider",
+            "Retry the provider smoke or switch to a ready fallback.",
+        )
+    if outcome == "timeout":
+        return ProviderFailureClassification(
+            "timeout",
+            True,
+            "external-provider",
+            "Retry within the bounded smoke timeout or switch fallback.",
+        )
+    if outcome == "provider_channel_unavailable":
+        return ProviderFailureClassification(
+            "configuration",
+            False,
+            "local-configuration",
+            "Repair model-to-provider channel configuration.",
+        )
+    if outcome == "empty_output":
+        return ProviderFailureClassification(
+            "provider-response",
+            True,
+            "external-provider",
+            "Inspect the sanitized response trace before retrying.",
+        )
+    return ProviderFailureClassification(
+        "unknown",
+        False,
+        risk_scope or "unknown",
+        "Inspect sanitized provider diagnostics before choosing a recovery action.",
+    )
 
 
 def _looks_like_terminal_fallback(message: str) -> bool:
@@ -315,13 +433,30 @@ def runtime_profile_eval_as_markdown(
         lines.append("")
         lines.append("## Provider Diagnostics")
         lines.append("")
-        lines.append("| label | outcome | exit_code | summary |")
-        lines.append("| --- | --- | ---: | --- |")
+        lines.append(
+            "| label | outcome | category | retryable | ownership | recovery_action | risk_scope | readiness | repair_steps | trace | error_code | request_id | exit_code | summary |"
+        )
+        lines.append(
+            "| --- | --- | --- | --- | --- | --- | --- | --- | ---: | --- | --- | --- | ---: | --- |"
+        )
         for item in provider_diagnostics:
-            summary = " ".join(item.summary.split())
-            summary = summary[:120] + ("..." if len(summary) > 120 else "")
-            lines.append(
-                f"| {item.label} | {item.outcome} | {item.exit_code} | {summary} |"
+            diagnostic_summary = " ".join(item.summary.split())
+            diagnostic_summary = diagnostic_summary[:120] + (
+                "..." if len(diagnostic_summary) > 120 else ""
             )
+            lines.append(
+                f"| {item.label} | {item.outcome} | {item.failure_category} | "
+                f"{'yes' if item.retryable else 'no'} | {item.ownership} | "
+                f"{item.recovery_action or '-'} | {item.risk_scope} | "
+                f"{item.readiness_status or '-'} | {item.repair_step_count} | "
+                f"{item.trace_artifact or '-'} | "
+                f"{item.error_code or '-'} | {item.request_id or '-'} | "
+                f"{item.exit_code} | {diagnostic_summary} |"
+            )
+            if item.guidance:
+                lines.append("")
+                lines.append(f"Guidance for `{item.label}`:")
+                for guidance in item.guidance:
+                    lines.append(f"- {guidance}")
 
     return "\n".join(lines)

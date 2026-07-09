@@ -2,6 +2,7 @@ from minicode.runtime_profile_eval import (
     ProviderDiagnostic,
     RuntimeEvalCondition,
     RuntimeEvalScenario,
+    classify_provider_failure,
     evaluate_runtime_profiles,
     runtime_profile_eval_as_dict,
     runtime_profile_eval_as_markdown,
@@ -20,6 +21,45 @@ class ScriptedModel(ModelAdapter):
         step = self._steps[self.calls]
         self.calls += 1
         return step
+
+
+def test_provider_error_1010_is_external_rejected_request() -> None:
+    result = classify_provider_failure(
+        outcome="provider_api_error",
+        error_code="1010",
+        summary="Model API error (RuntimeError): error code: 1010",
+        risk_scope="external-provider",
+    )
+
+    assert result.category == "provider-rejected-request"
+    assert result.retryable is False
+    assert result.ownership == "external-provider"
+    assert "provider contract" in result.recovery_action
+
+
+def test_common_codes_have_stable_failure_classes() -> None:
+    assert (
+        classify_provider_failure(
+            "provider_api_error", "401", "", "provider-config"
+        ).category
+        == "authentication"
+    )
+    assert (
+        classify_provider_failure(
+            "provider_api_error", "429", "", "external-provider"
+        ).category
+        == "rate-limited"
+    )
+    assert (
+        classify_provider_failure(
+            "provider_outage", "503", "", "external-provider"
+        ).category
+        == "provider-unavailable"
+    )
+    assert (
+        classify_provider_failure("timeout", "", "", "external-provider").category
+        == "timeout"
+    )
 
 
 def test_evaluate_runtime_profiles_compares_budget_floor_between_profiles() -> None:
@@ -234,6 +274,14 @@ def test_runtime_profile_eval_outputs_include_provider_diagnostics() -> None:
             summary="Provider availability failure: all viable fallback models were unavailable.",
             stdout="",
             stderr="Provider availability failure",
+            risk_scope="external-provider",
+            error_code="503",
+            request_id="req-123",
+            failure_category="provider-unavailable",
+            retryable=True,
+            ownership="external-provider",
+            recovery_action="Retry the provider smoke or switch to a ready fallback.",
+            guidance=["Configure a fallback model."],
         )
     ]
 
@@ -242,6 +290,15 @@ def test_runtime_profile_eval_outputs_include_provider_diagnostics() -> None:
 
     assert payload["provider_diagnostics"][0]["label"] == "headless-smoke"
     assert payload["provider_diagnostics"][0]["outcome"] == "provider_outage"
+    assert payload["provider_diagnostics"][0]["failure_category"] == "provider-unavailable"
+    assert payload["provider_diagnostics"][0]["retryable"] is True
     assert "## Provider Diagnostics" in rendered
     assert "headless-smoke" in rendered
     assert "provider_outage" in rendered
+    assert "external-provider" in rendered
+    assert "503" in rendered
+    assert "req-123" in rendered
+    assert "provider-unavailable" in rendered
+    assert "yes" in rendered
+    assert "Retry the provider smoke or switch to a ready fallback." in rendered
+    assert "Configure a fallback model." in rendered
