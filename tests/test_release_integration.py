@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -9,6 +10,7 @@ from pathlib import Path
 from minicode.agent_loop import run_agent_turn
 from minicode.memory import MemoryManager
 from minicode.permissions import PermissionManager
+from minicode.product_surfaces import ReadinessReport
 from minicode.prompt import build_system_prompt
 from minicode.tooling import ToolRegistry
 from minicode.tools import create_default_tool_registry
@@ -71,6 +73,727 @@ def test_release_cli_valid_config_runs_as_black_box(tmp_path: Path) -> None:
     assert "Provider: openai" in completed.stdout
     assert "Tool Profile: core" in completed.stdout
     assert "UnicodeEncodeError" not in completed.stderr
+
+
+def test_release_cli_lists_only_current_workspace_sessions(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    other_workspace = tmp_path / "other"
+    other_workspace.mkdir()
+    env = _release_env(tmp_path)
+
+    seed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from minicode.session import create_new_session, save_session\n"
+                f"s1=create_new_session(workspace={str(workspace)!r})\n"
+                "s1.messages=[{'role':'user','content':'current workspace task'}]\n"
+                "save_session(s1)\n"
+                f"s2=create_new_session(workspace={str(other_workspace)!r})\n"
+                "s2.messages=[{'role':'user','content':'other workspace task'}]\n"
+                "save_session(s2)\n"
+            ),
+        ],
+        cwd=workspace,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=20,
+        check=False,
+    )
+    assert seed.returncode == 0, seed.stderr
+
+    completed = subprocess.run(
+        [sys.executable, "-m", "minicode.main", "--list-workspace-sessions"],
+        cwd=workspace,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=20,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "current workspace task" in completed.stdout
+    assert "other workspace task" not in completed.stdout
+    assert "Total: 1 session(s)" in completed.stdout
+
+
+def test_release_cli_readiness_entrypoints_run_as_black_box(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    env = _release_env(tmp_path)
+
+    text = subprocess.run(
+        [sys.executable, "-m", "minicode.main", "--readiness"],
+        cwd=workspace,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=20,
+        check=False,
+    )
+    assert text.returncode == 0, text.stderr
+    assert "Readiness surface:" in text.stdout
+    assert "Risk scope:" in text.stdout
+    assert "Next actions:" in text.stdout
+
+    as_json = subprocess.run(
+        [sys.executable, "-m", "minicode.main", "--readiness-json"],
+        cwd=workspace,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=20,
+        check=False,
+    )
+    assert as_json.returncode == 0, as_json.stderr
+    payload = json.loads(as_json.stdout)
+    assert payload["provider"] == "openai"
+    assert "risk_scope" in payload
+    assert "next_actions" in payload
+
+
+def test_release_readiness_script_runs_as_black_box(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    env = _release_env(tmp_path)
+
+    text = subprocess.run(
+        [sys.executable, "-m", "minicode.readiness", "--cwd", str(workspace)],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=20,
+        check=False,
+    )
+    assert text.returncode == 0, text.stderr
+    assert "Readiness surface:" in text.stdout
+    assert "Risk scope:" in text.stdout
+    assert "Local preflight:" in text.stdout
+
+    as_json = subprocess.run(
+        [sys.executable, "-m", "minicode.readiness", "--cwd", str(workspace), "--json"],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=20,
+        check=False,
+    )
+    assert as_json.returncode == 0, as_json.stderr
+    payload = json.loads(as_json.stdout)
+    assert payload["provider"] == "openai"
+    assert "risk_scope" in payload
+    assert payload["preflight_checks"]
+    assert payload["preflight_checks"][-1]["label"] == "live-smoke-readiness"
+
+
+def test_release_readiness_script_exports_fallback_examples_as_black_box(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    examples_path = tmp_path / "artifacts" / "fallback-examples.json"
+    env = _release_env(tmp_path)
+    env.update(
+        {
+            "MINI_CODE_MODEL": "deepseek-v4-pro[1m]",
+            "MINI_CODE_MODEL_MODE": "",
+            "ANTHROPIC_AUTH_TOKEN": "proxy-token",
+            "ANTHROPIC_BASE_URL": "https://example.invalid",
+            "OPENAI_API_KEY": "",
+        }
+    )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "minicode.readiness",
+            "--cwd",
+            str(workspace),
+            "--examples",
+            "--examples-out",
+            str(examples_path),
+            "--fail-on",
+            "blocked",
+        ],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=20,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    payload = json.loads(completed.stdout)
+    saved_payload = json.loads(examples_path.read_text(encoding="utf-8"))
+    assert payload == saved_payload
+    assert payload["risk_scope"] == "no-fallback-configured"
+    assert payload["fallback_config_examples"]
+    assert payload["fallback_config_examples"][0]["settings"]["env"]["OPENAI_API_KEY"] == "sk-..."
+
+
+def test_release_readiness_script_exports_doctor_report_as_black_box(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    doctor_path = tmp_path / "artifacts" / "readiness-doctor.md"
+    env = _release_env(tmp_path)
+    env.update(
+        {
+            "MINI_CODE_MODEL": "deepseek-v4-pro[1m]",
+            "MINI_CODE_MODEL_MODE": "",
+            "ANTHROPIC_AUTH_TOKEN": "proxy-token",
+            "ANTHROPIC_BASE_URL": "https://example.invalid",
+            "OPENAI_API_KEY": "",
+        }
+    )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "minicode.readiness",
+            "--cwd",
+            str(workspace),
+            "--doctor",
+            "--doctor-out",
+            str(doctor_path),
+            "--fail-on",
+            "blocked",
+        ],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=20,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    saved = doctor_path.read_text(encoding="utf-8")
+    assert completed.stdout == saved
+    assert "# MiniCode Readiness Doctor" in saved
+    assert "- Status: warning" in saved
+    assert "- Risk scope: no-fallback-configured" in saved
+    assert "## Local Preflight" in saved
+    assert "## Repair Plan" in saved
+    assert "primary-provider-config" in saved
+    assert "live-smoke-readiness" in saved
+    assert "OPENAI_API_KEY" in saved
+    assert "This report is read-only." in saved
+
+
+def test_release_readiness_script_exports_repair_plan_as_black_box(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    repair_path = tmp_path / "artifacts" / "readiness-repair-plan.json"
+    env = _release_env(tmp_path)
+    env.update(
+        {
+            "MINI_CODE_MODEL": "deepseek-v4-pro[1m]",
+            "MINI_CODE_MODEL_MODE": "",
+            "ANTHROPIC_AUTH_TOKEN": "proxy-token",
+            "ANTHROPIC_BASE_URL": "https://example.invalid",
+            "OPENAI_API_KEY": "",
+        }
+    )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "minicode.readiness",
+            "--cwd",
+            str(workspace),
+            "--repair-plan",
+            "--repair-plan-out",
+            str(repair_path),
+            "--fail-on",
+            "blocked",
+        ],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=20,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    payload = json.loads(completed.stdout)
+    saved_payload = json.loads(repair_path.read_text(encoding="utf-8"))
+    assert payload == saved_payload
+    assert payload["risk_scope"] == "no-fallback-configured"
+    assert payload["repair_plan"]
+    assert any(item["step"] == "choose-fallback-provider" for item in payload["repair_plan"])
+    assert any(item.get("safety") == "preview-only; no settings are modified" for item in payload["repair_plan"])
+
+
+def test_release_readiness_script_exports_patch_preview_as_black_box(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    patch_preview_path = tmp_path / "artifacts" / "readiness-fallback-patch-preview.json"
+    env = _release_env(tmp_path)
+    env.update(
+        {
+            "MINI_CODE_MODEL": "deepseek-v4-pro[1m]",
+            "MINI_CODE_MODEL_MODE": "",
+            "ANTHROPIC_AUTH_TOKEN": "proxy-token",
+            "ANTHROPIC_BASE_URL": "https://example.invalid",
+            "OPENAI_API_KEY": "",
+        }
+    )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "minicode.readiness",
+            "--cwd",
+            str(workspace),
+            "--patch-preview",
+            "--patch-preview-out",
+            str(patch_preview_path),
+            "--fail-on",
+            "blocked",
+        ],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=20,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    payload = json.loads(completed.stdout)
+    saved_payload = json.loads(patch_preview_path.read_text(encoding="utf-8"))
+    assert payload == saved_payload
+    assert payload["risk_scope"] == "no-fallback-configured"
+    assert payload["fallback_settings_patch_preview"]
+    assert payload["fallback_settings_patch_preview"][0]["merge_patch"]["env"]["OPENAI_API_KEY"] == "sk-..."
+    assert payload["fallback_settings_patch_preview"][0]["safety"] == "preview-only; no settings are modified"
+
+
+def test_readiness_simulates_selected_patch_without_writing_settings(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    preview_path = tmp_path / "preview.json"
+    output_path = tmp_path / "simulation.json"
+    target_path = tmp_path / "must" / "not" / "be" / "written.json"
+    preview_path.write_text(
+        json.dumps(
+            {
+                "status": "warning",
+                "risk_scope": "no-fallback-configured",
+                "fallback_settings_patch_preview": [
+                    {
+                        "label": "OpenAI fallback",
+                        "target_path": str(target_path),
+                        "merge_patch": {
+                            "fallbackModels": ["gpt-4o"],
+                            "env": {
+                                "OPENAI_API_KEY": "sk-...",
+                                "OPENAI_BASE_URL": "https://api.openai.com",
+                            },
+                        },
+                        "safety": "preview-only; no settings are modified",
+                        "apply_notes": [
+                            "Review the selected provider patch before applying it.",
+                            "Replace placeholder credentials locally.",
+                            "Merge only one selected patch into the target settings file.",
+                            "Run minicode-readiness --json --fail-on blocked after applying.",
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    env = _release_env(tmp_path)
+    env["OPENAI_API_KEY"] = ""
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "minicode.readiness",
+            "--cwd",
+            str(workspace),
+            "--simulate-fallback-patch",
+            str(preview_path),
+            "--fallback-label",
+            "OpenAI fallback",
+            "--simulation-out",
+            str(output_path),
+        ],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=20,
+        check=False,
+    )
+
+    payload = json.loads(completed.stdout)
+    assert completed.returncode == 0, completed.stderr
+    assert payload["status"] == "requires-credentials"
+    assert payload["simulation_only"] is True
+    assert payload["live_provider_claim"] is False
+    assert json.loads(output_path.read_text(encoding="utf-8")) == payload
+    assert not target_path.exists()
+
+
+def test_readiness_simulation_threshold_and_missing_label_are_deterministic(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    preview_path = tmp_path / "preview.json"
+    preview_path.write_text(
+        json.dumps(
+            {
+                "status": "warning",
+                "risk_scope": "no-fallback-configured",
+                "fallback_settings_patch_preview": [
+                    {
+                        "label": "OpenAI fallback",
+                        "target_path": str(tmp_path / "settings.json"),
+                        "merge_patch": {"fallbackModels": ["gpt-4o"]},
+                        "safety": "preview-only; no settings are modified",
+                        "apply_notes": [
+                            "Review the selected provider patch before applying it.",
+                            "Replace placeholder credentials locally.",
+                            "Merge only one selected patch into the target settings file.",
+                            "Run minicode-readiness --json --fail-on blocked after applying.",
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    env = _release_env(tmp_path)
+    env["OPENAI_API_KEY"] = ""
+    command = [
+        sys.executable,
+        "-m",
+        "minicode.readiness",
+        "--cwd",
+        str(workspace),
+        "--simulate-fallback-patch",
+        str(preview_path),
+    ]
+
+    missing_label = subprocess.run(
+        command,
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=20,
+        check=False,
+    )
+    assert missing_label.returncode == 2
+    assert "--fallback-label is required with --simulate-fallback-patch" in missing_label.stderr
+
+    threshold = subprocess.run(
+        [
+            *command,
+            "--fallback-label",
+            "OpenAI fallback",
+            "--simulation-fail-on",
+            "requires-credentials",
+        ],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=20,
+        check=False,
+    )
+    assert threshold.returncode == 1
+    assert threshold.stdout, threshold.stderr
+    assert json.loads(threshold.stdout)["status"] == "requires-credentials"
+
+
+def test_release_readiness_script_exports_bundle_as_black_box(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    bundle_dir = tmp_path / "artifacts" / "readiness-bundle"
+    env = _release_env(tmp_path)
+    env.update(
+        {
+            "MINI_CODE_MODEL": "deepseek-v4-pro[1m]",
+            "MINI_CODE_MODEL_MODE": "",
+            "ANTHROPIC_AUTH_TOKEN": "proxy-token",
+            "ANTHROPIC_BASE_URL": "https://example.invalid",
+            "OPENAI_API_KEY": "",
+        }
+    )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "minicode.readiness",
+            "--cwd",
+            str(workspace),
+            "--bundle-out",
+            str(bundle_dir),
+            "--fail-on",
+            "blocked",
+        ],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=20,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "Bundle artifacts:" in completed.stdout
+    examples_path = bundle_dir / "readiness-fallback-examples.json"
+    doctor_path = bundle_dir / "readiness-doctor.md"
+    repair_path = bundle_dir / "readiness-repair-plan.json"
+    patch_preview_path = bundle_dir / "readiness-fallback-patch-preview.json"
+    manifest_path = bundle_dir / "readiness-artifact-manifest.json"
+    examples = json.loads(examples_path.read_text(encoding="utf-8"))
+    repair = json.loads(repair_path.read_text(encoding="utf-8"))
+    patch_preview = json.loads(patch_preview_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    assert examples["risk_scope"] == "no-fallback-configured"
+    assert "## Repair Plan" in doctor_path.read_text(encoding="utf-8")
+    assert repair["repair_plan"]
+    assert patch_preview["fallback_settings_patch_preview"]
+    assert {item["label"] for item in manifest} == {
+        "doctor_markdown",
+        "fallback_examples_json",
+        "patch_preview_json",
+        "repair_plan_json",
+    }
+    assert all(item["exists"] and item["size_bytes"] > 0 and len(item["sha256"]) == 64 for item in manifest)
+
+
+def test_readiness_outputs_redact_real_secrets(monkeypatch, tmp_path: Path, capsys) -> None:
+    import minicode.readiness
+
+    report = ReadinessReport(
+        status="warning",
+        provider="openai",
+        provider_ready=True,
+        provider_channel="openai via OPENAI_API_KEY",
+        fallback_ready=False,
+        fallback_config_examples=[
+            {
+                "label": "real fallback",
+                "path": str(tmp_path / "settings.json"),
+                "settings": {
+                    "fallbackModels": ["gpt-4o"],
+                    "env": {
+                        "OPENAI_API_KEY": "sk-real-secret-1234567890",
+                        "OPENAI_BASE_URL": "https://api.openai.com",
+                    },
+                },
+            }
+        ],
+        issues=["OPENAI_API_KEY=sk-real-secret-1234567890"],
+        next_actions=["Use authToken token-secret-1234567890"],
+        repair_plan=[
+            {
+                "step": "preview-secret-fallback",
+                "status": "preview",
+                "settings_preview": {
+                    "env": {"OPENAI_API_KEY": "sk-real-secret-1234567890"}
+                },
+            }
+        ],
+        summary="readiness: warning [Bearer token-secret-1234567890]",
+    )
+    monkeypatch.setattr(minicode.readiness, "build_readiness_report", lambda cwd: report)
+
+    examples_path = tmp_path / "examples.json"
+    doctor_path = tmp_path / "doctor.md"
+    repair_path = tmp_path / "repair.json"
+    patch_preview_path = tmp_path / "patch-preview.json"
+
+    assert minicode.readiness.main(["--cwd", str(tmp_path), "--json"]) == 0
+    json_stdout = capsys.readouterr().out
+    assert "sk-real-secret" not in json_stdout
+    assert "token-secret" not in json_stdout
+    assert "[REDACTED]" in json_stdout
+
+    assert minicode.readiness.main(
+        [
+            "--cwd",
+            str(tmp_path),
+            "--examples",
+            "--examples-out",
+            str(examples_path),
+        ]
+    ) == 0
+    examples_stdout = capsys.readouterr().out
+    examples_saved = examples_path.read_text(encoding="utf-8")
+    assert "sk-real-secret" not in examples_stdout
+    assert "sk-real-secret" not in examples_saved
+    assert json.loads(examples_saved)["fallback_config_examples"][0]["settings"]["env"]["OPENAI_API_KEY"] == "[REDACTED]"
+
+    assert minicode.readiness.main(
+        [
+            "--cwd",
+            str(tmp_path),
+            "--repair-plan",
+            "--repair-plan-out",
+            str(repair_path),
+        ]
+    ) == 0
+    repair_stdout = capsys.readouterr().out
+    repair_saved = repair_path.read_text(encoding="utf-8")
+    assert "sk-real-secret" not in repair_stdout
+    assert "sk-real-secret" not in repair_saved
+    assert json.loads(repair_saved)["repair_plan"][0]["settings_preview"]["env"]["OPENAI_API_KEY"] == "[REDACTED]"
+
+    assert minicode.readiness.main(
+        [
+            "--cwd",
+            str(tmp_path),
+            "--patch-preview",
+            "--patch-preview-out",
+            str(patch_preview_path),
+        ]
+    ) == 0
+    patch_preview_stdout = capsys.readouterr().out
+    patch_preview_saved = patch_preview_path.read_text(encoding="utf-8")
+    assert "sk-real-secret" not in patch_preview_stdout
+    assert "sk-real-secret" not in patch_preview_saved
+    assert json.loads(patch_preview_saved)["fallback_settings_patch_preview"][0]["merge_patch"]["env"]["OPENAI_API_KEY"] == "[REDACTED]"
+
+    assert minicode.readiness.main(
+        [
+            "--cwd",
+            str(tmp_path),
+            "--doctor",
+            "--doctor-out",
+            str(doctor_path),
+        ]
+    ) == 0
+    doctor_stdout = capsys.readouterr().out
+    doctor_saved = doctor_path.read_text(encoding="utf-8")
+    assert "sk-real-secret" not in doctor_stdout
+    assert "token-secret" not in doctor_stdout
+    assert "sk-real-secret" not in doctor_saved
+    assert "token-secret" not in doctor_saved
+
+
+def test_release_readiness_script_can_fail_on_threshold(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    env = _release_env(tmp_path)
+    env.update(
+        {
+            "MINI_CODE_MODEL": "deepseek-v4-pro[1m]",
+            "MINI_CODE_MODEL_MODE": "",
+            "ANTHROPIC_AUTH_TOKEN": "proxy-token",
+            "ANTHROPIC_BASE_URL": "https://example.invalid",
+            "OPENAI_API_KEY": "",
+        }
+    )
+
+    warning_gate = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "minicode.readiness",
+            "--cwd",
+            str(workspace),
+            "--json",
+            "--fail-on",
+            "warning",
+        ],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=20,
+        check=False,
+    )
+    assert warning_gate.returncode == 1
+    warning_payload = json.loads(warning_gate.stdout)
+    assert warning_payload["status"] == "warning"
+    assert warning_payload["risk_scope"] == "no-fallback-configured"
+
+    blocked_gate = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "minicode.readiness",
+            "--cwd",
+            str(workspace),
+            "--json",
+            "--fail-on",
+            "blocked",
+        ],
+        cwd=tmp_path,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=20,
+        check=False,
+    )
+    assert blocked_gate.returncode == 0, blocked_gate.stderr
+    assert json.loads(blocked_gate.stdout)["status"] == "warning"
 
 
 def test_release_non_tty_main_handles_memory_and_local_commands(tmp_path: Path) -> None:
