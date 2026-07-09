@@ -15,6 +15,7 @@ from minicode.release_readiness import (
     check_release_report,
     check_structure_compliance_artifact,
     classify_provider_outcome,
+    find_sensitive_payload_leaks,
     find_sensitive_text_leaks,
     main as release_readiness_utility_main,
     release_readiness_as_dict,
@@ -165,6 +166,28 @@ def test_release_redaction_preserves_placeholders_but_removes_real_secrets() -> 
     assert "sk-..." in redact_sensitive_text(text)
     assert find_sensitive_text_leaks('{"OPENROUTER_API_KEY": "sk-or-..."}') == []
     assert find_sensitive_text_leaks('{"OPENROUTER_API_KEY": "sk-or-real-secret-1234567890"}')
+
+
+def test_release_redaction_detects_nested_authorization_and_bearer_secrets() -> None:
+    payload = {
+        "headers": {
+            "authorization": "opaque-authorization-value",
+            "bearer": "opaque-bearer-value",
+        }
+    }
+
+    redacted = redact_sensitive_payload(payload)
+
+    assert redacted == {
+        "headers": {
+            "authorization": "[REDACTED]",
+            "bearer": "[REDACTED]",
+        }
+    }
+    assert find_sensitive_payload_leaks(payload) == [
+        "sensitive value at headers.authorization",
+        "sensitive value at headers.bearer",
+    ]
 
 
 def test_release_readiness_artifact_redaction_cli(tmp_path, capsys) -> None:
@@ -614,6 +637,33 @@ def test_release_readiness_fallback_simulation_validator_rejects_unsafe_payloads
     assert release_readiness.check_fallback_simulation_payload(object_viable_fallbacks).status == "failed"
     assert release_readiness.check_fallback_simulation_payload(empty_candidate).status == "failed"
     assert release_readiness.check_fallback_simulation_payload(missing_candidate).status == "failed"
+
+
+def test_release_readiness_fallback_simulation_requires_viable_subset_for_nonready_statuses() -> None:
+    payload = {
+        "selected_label": "OpenAI fallback",
+        "fallback_candidates": ["gpt-4o"],
+        "viable_fallbacks": ["gpt-4o-mini"],
+        "issues": [],
+        "next_actions": [],
+        "simulation_only": True,
+        "live_provider_claim": False,
+    }
+
+    for status, credential_state in (
+        ("requires-credentials", "placeholder"),
+        ("invalid", "invalid"),
+    ):
+        check = release_readiness.check_fallback_simulation_payload(
+            {
+                **payload,
+                "status": status,
+                "credential_state": credential_state,
+            }
+        )
+
+        assert check.status == "failed"
+        assert "viable fallbacks outside fallback_candidates" in check.stderr
 
 
 def test_release_readiness_release_report_check_cli_allows_provider_at_risk(tmp_path, capsys) -> None:

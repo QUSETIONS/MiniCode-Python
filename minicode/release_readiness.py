@@ -53,6 +53,8 @@ _SENSITIVE_STRUCTURED_KEY_NAMES = (
     "token",
     "secret",
     "authtoken",
+    "authorization",
+    "bearer",
 )
 _SECRET_TEXT_PATTERNS = (
     re.compile(r"\bsk-or-[A-Za-z0-9_-]{8,}\b"),
@@ -1225,6 +1227,12 @@ def check_fallback_simulation_payload(payload: Any) -> ReleaseCheck:
 
     fallback_candidates = payload.get("fallback_candidates")
     viable_fallbacks = payload.get("viable_fallbacks")
+    fallback_candidates_valid = isinstance(fallback_candidates, list) and all(
+        isinstance(item, str) and item.strip() for item in fallback_candidates
+    )
+    viable_fallbacks_valid = isinstance(viable_fallbacks, list) and all(
+        isinstance(item, str) and item.strip() for item in viable_fallbacks
+    )
     for field, values in (
         ("fallback_candidates", fallback_candidates),
         ("viable_fallbacks", viable_fallbacks),
@@ -1234,6 +1242,13 @@ def check_fallback_simulation_payload(payload: Any) -> ReleaseCheck:
         elif any(not isinstance(item, str) or not item.strip() for item in values):
             errors.append(f"fallback simulation has invalid {field} entries")
 
+    if (
+        fallback_candidates_valid
+        and viable_fallbacks_valid
+        and not set(viable_fallbacks).issubset(fallback_candidates)
+    ):
+        errors.append("fallback simulation has viable fallbacks outside fallback_candidates")
+
     if status == "ready" and (
         credential_state != "existing-local"
         or not isinstance(fallback_candidates, list)
@@ -1242,13 +1257,6 @@ def check_fallback_simulation_payload(payload: Any) -> ReleaseCheck:
         or not viable_fallbacks
     ):
         errors.append("ready fallback simulation requires existing-local credentials and fallback coverage")
-    elif (
-        status == "ready"
-        and isinstance(fallback_candidates, list)
-        and isinstance(viable_fallbacks, list)
-        and not set(viable_fallbacks).issubset(fallback_candidates)
-    ):
-        errors.append("ready fallback simulation has viable fallbacks outside fallback_candidates")
 
     redaction_findings = find_sensitive_text_leaks(
         json.dumps(payload, ensure_ascii=False, sort_keys=True)
