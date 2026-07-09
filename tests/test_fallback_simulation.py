@@ -128,6 +128,22 @@ def test_redacted_runtime_credential_without_preview_key_requires_credentials() 
     assert result.viable_fallbacks == []
 
 
+@pytest.mark.parametrize("runtime_key", ["[redacted]", "<redacted>", "..."])
+def test_placeholder_runtime_openai_credentials_cannot_make_fallback_ready(runtime_key: str) -> None:
+    result = simulate_fallback_patch(
+        ".",
+        runtime={
+            "model": "claude-sonnet-4-20250514",
+            "openaiApiKey": runtime_key,
+        },
+        preview=_openai_preview(),
+    )
+
+    assert result.status == "requires-credentials"
+    assert result.credential_state == "placeholder"
+    assert result.viable_fallbacks == []
+
+
 def test_fallback_candidates_follow_configuration_precedence() -> None:
     preview = _openai_preview()
     preview["merge_patch"].update(

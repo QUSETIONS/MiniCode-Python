@@ -26,7 +26,7 @@ ENV_RUNTIME_KEYS = {
     "CUSTOM_API_KEY": "customApiKey",
     "CUSTOM_API_BASE_URL": "customBaseUrl",
 }
-PLACEHOLDERS = {"", "[REDACTED]", "sk-...", "sk-or-..."}
+PLACEHOLDERS = {"", "[redacted]", "<redacted>", "...", "sk-...", "sk-or-..."}
 _FALLBACK_ROOTS = (
     "fallbackModels",
     "anthropicFallbackModels",
@@ -78,12 +78,16 @@ def select_fallback_preview(payload: Any, label: str) -> tuple[dict[str, Any] | 
     return matches[0], ""
 
 
+def _normalize_credential_marker(value: Any) -> str:
+    return value.strip().casefold() if isinstance(value, str) else ""
+
+
 def _is_placeholder(value: Any) -> bool:
-    return not isinstance(value, str) or value.strip() in PLACEHOLDERS
+    return not isinstance(value, str) or _normalize_credential_marker(value) in PLACEHOLDERS
 
 
 def _is_real_credential(value: Any) -> bool:
-    return isinstance(value, str) and value.strip() not in PLACEHOLDERS
+    return isinstance(value, str) and not _is_placeholder(value)
 
 
 def _invalid_result(label: str, issue: str) -> FallbackSimulation:
