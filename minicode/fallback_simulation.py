@@ -28,7 +28,13 @@ ENV_RUNTIME_KEYS = {
     "CUSTOM_API_BASE_URL": "customBaseUrl",
 }
 PLACEHOLDERS = {"", "[REDACTED]", "sk-...", "sk-or-..."}
-_FALLBACK_ROOTS = tuple(root for root in ALLOWED_PATCH_ROOTS if root != "env")
+_FALLBACK_ROOTS = (
+    "fallbackModels",
+    "anthropicFallbackModels",
+    "openaiFallbackModels",
+    "openrouterFallbackModels",
+    "customFallbackModels",
+)
 _CREDENTIAL_RUNTIME_KEYS = {"apiKey", "authToken", "openaiApiKey", "openrouterApiKey", "customApiKey"}
 
 
@@ -180,6 +186,11 @@ def simulate_fallback_patch(
                 effective_runtime[runtime_key] = ""
         else:
             effective_runtime[runtime_key] = value
+
+    # Preview credentials are never usable. Retain only actual local runtime credentials.
+    for runtime_key in _CREDENTIAL_RUNTIME_KEYS:
+        if not _is_real_credential(effective_runtime.get(runtime_key)):
+            effective_runtime[runtime_key] = ""
 
     report = build_readiness_report(cwd, runtime=effective_runtime)
     viable_fallbacks = [

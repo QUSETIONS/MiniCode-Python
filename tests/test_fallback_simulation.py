@@ -55,6 +55,48 @@ def test_existing_real_runtime_credential_can_be_ready() -> None:
     assert result.viable_fallbacks == ["gpt-4o"]
 
 
+def test_redacted_runtime_credential_without_preview_key_requires_credentials() -> None:
+    preview = _openai_preview()
+    del preview["merge_patch"]["env"]["OPENAI_API_KEY"]
+
+    result = simulate_fallback_patch(
+        ".",
+        runtime={
+            "model": "claude-sonnet-4-20250514",
+            "authToken": "primary-token",
+            "baseUrl": "https://api.anthropic.com",
+            "openaiApiKey": "[REDACTED]",
+        },
+        preview=preview,
+    )
+
+    assert result.status == "requires-credentials"
+    assert result.credential_state == "placeholder"
+    assert result.viable_fallbacks == []
+
+
+def test_fallback_candidates_follow_configuration_precedence() -> None:
+    preview = _openai_preview()
+    preview["merge_patch"].update(
+        {
+            "anthropicFallbackModels": ["claude-sonnet-4-20250514"],
+            "openaiFallbackModels": ["gpt-4.1"],
+            "openrouterFallbackModels": ["openrouter/auto"],
+            "customFallbackModels": ["custom-model"],
+        }
+    )
+
+    result = simulate_fallback_patch(".", runtime={"model": "x"}, preview=preview)
+
+    assert result.fallback_candidates == [
+        "gpt-4o",
+        "claude-sonnet-4-20250514",
+        "gpt-4.1",
+        "openrouter/auto",
+        "custom-model",
+    ]
+
+
 def test_patch_real_credential_is_unsafe() -> None:
     result = simulate_fallback_patch(
         ".",
