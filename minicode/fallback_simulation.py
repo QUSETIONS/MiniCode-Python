@@ -26,7 +26,8 @@ ENV_RUNTIME_KEYS = {
     "CUSTOM_API_KEY": "customApiKey",
     "CUSTOM_API_BASE_URL": "customBaseUrl",
 }
-PLACEHOLDERS = {"", "[redacted]", "<redacted>", "...", "sk-...", "sk-or-..."}
+_PLACEHOLDER_MARKERS = {"null", "none", "redacted", "masked", "placeholder", "changeme"}
+_MIN_CREDENTIAL_LENGTH = 16
 _FALLBACK_ROOTS = (
     "fallbackModels",
     "anthropicFallbackModels",
@@ -83,7 +84,20 @@ def _normalize_credential_marker(value: Any) -> str:
 
 
 def _is_placeholder(value: Any) -> bool:
-    return not isinstance(value, str) or _normalize_credential_marker(value) in PLACEHOLDERS
+    if not isinstance(value, str):
+        return True
+
+    marker = _normalize_credential_marker(value)
+    compact_marker = "".join(character for character in marker if character.isalnum())
+    if not marker or compact_marker in _PLACEHOLDER_MARKERS:
+        return True
+    if "redacted" in marker or "placeholder" in marker:
+        return True
+    if not any(character.isalnum() for character in marker):
+        return True
+    if marker.endswith("..."):
+        return True
+    return len(marker) < _MIN_CREDENTIAL_LENGTH
 
 
 def _is_real_credential(value: Any) -> bool:

@@ -128,7 +128,19 @@ def test_redacted_runtime_credential_without_preview_key_requires_credentials() 
     assert result.viable_fallbacks == []
 
 
-@pytest.mark.parametrize("runtime_key", ["[redacted]", "<redacted>", "..."])
+@pytest.mark.parametrize(
+    "runtime_key",
+    [
+        "[redacted]",
+        "<redacted>",
+        "...",
+        "***",
+        "null",
+        "sk-proj-...",
+        "placeholder",
+        "your-api-key",
+    ],
+)
 def test_placeholder_runtime_openai_credentials_cannot_make_fallback_ready(runtime_key: str) -> None:
     result = simulate_fallback_patch(
         ".",
