@@ -3,6 +3,7 @@ import urllib.request
 import pytest
 
 from minicode.fallback_simulation import (
+    _static_provider,
     select_fallback_preview,
     simulate_fallback_patch,
 )
@@ -57,6 +58,27 @@ def test_existing_real_runtime_credential_can_be_ready() -> None:
     assert result.status == "ready"
     assert result.credential_state == "existing-local"
     assert result.viable_fallbacks == ["gpt-4o"]
+
+
+def test_vendor_prefixed_openai_fallback_uses_custom_runtime_and_is_ready() -> None:
+    runtime = {
+        "model": "claude-sonnet-4-20250514",
+        "openaiBaseUrl": "https://provider.example.test/v1",
+        "customBaseUrl": "https://custom.example.test/v1",
+        "customApiKey": "existing-custom-secret",
+    }
+    result = simulate_fallback_patch(
+        ".",
+        runtime=runtime,
+        preview={
+            "label": "Custom fallback",
+            "merge_patch": {"fallbackModels": ["openai/gpt-4o"]},
+        },
+    )
+
+    assert _static_provider("openai/gpt-4o", runtime) == "custom"
+    assert result.status == "ready"
+    assert result.viable_fallbacks == ["openai/gpt-4o"]
 
 
 def test_existing_local_openai_credential_never_probes_or_calls_network(

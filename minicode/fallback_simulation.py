@@ -49,6 +49,7 @@ _OPENROUTER_PREFIXES = (
     "minimax/",
     "mistralai/",
 )
+_VENDOR_PREFIXES = _OPENROUTER_PREFIXES[1:]
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,13 +126,18 @@ def _patch_fallback_models(merge_patch: dict[str, Any]) -> list[str] | None:
     return models
 
 
-def _static_provider(model: str) -> str:
+def _static_provider(model: str, runtime: dict[str, Any] | None = None) -> str:
     normalized = model.strip()
+    normalized_lower = normalized.lower()
+    if normalized_lower.startswith(_VENDOR_PREFIXES):
+        if runtime and runtime.get("openaiBaseUrl"):
+            return Provider.CUSTOM.value
+        return Provider.OPENROUTER.value
+
     model_info = BUILTIN_MODELS.get(normalized)
     if model_info is not None:
         return model_info.provider.value
 
-    normalized_lower = normalized.lower()
     for known_model, known_info in BUILTIN_MODELS.items():
         if known_model.lower() == normalized_lower:
             return known_info.provider.value
@@ -169,7 +175,7 @@ def _safe_origin(value: Any) -> str:
 
 
 def _candidate_validation_errors(runtime: dict[str, Any], candidate: str) -> list[str]:
-    provider = _static_provider(candidate)
+    provider = _static_provider(candidate, runtime)
     provider_requirements = {
         Provider.ANTHROPIC.value: (("apiKey", "authToken"), "baseUrl"),
         Provider.OPENAI.value: (("openaiApiKey",), "openaiBaseUrl"),
@@ -192,7 +198,7 @@ def _candidate_validation_errors(runtime: dict[str, Any], candidate: str) -> lis
 def _credential_state(runtime: dict[str, Any], candidates: list[str]) -> str:
     credential_keys: set[str] = set()
     for candidate in candidates:
-        provider = _static_provider(candidate)
+        provider = _static_provider(candidate, runtime)
         if provider == "anthropic":
             credential_keys.update({"apiKey", "authToken"})
         elif provider == "openai":
@@ -211,7 +217,7 @@ def _credential_state(runtime: dict[str, Any], candidates: list[str]) -> str:
 
 def _effective_config(runtime: dict[str, Any], candidates: list[str]) -> dict[str, Any]:
     return {
-        "primary_provider": _static_provider(str(runtime.get("model", ""))),
+        "primary_provider": _static_provider(str(runtime.get("model", "")), runtime),
         "fallback_candidates": list(candidates),
         "base_urls": {
             "anthropic": _safe_origin(runtime.get("baseUrl")),
