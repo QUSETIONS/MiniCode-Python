@@ -302,7 +302,9 @@ class TestAgentLoopPerformance:
     def test_concurrent_vs_serial_speedup(self):
         """Compare concurrent vs serial tool execution speedup."""
         num_tools = 4
-        tool_delay = 0.05
+        # Keep the workload well above hosted-runner scheduling jitter so the
+        # ratio measures concurrency rather than short-sleep wakeup latency.
+        tool_delay = 0.2
 
         # Serial execution
         def run_serial():
