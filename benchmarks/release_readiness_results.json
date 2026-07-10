@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-10T04:07:52.718360+00:00",
+  "generated_at": "2026-07-10T04:23:46.564243+00:00",
   "status": "blocked",
   "local_gate_status": "blocked",
   "provider_status": "at-risk",
@@ -22,8 +22,8 @@
     "command": "/usr/bin/python3 -m pytest -q",
     "exit_code": 0,
     "status": "passed",
-    "summary": "1294 passed, 2 skipped in 116.83s (0:01:56)",
-    "stdout": "........................................................................ [  5%]\n........................................................................ [ 11%]\n........................................................................ [ 16%]\n........................................................................ [ 22%]\n........................................................................ [ 27%]\n........................................................................ [ 33%]\n........................................................................ [ 38%]\n........................................................................ [ 44%]\n........................................................................ [ 50%]\n......ss................................................................ [ 55%]\n........................................................................ [ 61%]\n........................................................................ [ 66%]\n........................................................................ [ 72%]\n........................................................................ [ 77%]\n........................................................................ [ 83%]\n........................................................................ [ 88%]\n........................................................................ [ 94%]\n........................................................................ [100%]\n1294 passed, 2 skipped in 116.83s (0:01:56)",
+    "summary": "1297 passed, 2 skipped in 106.00s (0:01:46)",
+    "stdout": "........................................................................ [  5%]\n........................................................................ [ 11%]\n........................................................................ [ 16%]\n........................................................................ [ 22%]\n........................................................................ [ 27%]\n........................................................................ [ 33%]\n........................................................................ [ 38%]\n........................................................................ [ 44%]\n........................................................................ [ 49%]\n........ss.............................................................. [ 55%]\n........................................................................ [ 60%]\n........................................................................ [ 66%]\n........................................................................ [ 72%]\n........................................................................ [ 77%]\n........................................................................ [ 83%]\n........................................................................ [ 88%]\n........................................................................ [ 94%]\n........................................................................ [ 99%]\n...                                                                      [100%]\n1297 passed, 2 skipped in 106.00s (0:01:46)",
     "stderr": ""
   },
   "runtime_eval_check": {
@@ -51,7 +51,7 @@
       "exit_code": 0,
       "status": "passed",
       "summary": "Total: 1 session(s)",
-      "stdout": "Saved sessions:\n\n  1. [e86ac147] 2026-07-10 04:07 - outputs/release_smoke_workspace\n     Messages: 0 | First: (empty)\n     Checkpoints: 1\n     Runtime: phase:verify@2\n\nTotal: 1 session(s)",
+      "stdout": "Saved sessions:\n\n  1. [3deaf1c7] 2026-07-10 04:23 - outputs/release_smoke_workspace\n     Messages: 0 | First: (empty)\n     Checkpoints: 1\n     Runtime: phase:verify@2\n\nTotal: 1 session(s)",
       "stderr": ""
     },
     {
@@ -60,7 +60,7 @@
       "exit_code": 0,
       "status": "passed",
       "summary": "- [tool:edit_file/success] Patched demo.txt",
-      "stdout": "Session inspect: e86ac147\n  Created: 2026-07-10 04:07:52\n  Updated: 2026-07-10 04:07:53\n  Workspace: outputs/release_smoke_workspace\n  Messages: 0\n  Transcript entries: 2\n  History entries: 1\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 1\n  Runtime: phase:verify@2\n  Readiness: ready via anthropic-compatible\n  Instructions: 1 layer(s): project-managed\n  Hooks: 1/1 hook(s) enabled\n  Delegation: 1 running, 3 slot(s) open\n  Extensions: 1 extension(s): git-helpers\n\nRecent checkpoints: 1 saved; latest [829dada0] demo.txt\n\nInstruction layers:\n  - project-managed [project/managed, present] Prefer verification-first delivery.\n\nHook surface:\n  1/1 hook(s) enabled\n\nDelegation surface:\n  1 running, 3 slot(s) open\n  - lint-worker :: running\n\nExtensions:\n  - git-helpers [project] 1.0.0, enabled :: Local helper bundle\n\nReadiness:\n  ready via anthropic-compatible (ready)\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] Patched demo.txt",
+      "stdout": "Session inspect: 3deaf1c7\n  Created: 2026-07-10 04:23:46\n  Updated: 2026-07-10 04:23:46\n  Workspace: outputs/release_smoke_workspace\n  Messages: 0\n  Transcript entries: 2\n  History entries: 1\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 1\n  Runtime: phase:verify@2\n  Readiness: ready via anthropic-compatible\n  Instructions: 1 layer(s): project-managed\n  Hooks: 1/1 hook(s) enabled\n  Delegation: 1 running, 3 slot(s) open\n  Extensions: 1 extension(s): git-helpers\n\nRecent checkpoints: 1 saved; latest [b2fa7806] demo.txt\n\nInstruction layers:\n  - project-managed [project/managed, present] Prefer verification-first delivery.\n\nHook surface:\n  1/1 hook(s) enabled\n\nDelegation surface:\n  1 running, 3 slot(s) open\n  - lint-worker :: running\n\nExtensions:\n  - git-helpers [project] 1.0.0, enabled :: Local helper bundle\n\nReadiness:\n  ready via anthropic-compatible (ready)\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] Patched demo.txt",
       "stderr": ""
     },
     {
@@ -69,7 +69,7 @@
       "exit_code": 0,
       "status": "passed",
       "summary": "- [tool:edit_file/success] Patched demo.txt",
-      "stdout": "Session replay: e86ac147\n  Workspace: outputs/release_smoke_workspace\n  Created: 2026-07-10 04:07:52\n  Updated: 2026-07-10 04:07:53\n  Runtime: phase:verify@2\n  Checkpoints: 1\n  Readiness: ready via anthropic-compatible\n  Delegation: 1 running, 3 slot(s) open\n\nCheckpoint trail (1 shown):\n  - [829dada0] 2026-07-10 04:07:52 :: demo.txt (edit)\n\nInstruction layers:\n  - project-managed [project/managed, present] Prefer verification-first delivery.\n\nExtensions:\n  - git-helpers [project] 1.0.0, enabled :: Local helper bundle\n\nPrompt history (1 shown):\n  1. continue with runtime trace\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] Patched demo.txt",
+      "stdout": "Session replay: 3deaf1c7\n  Workspace: outputs/release_smoke_workspace\n  Created: 2026-07-10 04:23:46\n  Updated: 2026-07-10 04:23:46\n  Runtime: phase:verify@2\n  Checkpoints: 1\n  Readiness: ready via anthropic-compatible\n  Delegation: 1 running, 3 slot(s) open\n\nCheckpoint trail (1 shown):\n  - [b2fa7806] 2026-07-10 04:23:46 :: demo.txt (edit)\n\nInstruction layers:\n  - project-managed [project/managed, present] Prefer verification-first delivery.\n\nExtensions:\n  - git-helpers [project] 1.0.0, enabled :: Local helper bundle\n\nPrompt history (1 shown):\n  1. continue with runtime trace\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] Patched demo.txt",
       "stderr": ""
     },
     {
@@ -78,7 +78,7 @@
       "exit_code": 0,
       "status": "passed",
       "summary": "Type: edit",
-      "stdout": "Rewind preview for session e86ac147:\n\nWould restore 1 checkpoint(s) across 1 file(s).\nMode: restore pre-edit file snapshots.\n\nPlanned restores:\n  1. [829dada0] 2026-07-10 04:07:52 - outputs/release_smoke_workspace/demo.txt\n     Restores: existing file\n     Type: edit",
+      "stdout": "Rewind preview for session 3deaf1c7:\n\nWould restore 1 checkpoint(s) across 1 file(s).\nMode: restore pre-edit file snapshots.\n\nPlanned restores:\n  1. [b2fa7806] 2026-07-10 04:23:46 - outputs/release_smoke_workspace/demo.txt\n     Restores: existing file\n     Type: edit",
       "stderr": ""
     },
     {
@@ -259,9 +259,9 @@
       "outcome": "provider_channel_unavailable",
       "command": "/usr/bin/python3 -m minicode.headless Reply with exactly OK.",
       "exit_code": 1,
-      "summary": "2026-07-10 12:10:00,749 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).",
+      "summary": "2026-07-10 12:25:41,644 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).",
       "stdout": "",
-      "stderr": "2026-07-10 12:10:00,749 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).\n2026-07-10 12:10:00,750 [ERROR] minicode.headless: Config load failed: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\nTraceback (most recent call last):\n  File \"minicode/headless.py\", line 178, in run_headless\n    runtime = load_runtime_config(cwd)\n              ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"minicode/config.py\", line 560, in load_runtime_config\n    raise RuntimeError(\"No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\")\nRuntimeError: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\n2026-07-10 12:10:00,754 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).\nConfig error: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\n",
+      "stderr": "2026-07-10 12:25:41,644 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).\n2026-07-10 12:25:41,645 [ERROR] minicode.headless: Config load failed: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\nTraceback (most recent call last):\n  File \"minicode/headless.py\", line 178, in run_headless\n    runtime = load_runtime_config(cwd)\n              ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"minicode/config.py\", line 560, in load_runtime_config\n    raise RuntimeError(\"No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\")\nRuntimeError: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\n2026-07-10 12:25:41,648 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).\nConfig error: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\n",
       "risk_scope": "provider-config",
       "error_code": "",
       "request_id": "",
@@ -333,15 +333,15 @@
       "label": "json",
       "path": "benchmarks/runtime_profile_eval_results.json",
       "exists": true,
-      "size_bytes": 6224,
-      "sha256": "f184ded420f10adf1e0b09df1c4d44d2d9f5a6b9409e1e7a5cfffb8251a4800a"
+      "size_bytes": 6227,
+      "sha256": "bc160c17a80ffec90b19d00680be7379a2f337dc3aebe461ed7d87d356e595b9"
     },
     {
       "label": "markdown",
       "path": "benchmarks/runtime_profile_eval_results.md",
       "exists": true,
-      "size_bytes": 2375,
-      "sha256": "6889ad103f81d495edada48585e503aacf611a76571212e99a0db48ed537204e"
+      "size_bytes": 2374,
+      "sha256": "4b88fb8c3795d9c5cbba56d1eebe47e774c4c380d00509949d59ff90adb7d6cd"
     },
     {
       "label": "patch_preview_json",
@@ -362,7 +362,7 @@
       "path": ".temp/structure-compliance.json",
       "exists": true,
       "size_bytes": 89486,
-      "sha256": "f75889197004160fa8f4ad25a1f23aaf27f67ca1c5a8443ea9d99796e232e980"
+      "sha256": "ae1d66d73debe0588536f4d3d1d4c5fb45d763a37b7c07094e87e4fd87e47849"
     }
   ],
   "readiness_report": {

@@ -4,17 +4,17 @@
 
 | condition | runs | completion_rate | widened_rate | verification_guard_rate | avg_model_calls | avg_runtime_events | avg_wall_time_ms |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| single | 2 | 0.00 | 0.00 | 0.00 | 1.00 | 2.00 | 16.41 |
-| single-deep | 2 | 1.00 | 0.50 | 0.00 | 6.00 | 4.50 | 6.79 |
+| single | 2 | 0.00 | 0.00 | 0.00 | 1.00 | 2.00 | 7.49 |
+| single-deep | 2 | 1.00 | 0.50 | 0.00 | 6.00 | 4.50 | 3.48 |
 
 ## Scenario Rows
 
 | scenario | condition | completed | stop_reason | widened | verification_guard | runtime_events | model_calls | wall_time_ms | final_message |
 | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | --- |
-| depth-budget-floor | single | no | max_steps | no | no | 2 | 1 | 29.67 | Reached the maximum tool step limit for this turn. |
-| depth-budget-floor | single-deep | yes | done | no | no | 2 | 2 | 5.82 | done |
-| widening-escalation | single | no | max_steps | no | no | 2 | 1 | 3.14 | Reached the maximum tool step limit for this turn. |
-| widening-escalation | single-deep | yes | done | yes | no | 7 | 10 | 7.75 | done with a broader plan |
+| depth-budget-floor | single | no | max_steps | no | no | 2 | 1 | 12.95 | Reached the maximum tool step limit for this turn. |
+| depth-budget-floor | single-deep | yes | done | no | no | 2 | 2 | 2.63 | done |
+| widening-escalation | single | no | max_steps | no | no | 2 | 1 | 2.03 | Reached the maximum tool step limit for this turn. |
+| widening-escalation | single-deep | yes | done | yes | no | 7 | 10 | 4.33 | done with a broader plan |
 
 ## Runtime Timelines
 
@@ -27,7 +27,7 @@
 
 | label | outcome | category | retryable | ownership | recovery_action | risk_scope | readiness | repair_steps | trace | error_code | request_id | exit_code | summary |
 | --- | --- | --- | --- | --- | --- | --- | --- | ---: | --- | --- | --- | ---: | --- |
-| headless-smoke | provider_channel_unavailable | configuration | no | local-configuration | Repair model-to-provider channel configuration. | provider-config | blocked | 6 | .temp/headless-provider-smoke-trace.json | - | - | 1 | 2026-07-10 12:10:00,749 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --... |
+| headless-smoke | provider_channel_unavailable | configuration | no | local-configuration | Repair model-to-provider channel configuration. | provider-config | blocked | 6 | .temp/headless-provider-smoke-trace.json | - | - | 1 | 2026-07-10 12:25:41,644 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --... |
 
 Guidance for `headless-smoke`:
 - Verify the selected model group and provider channel configuration.

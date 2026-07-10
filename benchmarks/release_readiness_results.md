@@ -1,6 +1,6 @@
 # MiniCode Release Readiness
 
-- Generated at: 2026-07-10T04:07:52.718360+00:00
+- Generated at: 2026-07-10T04:23:46.564243+00:00
 - Status: blocked
 - Local gates: blocked
 - Provider status: at-risk
@@ -16,7 +16,7 @@
 | check | status | exit_code | summary |
 | --- | --- | ---: | --- |
 | compileall | passed | 0 | compileall completed. |
-| pytest-q | passed | 0 | 1294 passed, 2 skipped in 116.83s (0:01:56) |
+| pytest-q | passed | 0 | 1297 passed, 2 skipped in 106.00s (0:01:46) |
 | runtime-profile-eval | passed | 0 | benchmarks/runtime_profile_eval_results.md |
 | structure-compliance | passed | 0 | quality gate findings: 0 |
 
@@ -52,7 +52,7 @@
 
 | label | outcome | failure_category | retryable | ownership | recovery_action | risk_scope | error_code | request_id | exit_code | summary |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | --- |
-| headless-smoke | provider_channel_unavailable | configuration | false | local-configuration | Repair model-to-provider channel configuration. | provider-config | - | - | 1 | 2026-07-10 12:10:00,749 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1). |
+| headless-smoke | provider_channel_unavailable | configuration | false | local-configuration | Repair model-to-provider channel configuration. | provider-config | - | - | 1 | 2026-07-10 12:25:41,644 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1). |
 
 ## Provider Action Items
 
@@ -124,8 +124,8 @@
 | fallback_examples_json | yes | 876 | ceee505c6b4d | .temp/readiness-fallback-examples.json |
 | fallback_simulations_json | yes | 875 | 1355d9236755 | .temp/readiness-bundle/readiness-fallback-simulations.json |
 | headless_trace | yes | 7947 | 642d9adad0bc | .temp/headless-provider-smoke-trace.json |
-| json | yes | 6224 | f184ded420f1 | benchmarks/runtime_profile_eval_results.json |
-| markdown | yes | 2375 | 6889ad103f81 | benchmarks/runtime_profile_eval_results.md |
+| json | yes | 6227 | bc160c17a80f | benchmarks/runtime_profile_eval_results.json |
+| markdown | yes | 2374 | 4b88fb8c3795 | benchmarks/runtime_profile_eval_results.md |
 | patch_preview_json | yes | 1611 | d3f81131954a | .temp/readiness-fallback-patch-preview.json |
 | repair_plan_json | yes | 2473 | d037b4854529 | .temp/readiness-repair-plan.json |
-| structure_compliance | yes | 89486 | f75889197004 | .temp/structure-compliance.json |
+| structure_compliance | yes | 89486 | ae1d66d73deb | .temp/structure-compliance.json |
