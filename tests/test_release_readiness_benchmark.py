@@ -19,6 +19,7 @@ from benchmarks.release_readiness import (
     _prepare_saved_session,
     _readiness_snapshot,
     _run_command,
+    _normalize_evidence_paths,
     main as release_readiness_main,
 )
 from minicode.product_surfaces import ReadinessReport
@@ -37,6 +38,28 @@ def test_release_readiness_command_preserves_repo_import_path(tmp_path: Path) ->
     assert check.status == "passed"
     assert check.exit_code == 0
     assert check.stdout == "OK"
+
+
+def test_release_evidence_paths_are_portable(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    home = tmp_path / "home"
+    payload = {
+        "path": str(repo / ".temp" / "trace.json"),
+        "command": f"python {repo / 'benchmarks' / 'release_readiness.py'}",
+        "home_path": str(home / ".mini-code" / "settings.json"),
+        "nested": [str(repo), 7, False, None],
+        "similar_prefix": f"{repo}-archive",
+    }
+
+    normalized = _normalize_evidence_paths(payload, repo_root=repo, home=home)
+
+    assert normalized == {
+        "path": ".temp/trace.json",
+        "command": "python benchmarks/release_readiness.py",
+        "home_path": "~/.mini-code/settings.json",
+        "nested": [".", 7, False, None],
+        "similar_prefix": f"{repo}-archive",
+    }
 
 
 def test_release_readiness_command_summarizes_readiness_json(tmp_path: Path) -> None:

@@ -49,6 +49,42 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 BENCHMARKS_DIR = REPO_ROOT / "benchmarks"
 
 
+def _normalize_evidence_paths(
+    value: object,
+    *,
+    repo_root: Path = REPO_ROOT,
+    home: Path | None = None,
+) -> object:
+    if isinstance(value, dict):
+        return {
+            key: _normalize_evidence_paths(item, repo_root=repo_root, home=home)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [
+            _normalize_evidence_paths(item, repo_root=repo_root, home=home)
+            for item in value
+        ]
+    if isinstance(value, tuple):
+        return tuple(
+            _normalize_evidence_paths(item, repo_root=repo_root, home=home)
+            for item in value
+        )
+    if not isinstance(value, str):
+        return value
+
+    repo_text = str(repo_root.resolve())
+    home_text = str((home or Path.home()).resolve())
+    normalized = value.replace(f"{repo_text}{os.sep}", "")
+    if normalized == repo_text:
+        normalized = "."
+    if home_text != repo_text:
+        normalized = normalized.replace(f"{home_text}{os.sep}", f"~{os.sep}")
+        if normalized == home_text:
+            normalized = "~"
+    return normalized
+
+
 def _run_command(label: str, command: list[str], *, cwd: Path, timeout: int = 1800) -> ReleaseCheck:
     env = dict(os.environ)
     existing_pythonpath = env.get("PYTHONPATH", "")
@@ -779,6 +815,8 @@ def main(argv: list[str] | None = None) -> int:
         artifact_manifest=artifact_manifest,
         readiness_report=readiness_snapshot,
     )
+    payload = _normalize_evidence_paths(payload)
+    markdown = _normalize_evidence_paths(markdown)
 
     json_path = BENCHMARKS_DIR / "release_readiness_results.json"
     markdown_path = BENCHMARKS_DIR / "release_readiness_results.md"
