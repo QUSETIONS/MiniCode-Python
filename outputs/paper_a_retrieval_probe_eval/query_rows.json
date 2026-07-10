@@ -1,0 +1,911 @@
+[
+  {
+    "stage": "bm25_only",
+    "stage_label": "BM25 Only",
+    "diagnostic_upper_bound": false,
+    "query_id": "q1",
+    "family": "single_domain",
+    "prompt": "Create a login form component with email validation",
+    "active_domains": [
+      "frontend"
+    ],
+    "ground_truth_ids": [
+      "fe-02",
+      "fe-04",
+      "fe-06",
+      "fe-05",
+      "fe-01"
+    ],
+    "retrieved_ids": [
+      "fe-02",
+      "be-08",
+      "fe-13",
+      "te-01",
+      "be-04"
+    ],
+    "precision_at_3": 0.3333333333333333,
+    "recall_at_5": 0.2,
+    "noise_at_5": 0.6
+  },
+  {
+    "stage": "domain_weighted",
+    "stage_label": "Domain Weighted",
+    "diagnostic_upper_bound": false,
+    "query_id": "q1",
+    "family": "single_domain",
+    "prompt": "Create a login form component with email validation",
+    "active_domains": [
+      "frontend"
+    ],
+    "ground_truth_ids": [
+      "fe-02",
+      "fe-04",
+      "fe-06",
+      "fe-05",
+      "fe-01"
+    ],
+    "retrieved_ids": [
+      "fe-02",
+      "be-04",
+      "fe-13",
+      "fe-01",
+      "fe-12"
+    ],
+    "precision_at_3": 0.3333333333333333,
+    "recall_at_5": 0.4,
+    "noise_at_5": 0.2
+  },
+  {
+    "stage": "oracle_ceiling",
+    "stage_label": "Oracle Ceiling",
+    "diagnostic_upper_bound": true,
+    "query_id": "q1",
+    "family": "single_domain",
+    "prompt": "Create a login form component with email validation",
+    "active_domains": [
+      "frontend"
+    ],
+    "ground_truth_ids": [
+      "fe-02",
+      "fe-04",
+      "fe-06",
+      "fe-05",
+      "fe-01"
+    ],
+    "retrieved_ids": [
+      "fe-02",
+      "fe-01",
+      "fe-05",
+      "fe-06",
+      "fe-04"
+    ],
+    "precision_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "noise_at_5": 0.0
+  },
+  {
+    "stage": "bm25_only",
+    "stage_label": "BM25 Only",
+    "diagnostic_upper_bound": false,
+    "query_id": "q2",
+    "family": "single_domain",
+    "prompt": "Implement JWT token refresh in axios interceptor",
+    "active_domains": [
+      "frontend"
+    ],
+    "ground_truth_ids": [
+      "fe-06",
+      "be-02",
+      "fe-01"
+    ],
+    "retrieved_ids": [
+      "fe-06",
+      "be-02",
+      "fe-13",
+      "be-04",
+      "te-01"
+    ],
+    "precision_at_3": 0.6666666666666666,
+    "recall_at_5": 0.6666666666666666,
+    "noise_at_5": 0.6
+  },
+  {
+    "stage": "domain_weighted",
+    "stage_label": "Domain Weighted",
+    "diagnostic_upper_bound": false,
+    "query_id": "q2",
+    "family": "single_domain",
+    "prompt": "Implement JWT token refresh in axios interceptor",
+    "active_domains": [
+      "frontend"
+    ],
+    "ground_truth_ids": [
+      "fe-06",
+      "be-02",
+      "fe-01"
+    ],
+    "retrieved_ids": [
+      "fe-06",
+      "be-02",
+      "fe-13",
+      "fe-02",
+      "fe-05"
+    ],
+    "precision_at_3": 0.6666666666666666,
+    "recall_at_5": 0.6666666666666666,
+    "noise_at_5": 0.2
+  },
+  {
+    "stage": "oracle_ceiling",
+    "stage_label": "Oracle Ceiling",
+    "diagnostic_upper_bound": true,
+    "query_id": "q2",
+    "family": "single_domain",
+    "prompt": "Implement JWT token refresh in axios interceptor",
+    "active_domains": [
+      "frontend"
+    ],
+    "ground_truth_ids": [
+      "fe-06",
+      "be-02",
+      "fe-01"
+    ],
+    "retrieved_ids": [
+      "fe-06",
+      "be-02"
+    ],
+    "precision_at_3": 0.6666666666666666,
+    "recall_at_5": 0.6666666666666666,
+    "noise_at_5": 0.5
+  },
+  {
+    "stage": "bm25_only",
+    "stage_label": "BM25 Only",
+    "diagnostic_upper_bound": false,
+    "query_id": "q3",
+    "family": "single_domain",
+    "prompt": "Add rate limiting middleware to FastAPI",
+    "active_domains": [
+      "backend"
+    ],
+    "ground_truth_ids": [
+      "be-03",
+      "be-01",
+      "be-04"
+    ],
+    "retrieved_ids": [
+      "fe-13",
+      "be-04",
+      "do-05",
+      "fe-06",
+      "be-03"
+    ],
+    "precision_at_3": 0.3333333333333333,
+    "recall_at_5": 0.6666666666666666,
+    "noise_at_5": 0.6
+  },
+  {
+    "stage": "domain_weighted",
+    "stage_label": "Domain Weighted",
+    "diagnostic_upper_bound": false,
+    "query_id": "q3",
+    "family": "single_domain",
+    "prompt": "Add rate limiting middleware to FastAPI",
+    "active_domains": [
+      "backend"
+    ],
+    "ground_truth_ids": [
+      "be-03",
+      "be-01",
+      "be-04"
+    ],
+    "retrieved_ids": [
+      "be-03",
+      "be-04",
+      "fe-13",
+      "do-05",
+      "db-08"
+    ],
+    "precision_at_3": 0.6666666666666666,
+    "recall_at_5": 0.6666666666666666,
+    "noise_at_5": 0.6
+  },
+  {
+    "stage": "oracle_ceiling",
+    "stage_label": "Oracle Ceiling",
+    "diagnostic_upper_bound": true,
+    "query_id": "q3",
+    "family": "single_domain",
+    "prompt": "Add rate limiting middleware to FastAPI",
+    "active_domains": [
+      "backend"
+    ],
+    "ground_truth_ids": [
+      "be-03",
+      "be-01",
+      "be-04"
+    ],
+    "retrieved_ids": [
+      "be-03",
+      "be-04",
+      "be-01"
+    ],
+    "precision_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "noise_at_5": 0.0
+  },
+  {
+    "stage": "bm25_only",
+    "stage_label": "BM25 Only",
+    "diagnostic_upper_bound": false,
+    "query_id": "q4",
+    "family": "single_domain",
+    "prompt": "Set up async background task for sending email",
+    "active_domains": [
+      "backend"
+    ],
+    "ground_truth_ids": [
+      "be-07",
+      "be-08",
+      "be-01"
+    ],
+    "retrieved_ids": [
+      "be-08",
+      "be-07",
+      "fe-06",
+      "fe-02",
+      "te-01"
+    ],
+    "precision_at_3": 0.6666666666666666,
+    "recall_at_5": 0.6666666666666666,
+    "noise_at_5": 0.6
+  },
+  {
+    "stage": "domain_weighted",
+    "stage_label": "Domain Weighted",
+    "diagnostic_upper_bound": false,
+    "query_id": "q4",
+    "family": "single_domain",
+    "prompt": "Set up async background task for sending email",
+    "active_domains": [
+      "backend"
+    ],
+    "ground_truth_ids": [
+      "be-07",
+      "be-08",
+      "be-01"
+    ],
+    "retrieved_ids": [
+      "be-08",
+      "be-07",
+      "be-01",
+      "be-03",
+      "fe-06"
+    ],
+    "precision_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "noise_at_5": 0.2
+  },
+  {
+    "stage": "oracle_ceiling",
+    "stage_label": "Oracle Ceiling",
+    "diagnostic_upper_bound": true,
+    "query_id": "q4",
+    "family": "single_domain",
+    "prompt": "Set up async background task for sending email",
+    "active_domains": [
+      "backend"
+    ],
+    "ground_truth_ids": [
+      "be-07",
+      "be-08",
+      "be-01"
+    ],
+    "retrieved_ids": [
+      "be-08",
+      "be-07",
+      "be-01"
+    ],
+    "precision_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "noise_at_5": 0.0
+  },
+  {
+    "stage": "bm25_only",
+    "stage_label": "BM25 Only",
+    "diagnostic_upper_bound": false,
+    "query_id": "q5",
+    "family": "single_domain",
+    "prompt": "Write database migration to add user avatar column",
+    "active_domains": [
+      "database"
+    ],
+    "ground_truth_ids": [
+      "db-02",
+      "db-03",
+      "db-01"
+    ],
+    "retrieved_ids": [
+      "fe-13",
+      "be-04",
+      "do-05",
+      "be-03",
+      "do-01"
+    ],
+    "precision_at_3": 0.0,
+    "recall_at_5": 0.0,
+    "noise_at_5": 1.0
+  },
+  {
+    "stage": "domain_weighted",
+    "stage_label": "Domain Weighted",
+    "diagnostic_upper_bound": false,
+    "query_id": "q5",
+    "family": "single_domain",
+    "prompt": "Write database migration to add user avatar column",
+    "active_domains": [
+      "database"
+    ],
+    "ground_truth_ids": [
+      "db-02",
+      "db-03",
+      "db-01"
+    ],
+    "retrieved_ids": [
+      "db-08",
+      "fe-13",
+      "be-04",
+      "do-05",
+      "db-02"
+    ],
+    "precision_at_3": 0.0,
+    "recall_at_5": 0.3333333333333333,
+    "noise_at_5": 0.6
+  },
+  {
+    "stage": "oracle_ceiling",
+    "stage_label": "Oracle Ceiling",
+    "diagnostic_upper_bound": true,
+    "query_id": "q5",
+    "family": "single_domain",
+    "prompt": "Write database migration to add user avatar column",
+    "active_domains": [
+      "database"
+    ],
+    "ground_truth_ids": [
+      "db-02",
+      "db-03",
+      "db-01"
+    ],
+    "retrieved_ids": [
+      "db-02",
+      "db-01",
+      "db-03"
+    ],
+    "precision_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "noise_at_5": 0.0
+  },
+  {
+    "stage": "bm25_only",
+    "stage_label": "BM25 Only",
+    "diagnostic_upper_bound": false,
+    "query_id": "q6",
+    "family": "single_domain",
+    "prompt": "Add full-text search to product descriptions",
+    "active_domains": [
+      "database"
+    ],
+    "ground_truth_ids": [
+      "db-10",
+      "db-05",
+      "db-01"
+    ],
+    "retrieved_ids": [
+      "fe-13",
+      "do-05",
+      "do-01",
+      "db-10",
+      "db-08"
+    ],
+    "precision_at_3": 0.0,
+    "recall_at_5": 0.3333333333333333,
+    "noise_at_5": 0.6
+  },
+  {
+    "stage": "domain_weighted",
+    "stage_label": "Domain Weighted",
+    "diagnostic_upper_bound": false,
+    "query_id": "q6",
+    "family": "single_domain",
+    "prompt": "Add full-text search to product descriptions",
+    "active_domains": [
+      "database"
+    ],
+    "ground_truth_ids": [
+      "db-10",
+      "db-05",
+      "db-01"
+    ],
+    "retrieved_ids": [
+      "db-10",
+      "db-08",
+      "fe-13",
+      "do-05",
+      "do-01"
+    ],
+    "precision_at_3": 0.3333333333333333,
+    "recall_at_5": 0.3333333333333333,
+    "noise_at_5": 0.6
+  },
+  {
+    "stage": "oracle_ceiling",
+    "stage_label": "Oracle Ceiling",
+    "diagnostic_upper_bound": true,
+    "query_id": "q6",
+    "family": "single_domain",
+    "prompt": "Add full-text search to product descriptions",
+    "active_domains": [
+      "database"
+    ],
+    "ground_truth_ids": [
+      "db-10",
+      "db-05",
+      "db-01"
+    ],
+    "retrieved_ids": [
+      "db-10"
+    ],
+    "precision_at_3": 0.3333333333333333,
+    "recall_at_5": 0.3333333333333333,
+    "noise_at_5": 0.0
+  },
+  {
+    "stage": "bm25_only",
+    "stage_label": "BM25 Only",
+    "diagnostic_upper_bound": false,
+    "query_id": "q7",
+    "family": "single_domain",
+    "prompt": "Configure GitHub Actions for PR test and lint checks",
+    "active_domains": [
+      "devops"
+    ],
+    "ground_truth_ids": [
+      "do-01",
+      "te-04",
+      "te-01"
+    ],
+    "retrieved_ids": [
+      "do-01",
+      "fe-06",
+      "do-05",
+      "be-09",
+      "fe-02"
+    ],
+    "precision_at_3": 0.3333333333333333,
+    "recall_at_5": 0.3333333333333333,
+    "noise_at_5": 0.6
+  },
+  {
+    "stage": "domain_weighted",
+    "stage_label": "Domain Weighted",
+    "diagnostic_upper_bound": false,
+    "query_id": "q7",
+    "family": "single_domain",
+    "prompt": "Configure GitHub Actions for PR test and lint checks",
+    "active_domains": [
+      "devops"
+    ],
+    "ground_truth_ids": [
+      "do-01",
+      "te-04",
+      "te-01"
+    ],
+    "retrieved_ids": [
+      "do-01",
+      "fe-06",
+      "do-05",
+      "be-09",
+      "fe-02"
+    ],
+    "precision_at_3": 0.3333333333333333,
+    "recall_at_5": 0.3333333333333333,
+    "noise_at_5": 0.6
+  },
+  {
+    "stage": "oracle_ceiling",
+    "stage_label": "Oracle Ceiling",
+    "diagnostic_upper_bound": true,
+    "query_id": "q7",
+    "family": "single_domain",
+    "prompt": "Configure GitHub Actions for PR test and lint checks",
+    "active_domains": [
+      "devops"
+    ],
+    "ground_truth_ids": [
+      "do-01",
+      "te-04",
+      "te-01"
+    ],
+    "retrieved_ids": [
+      "do-01",
+      "te-01"
+    ],
+    "precision_at_3": 0.6666666666666666,
+    "recall_at_5": 0.6666666666666666,
+    "noise_at_5": 0.5
+  },
+  {
+    "stage": "bm25_only",
+    "stage_label": "BM25 Only",
+    "diagnostic_upper_bound": false,
+    "query_id": "q8",
+    "family": "single_domain",
+    "prompt": "Set up Kubernetes HPA for scaling based on CPU",
+    "active_domains": [
+      "devops"
+    ],
+    "ground_truth_ids": [
+      "do-04",
+      "do-05",
+      "do-01"
+    ],
+    "retrieved_ids": [
+      "do-05",
+      "fe-09",
+      "do-04",
+      "fe-06",
+      "be-09"
+    ],
+    "precision_at_3": 0.6666666666666666,
+    "recall_at_5": 0.6666666666666666,
+    "noise_at_5": 0.6
+  },
+  {
+    "stage": "domain_weighted",
+    "stage_label": "Domain Weighted",
+    "diagnostic_upper_bound": false,
+    "query_id": "q8",
+    "family": "single_domain",
+    "prompt": "Set up Kubernetes HPA for scaling based on CPU",
+    "active_domains": [
+      "devops"
+    ],
+    "ground_truth_ids": [
+      "do-04",
+      "do-05",
+      "do-01"
+    ],
+    "retrieved_ids": [
+      "do-04",
+      "do-05",
+      "fe-09",
+      "do-01",
+      "fe-06"
+    ],
+    "precision_at_3": 0.6666666666666666,
+    "recall_at_5": 1.0,
+    "noise_at_5": 0.4
+  },
+  {
+    "stage": "oracle_ceiling",
+    "stage_label": "Oracle Ceiling",
+    "diagnostic_upper_bound": true,
+    "query_id": "q8",
+    "family": "single_domain",
+    "prompt": "Set up Kubernetes HPA for scaling based on CPU",
+    "active_domains": [
+      "devops"
+    ],
+    "ground_truth_ids": [
+      "do-04",
+      "do-05",
+      "do-01"
+    ],
+    "retrieved_ids": [
+      "do-04",
+      "do-05",
+      "do-01"
+    ],
+    "precision_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "noise_at_5": 0.0
+  },
+  {
+    "stage": "bm25_only",
+    "stage_label": "BM25 Only",
+    "diagnostic_upper_bound": false,
+    "query_id": "q9",
+    "family": "single_domain",
+    "prompt": "Write E2E tests for user registration flow",
+    "active_domains": [
+      "testing"
+    ],
+    "ground_truth_ids": [
+      "te-02",
+      "te-01"
+    ],
+    "retrieved_ids": [
+      "be-03",
+      "db-06",
+      "be-04",
+      "fe-06",
+      "do-05"
+    ],
+    "precision_at_3": 0.0,
+    "recall_at_5": 0.0,
+    "noise_at_5": 1.0
+  },
+  {
+    "stage": "domain_weighted",
+    "stage_label": "Domain Weighted",
+    "diagnostic_upper_bound": false,
+    "query_id": "q9",
+    "family": "single_domain",
+    "prompt": "Write E2E tests for user registration flow",
+    "active_domains": [
+      "testing"
+    ],
+    "ground_truth_ids": [
+      "te-02",
+      "te-01"
+    ],
+    "retrieved_ids": [
+      "te-02",
+      "te-01",
+      "be-03",
+      "db-06",
+      "be-04"
+    ],
+    "precision_at_3": 0.6666666666666666,
+    "recall_at_5": 1.0,
+    "noise_at_5": 0.6
+  },
+  {
+    "stage": "oracle_ceiling",
+    "stage_label": "Oracle Ceiling",
+    "diagnostic_upper_bound": true,
+    "query_id": "q9",
+    "family": "single_domain",
+    "prompt": "Write E2E tests for user registration flow",
+    "active_domains": [
+      "testing"
+    ],
+    "ground_truth_ids": [
+      "te-02",
+      "te-01"
+    ],
+    "retrieved_ids": [
+      "te-02",
+      "te-01"
+    ],
+    "precision_at_3": 0.6666666666666666,
+    "recall_at_5": 1.0,
+    "noise_at_5": 0.0
+  },
+  {
+    "stage": "bm25_only",
+    "stage_label": "BM25 Only",
+    "diagnostic_upper_bound": false,
+    "query_id": "q10",
+    "family": "single_domain",
+    "prompt": "Set up code coverage gate in CI pipeline",
+    "active_domains": [
+      "testing"
+    ],
+    "ground_truth_ids": [
+      "te-04",
+      "do-01",
+      "te-01"
+    ],
+    "retrieved_ids": [
+      "te-04",
+      "fe-06",
+      "fe-09",
+      "fe-13",
+      "be-04"
+    ],
+    "precision_at_3": 0.3333333333333333,
+    "recall_at_5": 0.3333333333333333,
+    "noise_at_5": 0.8
+  },
+  {
+    "stage": "domain_weighted",
+    "stage_label": "Domain Weighted",
+    "diagnostic_upper_bound": false,
+    "query_id": "q10",
+    "family": "single_domain",
+    "prompt": "Set up code coverage gate in CI pipeline",
+    "active_domains": [
+      "testing"
+    ],
+    "ground_truth_ids": [
+      "te-04",
+      "do-01",
+      "te-01"
+    ],
+    "retrieved_ids": [
+      "te-04",
+      "te-01",
+      "te-02",
+      "fe-09",
+      "fe-06"
+    ],
+    "precision_at_3": 0.6666666666666666,
+    "recall_at_5": 0.6666666666666666,
+    "noise_at_5": 0.4
+  },
+  {
+    "stage": "oracle_ceiling",
+    "stage_label": "Oracle Ceiling",
+    "diagnostic_upper_bound": true,
+    "query_id": "q10",
+    "family": "single_domain",
+    "prompt": "Set up code coverage gate in CI pipeline",
+    "active_domains": [
+      "testing"
+    ],
+    "ground_truth_ids": [
+      "te-04",
+      "do-01",
+      "te-01"
+    ],
+    "retrieved_ids": [
+      "te-04",
+      "te-01",
+      "do-01"
+    ],
+    "precision_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "noise_at_5": 0.3333333333333333
+  },
+  {
+    "stage": "bm25_only",
+    "stage_label": "BM25 Only",
+    "diagnostic_upper_bound": false,
+    "query_id": "q11",
+    "family": "cross_domain",
+    "prompt": "Add health check endpoint with DB and Redis status",
+    "active_domains": [
+      "backend"
+    ],
+    "ground_truth_ids": [
+      "be-15",
+      "do-05",
+      "db-01"
+    ],
+    "retrieved_ids": [
+      "be-15",
+      "te-01",
+      "fe-06",
+      "be-07",
+      "be-03"
+    ],
+    "precision_at_3": 0.3333333333333333,
+    "recall_at_5": 0.3333333333333333,
+    "noise_at_5": 0.4
+  },
+  {
+    "stage": "domain_weighted",
+    "stage_label": "Domain Weighted",
+    "diagnostic_upper_bound": false,
+    "query_id": "q11",
+    "family": "cross_domain",
+    "prompt": "Add health check endpoint with DB and Redis status",
+    "active_domains": [
+      "backend"
+    ],
+    "ground_truth_ids": [
+      "be-15",
+      "do-05",
+      "db-01"
+    ],
+    "retrieved_ids": [
+      "be-15",
+      "fe-06",
+      "be-07",
+      "be-03",
+      "te-01"
+    ],
+    "precision_at_3": 0.3333333333333333,
+    "recall_at_5": 0.3333333333333333,
+    "noise_at_5": 0.4
+  },
+  {
+    "stage": "oracle_ceiling",
+    "stage_label": "Oracle Ceiling",
+    "diagnostic_upper_bound": true,
+    "query_id": "q11",
+    "family": "cross_domain",
+    "prompt": "Add health check endpoint with DB and Redis status",
+    "active_domains": [
+      "backend"
+    ],
+    "ground_truth_ids": [
+      "be-15",
+      "do-05",
+      "db-01"
+    ],
+    "retrieved_ids": [
+      "be-15"
+    ],
+    "precision_at_3": 0.3333333333333333,
+    "recall_at_5": 0.3333333333333333,
+    "noise_at_5": 0.0
+  },
+  {
+    "stage": "bm25_only",
+    "stage_label": "BM25 Only",
+    "diagnostic_upper_bound": false,
+    "query_id": "q12",
+    "family": "cross_domain",
+    "prompt": "Implement soft delete for user accounts with audit log",
+    "active_domains": [
+      "database"
+    ],
+    "ground_truth_ids": [
+      "db-08",
+      "be-06",
+      "fe-06"
+    ],
+    "retrieved_ids": [
+      "fe-06",
+      "te-01",
+      "fe-02",
+      "fe-13",
+      "be-03"
+    ],
+    "precision_at_3": 0.3333333333333333,
+    "recall_at_5": 0.3333333333333333,
+    "noise_at_5": 1.0
+  },
+  {
+    "stage": "domain_weighted",
+    "stage_label": "Domain Weighted",
+    "diagnostic_upper_bound": false,
+    "query_id": "q12",
+    "family": "cross_domain",
+    "prompt": "Implement soft delete for user accounts with audit log",
+    "active_domains": [
+      "database"
+    ],
+    "ground_truth_ids": [
+      "db-08",
+      "be-06",
+      "fe-06"
+    ],
+    "retrieved_ids": [
+      "db-08",
+      "fe-06",
+      "te-01",
+      "fe-02",
+      "fe-13"
+    ],
+    "precision_at_3": 0.6666666666666666,
+    "recall_at_5": 0.6666666666666666,
+    "noise_at_5": 0.8
+  },
+  {
+    "stage": "oracle_ceiling",
+    "stage_label": "Oracle Ceiling",
+    "diagnostic_upper_bound": true,
+    "query_id": "q12",
+    "family": "cross_domain",
+    "prompt": "Implement soft delete for user accounts with audit log",
+    "active_domains": [
+      "database"
+    ],
+    "ground_truth_ids": [
+      "db-08",
+      "be-06",
+      "fe-06"
+    ],
+    "retrieved_ids": [
+      "db-08",
+      "fe-06"
+    ],
+    "precision_at_3": 0.6666666666666666,
+    "recall_at_5": 0.6666666666666666,
+    "noise_at_5": 0.5
+  }
+]
