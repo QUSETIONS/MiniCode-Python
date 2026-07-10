@@ -645,11 +645,6 @@ def check_release_report_payload(payload: Any) -> ReleaseCheck:
         )
         if check and check.get("status") not in {"passed", "failed"}:
             errors.append(f"smoke_checks[{index}] has invalid status: {check.get('status')}")
-    smoke_labels = {
-        str(item.get("label") or "")
-        for item in smoke_checks
-        if isinstance(item, dict)
-    }
     for required_label in (
         "readiness-artifacts",
         "readiness-bundle",

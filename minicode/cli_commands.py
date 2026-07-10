@@ -5,7 +5,6 @@ from pathlib import Path
 
 from Main.MinicodeFrontline.Src.Application.Entry.LocalCommandSurface import (
     SLASH_COMMANDS,
-    SlashCommand,
 )
 from minicode.config import (
     CLAUDE_SETTINGS_PATH,

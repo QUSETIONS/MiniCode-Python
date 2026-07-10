@@ -12,7 +12,7 @@ The sub-agent runs a full agent loop (model + tools) with:
 from __future__ import annotations
 
 import time
-from typing import Any, TypedDict, cast
+from typing import TypedDict, cast
 
 from minicode.agent_loop import run_agent_turn
 from minicode.tooling import ToolDefinition, ToolResult
