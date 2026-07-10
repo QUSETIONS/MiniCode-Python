@@ -41,6 +41,27 @@ def _check(label: str, *, status: str = "passed", exit_code: int = 0, summary: s
     )
 
 
+def test_evidence_path_normalizer_is_shared_and_boundary_safe(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    home = tmp_path / "home"
+
+    normalized = release_readiness.normalize_evidence_paths(
+        {
+            "repo": str(repo / ".temp" / "trace.json"),
+            "home": str(home / ".mini-code" / "settings.json"),
+            "similar": f"{repo}-archive",
+        },
+        repo_root=repo,
+        home=home,
+    )
+
+    assert normalized == {
+        "repo": ".temp/trace.json",
+        "home": "~/.mini-code/settings.json",
+        "similar": f"{repo}-archive",
+    }
+
+
 def _fallback_simulations_payload(label: str = "OpenAI fallback") -> dict:
     return {
         "simulation_only": True,

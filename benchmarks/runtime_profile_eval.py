@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import asdict
 from pathlib import Path
 import subprocess
 import sys
@@ -20,11 +21,29 @@ from minicode.runtime_profile_eval import (
     runtime_profile_eval_as_markdown,
 )
 from minicode.release_readiness import (
+    normalize_evidence_paths,
     redact_sensitive_payload,
     redact_sensitive_text,
 )
 from minicode.tooling import ToolRegistry
 from minicode.types import AgentStep, ChatMessage, ModelAdapter
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _portable_provider_diagnostic(
+    diagnostic: ProviderDiagnostic,
+    *,
+    repo_root: Path = REPO_ROOT,
+    home: Path | None = None,
+) -> ProviderDiagnostic:
+    payload = normalize_evidence_paths(
+        asdict(diagnostic),
+        repo_root=repo_root,
+        home=home,
+    )
+    return ProviderDiagnostic(**payload)
 
 
 class ScriptedModel(ModelAdapter):
@@ -208,8 +227,7 @@ def _classify_provider_diagnostic(
 
 def collect_provider_diagnostics() -> list[ProviderDiagnostic]:
     command = [sys.executable, "-m", "minicode.headless", "Reply with exactly OK."]
-    repo_root = Path(__file__).resolve().parents[1]
-    trace_artifact = repo_root / ".temp" / "headless-provider-smoke-trace.json"
+    trace_artifact = REPO_ROOT / ".temp" / "headless-provider-smoke-trace.json"
     trace_artifact.parent.mkdir(parents=True, exist_ok=True)
     try:
         trace_artifact.unlink()
@@ -220,7 +238,7 @@ def collect_provider_diagnostics() -> list[ProviderDiagnostic]:
     try:
         completed = subprocess.run(
             command,
-            cwd=repo_root,
+            cwd=REPO_ROOT,
             env=env,
             capture_output=True,
             text=True,
@@ -276,19 +294,24 @@ def main() -> None:
         scenarios=build_demo_scenarios(),
         conditions=build_demo_conditions(),
     )
-    provider_diagnostics = collect_provider_diagnostics()
+    provider_diagnostics = [
+        _portable_provider_diagnostic(diagnostic)
+        for diagnostic in collect_provider_diagnostics()
+    ]
     payload = redact_sensitive_payload(
         runtime_profile_eval_as_dict(rows, provider_diagnostics)
+    )
+    payload = normalize_evidence_paths(payload, repo_root=REPO_ROOT)
+    markdown = normalize_evidence_paths(
+        redact_sensitive_text(
+            runtime_profile_eval_as_markdown(rows, provider_diagnostics)
+        ),
+        repo_root=REPO_ROOT,
     )
     output_path = Path("benchmarks") / "runtime_profile_eval_results.json"
     markdown_path = Path("benchmarks") / "runtime_profile_eval_results.md"
     output_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    markdown_path.write_text(
-        redact_sensitive_text(
-            runtime_profile_eval_as_markdown(rows, provider_diagnostics)
-        ),
-        encoding="utf-8",
-    )
+    markdown_path.write_text(markdown, encoding="utf-8")
     print(output_path)
     print(markdown_path)
 

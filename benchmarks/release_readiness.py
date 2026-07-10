@@ -26,6 +26,7 @@ from minicode.release_readiness import (
     check_release_report,
     check_structure_compliance_artifact,
     classify_provider_outcome,
+    normalize_evidence_paths,
     release_readiness_as_dict,
     release_readiness_as_markdown,
     should_fail_release_status,
@@ -55,34 +56,7 @@ def _normalize_evidence_paths(
     repo_root: Path = REPO_ROOT,
     home: Path | None = None,
 ) -> object:
-    if isinstance(value, dict):
-        return {
-            key: _normalize_evidence_paths(item, repo_root=repo_root, home=home)
-            for key, item in value.items()
-        }
-    if isinstance(value, list):
-        return [
-            _normalize_evidence_paths(item, repo_root=repo_root, home=home)
-            for item in value
-        ]
-    if isinstance(value, tuple):
-        return tuple(
-            _normalize_evidence_paths(item, repo_root=repo_root, home=home)
-            for item in value
-        )
-    if not isinstance(value, str):
-        return value
-
-    repo_text = str(repo_root.resolve())
-    home_text = str((home or Path.home()).resolve())
-    normalized = value.replace(f"{repo_text}{os.sep}", "")
-    if normalized == repo_text:
-        normalized = "."
-    if home_text != repo_text:
-        normalized = normalized.replace(f"{home_text}{os.sep}", f"~{os.sep}")
-        if normalized == home_text:
-            normalized = "~"
-    return normalized
+    return normalize_evidence_paths(value, repo_root=repo_root, home=home)
 
 
 def _run_command(label: str, command: list[str], *, cwd: Path, timeout: int = 1800) -> ReleaseCheck:

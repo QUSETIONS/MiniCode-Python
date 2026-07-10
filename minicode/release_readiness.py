@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -26,6 +27,42 @@ RELEASE_STATUS_ORDER = {
     "at-risk": 2,
     "blocked": 3,
 }
+
+
+def normalize_evidence_paths(
+    value: Any,
+    *,
+    repo_root: Path,
+    home: Path | None = None,
+) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: normalize_evidence_paths(item, repo_root=repo_root, home=home)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [
+            normalize_evidence_paths(item, repo_root=repo_root, home=home)
+            for item in value
+        ]
+    if isinstance(value, tuple):
+        return tuple(
+            normalize_evidence_paths(item, repo_root=repo_root, home=home)
+            for item in value
+        )
+    if not isinstance(value, str):
+        return value
+
+    repo_text = str(repo_root.resolve())
+    home_text = str((home or Path.home()).resolve())
+    normalized = value.replace(f"{repo_text}{os.sep}", "")
+    if normalized == repo_text:
+        normalized = "."
+    if home_text != repo_text:
+        normalized = normalized.replace(f"{home_text}{os.sep}", f"~{os.sep}")
+        if normalized == home_text:
+            normalized = "~"
+    return normalized
 
 
 _SENSITIVE_KEY_PARTS = (

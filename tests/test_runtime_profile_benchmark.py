@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from benchmarks.runtime_profile_eval import _classify_provider_diagnostic
+from benchmarks.runtime_profile_eval import (
+    _classify_provider_diagnostic,
+    _portable_provider_diagnostic,
+)
 
 
 def test_runtime_profile_provider_diagnostic_classifies_model_api_error() -> None:
@@ -60,3 +63,25 @@ def test_runtime_profile_provider_diagnostic_classifies_local_config_failure() -
     assert diagnostic.failure_category == "configuration"
     assert diagnostic.retryable is False
     assert diagnostic.ownership == "local-configuration"
+
+
+def test_runtime_profile_normalizes_diagnostic_before_markdown_truncation(tmp_path) -> None:
+    repo = tmp_path / "repo"
+    diagnostic = _classify_provider_diagnostic(
+        label="headless-smoke",
+        command=f"python {repo / 'minicode' / 'headless.py'}",
+        exit_code=1,
+        stdout="",
+        stderr=f"Config error at {repo / '.mcp.json'}: No model configured.",
+        trace_artifact=repo / ".temp" / "trace.json",
+    )
+
+    portable = _portable_provider_diagnostic(
+        diagnostic,
+        repo_root=repo,
+        home=tmp_path,
+    )
+
+    assert str(repo) not in portable.command
+    assert str(repo) not in portable.stderr
+    assert portable.trace_artifact == ".temp/trace.json"
