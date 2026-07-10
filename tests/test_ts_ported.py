@@ -1,8 +1,11 @@
-"""Tests ported from the TypeScript main version (MiniCode-main-work/test/*.test.ts).
+"""Tests ported from the TypeScript parity provenance record.
 
 These translate the TS reference scenarios into pytest so the Python port can be
 checked against the same expectations. The TS suite is green (200/0); any failure
 here is a real divergence / bug in the Python port.
+
+Stable provenance:
+  - Docs/Documentation/engineering/ts-parity-provenance.json
 
 Sources ported:
   - test/input-parser.test.ts          -> parse_input_chunk multiline paste

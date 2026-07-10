@@ -155,6 +155,22 @@ def test_list_sessions(temp_session_dir):
     assert listed[0].updated_at >= listed[1].updated_at
 
 
+def test_list_sessions_can_filter_by_workspace(temp_session_dir):
+    """Test listing sessions for one workspace."""
+    session1 = create_new_session(workspace="/tmp/workspace1")
+    session1.messages = [{"role": "user", "content": "Workspace one"}]
+    save_session(session1)
+
+    session2 = create_new_session(workspace="/tmp/workspace2")
+    session2.messages = [{"role": "user", "content": "Workspace two"}]
+    save_session(session2)
+
+    listed = list_sessions(workspace="/tmp/workspace2")
+
+    assert [meta.session_id for meta in listed] == [session2.session_id]
+    assert listed[0].workspace == "/tmp/workspace2"
+
+
 def test_get_latest_session(temp_session_dir):
     """Test getting the most recent session."""
     # Create sessions for different workspaces

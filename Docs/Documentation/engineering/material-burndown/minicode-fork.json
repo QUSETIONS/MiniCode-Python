@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "materialRoot": "MiniCode-fork",
+  "auditedAt": "2026-06-29",
+  "identity": "comparison-material",
+  "boundary": "Fork comparison material only; no current product app entry or test resolves through MiniCode-fork.",
+  "archiveApproval": {
+    "approvedAt": "2026-06-29",
+    "approvedBy": "workspace owner via chat",
+    "approvedAction": "archival deletion allowed after inventory gates pass",
+    "retainedInPlace": true
+  },
+  "summary": {
+    "fileCountExcludingGitNodeModulesAndExternal": 65,
+    "typescriptSourceFileCount": 45,
+    "referenceDocAssetCount": 12,
+    "binLauncherCount": 1,
+    "externalFileCountExcludingGit": 127,
+    "activeProductCallerCount": 0,
+    "docsReferenceCallerCount": 1
+  },
+  "dispositionPolicy": "Archive-approved historical comparison material. Retained in place until physical deletion is executed deliberately.",
+  "entries": [
+    {
+      "path": "MiniCode-fork/README.md",
+      "status": "comparison-readme-linked",
+      "disposition": "retained-reference",
+      "currentReferences": [
+        {
+          "path": "Docs/Documentation/CODE_WIKI.md",
+          "reason": "Historical wiki explicitly retains MiniCode-fork as an upstream/reference fork."
+        }
+      ],
+      "replacementEvidence": [
+        {
+          "path": "README.md",
+          "reason": "Current product-facing README is owned at the repository root."
+        }
+      ],
+      "nextAction": "Migrate any still-useful comparison note into current docs before deleting the fork."
+    },
+    {
+      "path": "MiniCode-fork/package.json",
+      "status": "comparison-node-package-no-product-caller",
+      "disposition": "retained-reference",
+      "currentReferences": [
+        {
+          "path": "Docs/Documentation/CODE_WIKI.md",
+          "reason": "Historical wiki explicitly retains this fork as comparison material."
+        }
+      ],
+      "replacementEvidence": [
+        {
+          "path": "pyproject.toml",
+          "reason": "Current product packaging and console scripts are Python-owned."
+        }
+      ],
+      "nextAction": "Do not treat this Node package as a product launcher unless the fork is restored as an explicit app boundary."
+    },
+    {
+      "path": "MiniCode-fork/src/index.ts",
+      "status": "comparison-cli-entry-no-product-caller",
+      "disposition": "retained-reference",
+      "currentReferences": [
+        {
+          "path": "Docs/Documentation/CODE_WIKI.md",
+          "reason": "Historical wiki explicitly points to the fork for comparison and architecture context."
+        }
+      ],
+      "replacementEvidence": [
+        {
+          "path": "minicode/main.py",
+          "reason": "Current interactive CLI lifecycle is owned by the Python app."
+        },
+        {
+          "path": "minicode/headless.py",
+          "reason": "Current automation lifecycle is owned by the Python app."
+        }
+      ],
+      "nextAction": "Retain only for comparison until docs stop citing the fork."
+    },
+    {
+      "path": "MiniCode-fork/docs/index.html",
+      "status": "comparison-docs-site",
+      "disposition": "retained-reference",
+      "currentReferences": [
+        {
+          "path": "Docs/Documentation/CODE_WIKI.md",
+          "reason": "Historical wiki explicitly records the fork as reference material."
+        }
+      ],
+      "replacementEvidence": [
+        {
+          "path": "Docs/Documentation/assets/readme/minicode-terminal-hero.html",
+          "reason": "Current product-facing visual assets live under Docs/Documentation/assets."
+        }
+      ],
+      "nextAction": "Migrate any useful visual asset into Docs/Documentation/assets before deleting the fork docs site."
+    },
+    {
+      "path": "MiniCode-fork/external/MiniCode-Python",
+      "status": "nested-external-reference",
+      "disposition": "retained-reference",
+      "currentReferences": [
+        {
+          "path": "Docs/Documentation/CODE_WIKI.md",
+          "reason": "Historical wiki explicitly notes the fork includes the external MiniCode-Python material."
+        }
+      ],
+      "replacementEvidence": [
+        {
+          "path": "Docs/Documentation/engineering/material-burndown/ts-src-py-src.json",
+          "reason": "The active legacy Python mirror burn-down is tracked separately under ts-src/py-src."
+        }
+      ],
+      "nextAction": "Treat this nested external copy as comparison-only unless a distinct caller or evidence value is documented."
+    }
+  ]
+}

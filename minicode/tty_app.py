@@ -60,6 +60,7 @@ def run_tty_app(
     permissions: PermissionManager,
     resume_session: str | None = None,
     list_sessions_only: bool = False,
+    list_workspace_sessions_only: bool = False,
     memory_manager: Any | None = None,
     context_manager: Any | None = None,
     prompt_bundle: Any | None = None,
@@ -69,10 +70,15 @@ def run_tty_app(
     
     Args:
         resume_session: Session ID to resume, or "latest" for most recent
-        list_sessions_only: If True, print session list and exit
+        list_sessions_only: If True, print all saved sessions and exit
+        list_workspace_sessions_only: If True, print current-workspace sessions and exit
     """
 
-    if handle_session_listing(cwd, list_sessions_only):
+    if handle_session_listing(
+        cwd,
+        list_sessions_only or list_workspace_sessions_only,
+        workspace_only=list_workspace_sessions_only,
+    ):
         return messages
 
     session = load_or_create_session(cwd, resume_session)

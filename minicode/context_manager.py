@@ -315,7 +315,7 @@ class _ExtractedInfo:
 
 
 # Tool categories for classification
-_EDIT_TOOLS = frozenset({"edit_file", "write_file", "modify_file", "patch_file", "multi_edit"})
+_EDIT_TOOLS = frozenset({"edit_file", "write_file", "modify_file", "patch_file"})
 _READ_TOOLS = frozenset({"read_file", "list_files", "grep_files", "file_tree"})
 _SEARCH_TOOLS = frozenset({"grep_files", "find_symbols", "find_references", "web_search", "web_fetch"})
 _COMMAND_TOOLS = frozenset({"run_command", "execute_command", "bash"})
@@ -869,10 +869,6 @@ class ContextManager:
         # Tool-specific compression
         if tool_name in _EDIT_TOOLS:
             path = inp.get("path") or inp.get("filePath", "unknown")
-            # Preserve key edit details
-            if tool_name == "multi_edit":
-                edits = inp.get("edits", [])
-                return f"[Edited {path}: {len(edits)} changes applied]"
             return f"[Edited {path}: ok]"
         
         if tool_name in _READ_TOOLS:

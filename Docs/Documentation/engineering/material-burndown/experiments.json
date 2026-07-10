@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "materialRoot": "experiments",
+  "auditedAt": "2026-06-29",
+  "identity": "research-material-or-tool-app",
+  "boundary": "Research evidence surface with no live product caller.",
+  "summary": {
+    "experimentDirectoryCount": 1,
+    "experimentFileCount": 3,
+    "currentExecutableEntries": 1
+  },
+  "entries": [
+    {
+      "path": "experiments/2026-06-21-paper-a-retrieval-probe/command.txt",
+      "status": "rebound-to-current-benchmark-surface",
+      "currentReferences": [
+        {
+          "path": "benchmarks/paper_a_retrieval_probe_eval.py",
+          "reason": "Current runnable benchmark entry regenerates the summary json and markdown artifacts."
+        },
+        {
+          "path": "minicode/paper_a_retrieval_probe_eval.py",
+          "reason": "Artifact-backed evaluation logic rebuilds rows from the committed canonical row set."
+        },
+        {
+          "path": "tests/test_paper_a_retrieval_probe_eval.py",
+          "reason": "A focused pytest gate keeps the research boundary executable."
+        }
+      ],
+      "nextAction": "Decide whether this surface becomes an explicit research tool/app boundary or remains an archived experiment with reproducible support files."
+    },
+    {
+      "path": "experiments/2026-06-21-paper-a-retrieval-probe/raw_output.txt",
+      "status": "retained-as-archival-evidence",
+      "currentReferences": [
+        {
+          "path": "benchmarks/paper_a_retrieval_probe_eval_results.json",
+          "reason": "Current reproducible benchmark summary json replaces the one-off captured command output."
+        },
+        {
+          "path": "outputs/paper_a_retrieval_probe_eval/query_rows.json",
+          "reason": "Current per-query evidence artifact provides the regenerated row-level output."
+        }
+      ],
+      "nextAction": "Keep as one-time audit evidence until paper/report consumers rely only on reproducible outputs."
+    },
+    {
+      "path": "experiments/2026-06-21-paper-a-retrieval-probe/report.md",
+      "status": "retained-as-archival-summary",
+      "currentReferences": [
+        {
+          "path": "benchmarks/paper_a_retrieval_probe_eval_results.md",
+          "reason": "Current reproducible markdown summary now carries the same benchmark headline and claim boundary."
+        }
+      ],
+      "nextAction": "Replace paper/report links with the reproducible benchmark report before treating the archived report as retired."
+    }
+  ],
+  "residualRisk": "The restored benchmark currently rebuilds report artifacts from committed canonical query rows instead of executing a live retrieval pipeline."
+}

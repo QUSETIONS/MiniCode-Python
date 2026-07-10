@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "materialRoot": "ts-src/py-src",
+  "auditedAt": "2026-06-29",
+  "identity": "legacy-python-source-material",
+  "summary": {
+    "legacyPythonModuleCount": 71,
+    "currentPythonModuleCountAtAudit": 132,
+    "sharedRelativePathCount": 60,
+    "legacyOnlyRelativePathCount": 11,
+    "legacyTestFileCount": 16,
+    "sharedLegacyTestFileCount": 16,
+    "currentNameResidueCount": 0,
+    "retiredLegacyOnlyModuleCount": 11
+  },
+  "focus": "Burn-down is narrowed to legacy-only module paths because every legacy test filename already has a current tests/ counterpart and current-name residues have been cleared from active code.",
+  "dispositionPolicy": "Legacy-only modules are retired unless a current product caller, documented product surface, and focused tests are added in minicode/.",
+  "entries": [
+    {
+      "legacyPath": "ts-src/py-src/minicode/async_context.py",
+      "legacyRelativePath": "async_context.py",
+      "status": "legacy-only-no-current-caller",
+      "currentReferences": [],
+      "disposition": "retired",
+      "replacementEvidence": [
+        {
+          "path": "minicode/product_surfaces.py",
+          "reason": "Current instruction, extension, readiness, and prompt bundle surfaces replace the old ad hoc async context collector boundary."
+        },
+        {
+          "path": "minicode/prompt_pipeline.py",
+          "reason": "Current prompt assembly owns cached paragraph evaluation for dynamic context."
+        }
+      ],
+      "nextAction": "Confirm intentional retirement or port a replacement only if a real product or tool caller reappears."
+    },
+    {
+      "legacyPath": "ts-src/py-src/minicode/poly_commands.py",
+      "legacyRelativePath": "poly_commands.py",
+      "status": "legacy-only-no-current-caller",
+      "currentReferences": [],
+      "disposition": "retired",
+      "replacementEvidence": [
+        {
+          "path": "minicode/cli_commands.py",
+          "reason": "Current slash-command surface owns local command parsing and dispatch without the old polymorphic registry."
+        },
+        {
+          "path": "tests/test_cli_commands.py",
+          "reason": "Current product command behavior is covered directly."
+        }
+      ],
+      "nextAction": "Keep retired unless a current slash-command capability still depends on the old polymorphic command registry semantics."
+    },
+    {
+      "legacyPath": "ts-src/py-src/minicode/sub_agents.py",
+      "legacyRelativePath": "sub_agents.py",
+      "status": "legacy-only-no-current-caller",
+      "currentReferences": [],
+      "disposition": "retired",
+      "replacementEvidence": [
+        {
+          "path": "minicode/tools/task.py",
+          "reason": "Current task tool owns executable sub-agent delegation with filtered tool sets and turn limits."
+        }
+      ],
+      "nextAction": "Keep retired unless the current multi-agent surface requires a direct Python sub-agent manager boundary."
+    },
+    {
+      "legacyPath": "ts-src/py-src/minicode/tools/api_tester.py",
+      "legacyRelativePath": "tools/api_tester.py",
+      "status": "legacy-only-no-current-caller",
+      "currentReferences": [],
+      "disposition": "retired",
+      "replacementEvidence": [
+        {
+          "path": "minicode/tools/http_utils.py",
+          "reason": "The optional full tool profile already provides generic HTTP request support."
+        }
+      ],
+      "nextAction": "Keep retired unless HTTP API endpoint testing is restored as an explicit tool module with tests."
+    },
+    {
+      "legacyPath": "ts-src/py-src/minicode/tools/db_explorer.py",
+      "legacyRelativePath": "tools/db_explorer.py",
+      "status": "legacy-only-no-current-caller",
+      "currentReferences": [],
+      "disposition": "retired",
+      "replacementEvidence": [],
+      "nextAction": "Keep retired unless database exploration is restored as an explicit tool module with tests."
+    },
+    {
+      "legacyPath": "ts-src/py-src/minicode/tools/docker_helper.py",
+      "legacyRelativePath": "tools/docker_helper.py",
+      "status": "legacy-only-no-current-caller",
+      "currentReferences": [],
+      "disposition": "retired",
+      "replacementEvidence": [],
+      "nextAction": "Keep retired unless Docker management is restored as an explicit tool module with tests."
+    },
+    {
+      "legacyPath": "ts-src/py-src/minicode/tools/governance_audit.py",
+      "legacyRelativePath": "tools/governance_audit.py",
+      "status": "legacy-only-no-current-caller",
+      "currentReferences": [],
+      "disposition": "retired",
+      "replacementEvidence": [
+        {
+          "path": "tests/test_architecture_isolation.py",
+          "reason": "Current architecture guardrails are enforced by focused tests instead of a standalone governance audit tool."
+        }
+      ],
+      "nextAction": "Keep retired unless governance audit returns as an explicit tool/app boundary."
+    },
+    {
+      "legacyPath": "ts-src/py-src/minicode/tools/governance_audit_tool.py",
+      "legacyRelativePath": "tools/governance_audit_tool.py",
+      "status": "legacy-only-no-current-caller",
+      "currentReferences": [],
+      "disposition": "retired",
+      "replacementEvidence": [
+        {
+          "path": "tests/test_architecture_isolation.py",
+          "reason": "Current architecture guardrails are enforced by focused tests instead of a standalone governance audit tool."
+        }
+      ],
+      "nextAction": "Keep retired unless governance audit returns as an explicit tool/app boundary."
+    },
+    {
+      "legacyPath": "ts-src/py-src/minicode/tools/multi_edit.py",
+      "legacyRelativePath": "tools/multi_edit.py",
+      "status": "legacy-only-no-current-caller",
+      "currentReferences": [],
+      "disposition": "retired",
+      "replacementEvidence": [
+        {
+          "path": "minicode/tools/patch_file.py",
+          "reason": "Current patch_file tool applies multiple exact-text replacements through the review path."
+        }
+      ],
+      "nextAction": "Keep retired unless a batch edit surface is restored as an explicit tool module with tests."
+    },
+    {
+      "legacyPath": "ts-src/py-src/minicode/tools/notebook_edit.py",
+      "legacyRelativePath": "tools/notebook_edit.py",
+      "status": "legacy-only-no-current-caller",
+      "currentReferences": [],
+      "disposition": "retired",
+      "replacementEvidence": [],
+      "nextAction": "Keep retired unless notebook editing becomes an explicit supported tool surface again."
+    },
+    {
+      "legacyPath": "ts-src/py-src/minicode/tools/run_with_debug.py",
+      "legacyRelativePath": "tools/run_with_debug.py",
+      "status": "legacy-only-no-current-caller",
+      "currentReferences": [],
+      "disposition": "retired",
+      "replacementEvidence": [
+        {
+          "path": "minicode/tools/run_command.py",
+          "reason": "Current command execution is centralized in run_command; debug parsing is not a supported separate tool surface."
+        },
+        {
+          "path": "minicode/tooling.py",
+          "reason": "ToolRegistry keeps generic command-output truncation for the supported run_command tool."
+        }
+      ],
+      "nextAction": "Keep retired unless debug-wrapped command execution is restored as an explicit tool module with tests."
+    }
+  ]
+}
