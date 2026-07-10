@@ -23,6 +23,21 @@ def _assert_repo_path_exists(path_text: str) -> None:
     assert path.exists(), f"expected repo path to exist: {path_text}"
 
 
+def _assert_repo_or_optional_material_path(path_text: str) -> None:
+    path = ROOT / path_text
+    if path.exists():
+        return
+    optional_roots = {
+        material["path"].rstrip("/")
+        for material in _load_inventory()["materials"]
+        if material.get("presencePolicy") == "optional-workspace-material"
+    }
+    assert any(
+        path_text == root or path_text.startswith(f"{root}/")
+        for root in optional_roots
+    ), f"expected repo or optional material path: {path_text}"
+
+
 def test_material_inventory_tracks_current_product_app_entries() -> None:
     inventory = _load_inventory()
 
@@ -359,11 +374,11 @@ def test_ts_src_burndown_manifest_tracks_reference_boundary() -> None:
     assert "engineering/material-burndown/" in code_wiki
 
     for entry in manifest["entries"]:
-        _assert_repo_path_exists(entry["path"])
+        _assert_repo_or_optional_material_path(entry["path"])
         assert entry["disposition"] in {"retained-reference", "delegated"}
         for current in entry["currentReferences"]:
             assert current["reason"]
-            _assert_repo_path_exists(current["path"])
+            _assert_repo_or_optional_material_path(current["path"])
         for evidence in entry["replacementEvidence"]:
             assert evidence["reason"]
             _assert_repo_path_exists(evidence["path"])
@@ -391,11 +406,11 @@ def test_minicode_fork_burndown_manifest_tracks_comparison_boundary() -> None:
     )
 
     for entry in manifest["entries"]:
-        _assert_repo_path_exists(entry["path"])
+        _assert_repo_or_optional_material_path(entry["path"])
         assert entry["disposition"] == "retained-reference"
         for current in entry["currentReferences"]:
             assert current["reason"]
-            _assert_repo_path_exists(current["path"])
+            _assert_repo_or_optional_material_path(current["path"])
         for evidence in entry["replacementEvidence"]:
             assert evidence["reason"]
             _assert_repo_path_exists(evidence["path"])
@@ -435,11 +450,11 @@ def test_minicode_main_work_burndown_manifest_tracks_parity_source_boundary() ->
     assert "MiniCode-main-work" not in ts_ported
 
     for entry in manifest["entries"]:
-        _assert_repo_path_exists(entry["path"])
+        _assert_repo_or_optional_material_path(entry["path"])
         assert entry["disposition"] == "retained-reference"
         for current in entry["currentReferences"]:
             assert current["reason"]
-            _assert_repo_path_exists(current["path"])
+            _assert_repo_or_optional_material_path(current["path"])
         for evidence in entry["replacementEvidence"]:
             assert evidence["reason"]
             _assert_repo_path_exists(evidence["path"])
@@ -475,4 +490,4 @@ def test_experiments_burndown_manifest_tracks_rebound_benchmark_surface() -> Non
         _assert_repo_path_exists(entry["path"])
         for current in entry["currentReferences"]:
             assert current["reason"]
-            _assert_repo_path_exists(current["path"])
+            _assert_repo_or_optional_material_path(current["path"])
