@@ -315,9 +315,16 @@ class TestAgentLoopPerformance:
 
         # Concurrent execution
         with concurrent.futures.ThreadPoolExecutor(max_workers=num_tools) as pool:
-            # Warm the pool before measuring; this test is about concurrent
-            # execution throughput, not OS thread startup jitter.
-            warmup = [pool.submit(lambda: None) for _ in range(num_tools)]
+            # A barrier forces every worker to exist before timing starts. Fast
+            # no-op submissions can otherwise all run on one worker while the
+            # executor is still creating the remaining threads.
+            warmup_barrier = threading.Barrier(num_tools + 1)
+
+            def warm_worker() -> None:
+                warmup_barrier.wait()
+
+            warmup = [pool.submit(warm_worker) for _ in range(num_tools)]
+            warmup_barrier.wait()
             for f in warmup:
                 f.result()
 
