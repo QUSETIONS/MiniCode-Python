@@ -1,6 +1,6 @@
 # MiniCode Release Readiness
 
-- Generated at: 2026-07-10T01:06:37.444556+00:00
+- Generated at: 2026-07-10T03:54:12.460399+00:00
 - Status: blocked
 - Local gates: blocked
 - Provider status: at-risk
@@ -16,7 +16,7 @@
 | check | status | exit_code | summary |
 | --- | --- | ---: | --- |
 | compileall | passed | 0 | compileall completed. |
-| pytest-q | passed | 0 | 1290 passed, 2 skipped in 122.03s (0:02:02) |
+| pytest-q | passed | 0 | 1294 passed, 2 skipped in 97.99s (0:01:37) |
 | runtime-profile-eval | passed | 0 | benchmarks/runtime_profile_eval_results.md |
 | structure-compliance | passed | 0 | quality gate findings: 0 |
 
@@ -36,7 +36,7 @@
 | readiness-doctor | failed | 1 | doctor blocked (provider-config) |
 | readiness-repair-plan | failed | 1 | repair plan 6 (provider-config) |
 | readiness-patch-preview | failed | 1 | patch preview 2 (provider-config) |
-| readiness-bundle-generate | failed | 1 | - repair_plan_json: /home/tim/桌面/minicode/.temp/readiness-bundle/readiness-repair-plan.json |
+| readiness-bundle-generate | failed | 1 | - repair_plan_json: .temp/readiness-bundle/readiness-repair-plan.json |
 | readiness-artifacts | passed | 0 | readiness artifacts valid: 2 fallback example(s), 6 repair step(s), 2 patch preview(s) |
 | fallback-patch-preview | passed | 0 | fallback patch preview valid: 2 preview(s) (provider-config) |
 | fallback-simulation | passed | 0 | fallback simulations valid: 2 simulation(s) |
@@ -52,13 +52,13 @@
 
 | label | outcome | failure_category | retryable | ownership | recovery_action | risk_scope | error_code | request_id | exit_code | summary |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | --- |
-| headless-smoke | provider_channel_unavailable | configuration | false | local-configuration | Repair model-to-provider channel configuration. | provider-config | - | - | 1 | 2026-07-10 09:08:49,143 [WARNING] minicode.config: Project .mcp.json found at /home/tim/桌面/minicode/.mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1). |
+| headless-smoke | provider_channel_unavailable | configuration | false | local-configuration | Repair model-to-provider channel configuration. | provider-config | - | - | 1 | 2026-07-10 11:56:00,864 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1). |
 
 ## Provider Action Items
 
 - `headless-smoke`: Verify the selected model group and provider channel configuration.
 - `headless-smoke`: Add a viable fallback provider/model or credentials for the configured channel.
-- `headless-smoke`: Inspect headless trace artifact: /home/tim/桌面/minicode/.temp/headless-provider-smoke-trace.json
+- `headless-smoke`: Inspect headless trace artifact: .temp/headless-provider-smoke-trace.json
 
 ## Provider Fallback Coverage
 
@@ -86,8 +86,8 @@
   - verify-release-readiness [verify]: Run the release smoke after local readiness is configured.
     command: `python benchmarks/release_readiness.py --fail-on at-risk`
 - Config examples:
-  - OpenAI fallback (/home/tim/.mini-code/settings.json): `{"env": {"OPENAI_API_KEY": "sk-...", "OPENAI_BASE_URL": "https://api.openai.com"}, "fallbackModels": ["gpt-4o", "gpt-4o-mini"]}`
-  - OpenRouter fallback (/home/tim/.mini-code/settings.json): `{"env": {"OPENROUTER_API_KEY": "[REDACTED]", "OPENROUTER_BASE_URL": "https://openrouter.ai/api"}, "fallbackModels": ["openrouter/auto"]}`
+  - OpenAI fallback (~/.mini-code/settings.json): `{"env": {"OPENAI_API_KEY": "sk-...", "OPENAI_BASE_URL": "https://api.openai.com"}, "fallbackModels": ["gpt-4o", "gpt-4o-mini"]}`
+  - OpenRouter fallback (~/.mini-code/settings.json): `{"env": {"OPENROUTER_API_KEY": "[REDACTED]", "OPENROUTER_BASE_URL": "https://openrouter.ai/api"}, "fallbackModels": ["openrouter/auto"]}`
 
 ### Local Preflight
 
@@ -101,31 +101,31 @@
 
 ## Runtime Profile Artifacts
 
-- JSON: /home/tim/桌面/minicode/benchmarks/runtime_profile_eval_results.json
-- Markdown: /home/tim/桌面/minicode/benchmarks/runtime_profile_eval_results.md
-- headless_trace: /home/tim/桌面/minicode/.temp/headless-provider-smoke-trace.json
+- JSON: benchmarks/runtime_profile_eval_results.json
+- Markdown: benchmarks/runtime_profile_eval_results.md
+- headless_trace: .temp/headless-provider-smoke-trace.json
 
 ## Readiness Artifacts
 
-- bundle_directory: /home/tim/桌面/minicode/.temp/readiness-bundle
-- bundle_manifest_json: /home/tim/桌面/minicode/.temp/readiness-bundle/readiness-artifact-manifest.json
-- doctor_markdown: /home/tim/桌面/minicode/.temp/readiness-doctor.md
-- fallback_examples_json: /home/tim/桌面/minicode/.temp/readiness-fallback-examples.json
-- fallback_simulations_json: /home/tim/桌面/minicode/.temp/readiness-bundle/readiness-fallback-simulations.json
-- patch_preview_json: /home/tim/桌面/minicode/.temp/readiness-fallback-patch-preview.json
-- repair_plan_json: /home/tim/桌面/minicode/.temp/readiness-repair-plan.json
+- bundle_directory: .temp/readiness-bundle
+- bundle_manifest_json: .temp/readiness-bundle/readiness-artifact-manifest.json
+- doctor_markdown: .temp/readiness-doctor.md
+- fallback_examples_json: .temp/readiness-fallback-examples.json
+- fallback_simulations_json: .temp/readiness-bundle/readiness-fallback-simulations.json
+- patch_preview_json: .temp/readiness-fallback-patch-preview.json
+- repair_plan_json: .temp/readiness-repair-plan.json
 
 ## Artifact Manifest
 
 | label | exists | size_bytes | sha256 | path |
 | --- | --- | ---: | --- | --- |
-| bundle_manifest_json | yes | 1326 | 5aea6caf343f | /home/tim/桌面/minicode/.temp/readiness-bundle/readiness-artifact-manifest.json |
-| doctor_markdown | yes | 3267 | 2fb847f4c8c6 | /home/tim/桌面/minicode/.temp/readiness-doctor.md |
-| fallback_examples_json | yes | 876 | ceee505c6b4d | /home/tim/桌面/minicode/.temp/readiness-fallback-examples.json |
-| fallback_simulations_json | yes | 875 | 1355d9236755 | /home/tim/桌面/minicode/.temp/readiness-bundle/readiness-fallback-simulations.json |
-| headless_trace | yes | 7907 | 25562c2f68a6 | /home/tim/桌面/minicode/.temp/headless-provider-smoke-trace.json |
-| json | yes | 6452 | 31f1d39fadf6 | /home/tim/桌面/minicode/benchmarks/runtime_profile_eval_results.json |
-| markdown | yes | 2431 | f15b57e85e0f | /home/tim/桌面/minicode/benchmarks/runtime_profile_eval_results.md |
-| patch_preview_json | yes | 1611 | d3f81131954a | /home/tim/桌面/minicode/.temp/readiness-fallback-patch-preview.json |
-| repair_plan_json | yes | 2473 | d037b4854529 | /home/tim/桌面/minicode/.temp/readiness-repair-plan.json |
-| structure_compliance | yes | 98327 | 2e1369154faa | /home/tim/桌面/minicode/.temp/structure-compliance.json |
+| bundle_manifest_json | yes | 1526 | 16da44b19a63 | .temp/readiness-bundle/readiness-artifact-manifest.json |
+| doctor_markdown | yes | 3307 | 66b1462dca50 | .temp/readiness-doctor.md |
+| fallback_examples_json | yes | 876 | ceee505c6b4d | .temp/readiness-fallback-examples.json |
+| fallback_simulations_json | yes | 875 | 1355d9236755 | .temp/readiness-bundle/readiness-fallback-simulations.json |
+| headless_trace | yes | 7947 | 642d9adad0bc | .temp/headless-provider-smoke-trace.json |
+| json | yes | 6228 | 9c073a181ec7 | benchmarks/runtime_profile_eval_results.json |
+| markdown | yes | 2375 | effb0113e34e | benchmarks/runtime_profile_eval_results.md |
+| patch_preview_json | yes | 1611 | d3f81131954a | .temp/readiness-fallback-patch-preview.json |
+| repair_plan_json | yes | 2473 | d037b4854529 | .temp/readiness-repair-plan.json |
+| structure_compliance | yes | 88600 | 4e4814bb758c | .temp/structure-compliance.json |

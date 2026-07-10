@@ -4,7 +4,7 @@
       "scenario": "depth-budget-floor",
       "condition": "single",
       "runtime_profile": "single",
-      "wall_time_ms": 17.727876002027187,
+      "wall_time_ms": 19.30163200449897,
       "model_calls": 1,
       "tool_starts": 0,
       "tool_results": 0,
@@ -29,7 +29,7 @@
       "scenario": "depth-budget-floor",
       "condition": "single-deep",
       "runtime_profile": "single-deep",
-      "wall_time_ms": 4.584296002576593,
+      "wall_time_ms": 3.9197339938255027,
       "model_calls": 2,
       "tool_starts": 0,
       "tool_results": 0,
@@ -54,7 +54,7 @@
       "scenario": "widening-escalation",
       "condition": "single",
       "runtime_profile": "single",
-      "wall_time_ms": 4.4405810003809165,
+      "wall_time_ms": 3.128554999420885,
       "model_calls": 1,
       "tool_starts": 0,
       "tool_results": 0,
@@ -79,7 +79,7 @@
       "scenario": "widening-escalation",
       "condition": "single-deep",
       "runtime_profile": "single-deep",
-      "wall_time_ms": 9.281582999392413,
+      "wall_time_ms": 7.429599994793534,
       "model_calls": 10,
       "tool_starts": 0,
       "tool_results": 0,
@@ -117,7 +117,7 @@
       "total_tool_starts": 0,
       "total_tool_results": 0,
       "total_runtime_events": 4,
-      "total_wall_time_ms": 22.168457002408104,
+      "total_wall_time_ms": 22.430187003919855,
       "completion_rate": 0.0,
       "widened_rate": 0.0,
       "verification_guard_rate": 0.0,
@@ -125,7 +125,7 @@
       "avg_tool_starts": 0.0,
       "avg_tool_results": 0.0,
       "avg_runtime_events": 2.0,
-      "avg_wall_time_ms": 11.084228501204052
+      "avg_wall_time_ms": 11.215093501959927
     },
     "single-deep": {
       "runs": 2,
@@ -136,7 +136,7 @@
       "total_tool_starts": 0,
       "total_tool_results": 0,
       "total_runtime_events": 9,
-      "total_wall_time_ms": 13.865879001969006,
+      "total_wall_time_ms": 11.349333988619037,
       "completion_rate": 1.0,
       "widened_rate": 0.5,
       "verification_guard_rate": 0.0,
@@ -144,7 +144,7 @@
       "avg_tool_starts": 0.0,
       "avg_tool_results": 0.0,
       "avg_runtime_events": 4.5,
-      "avg_wall_time_ms": 6.932939500984503
+      "avg_wall_time_ms": 5.6746669943095185
     }
   },
   "provider_diagnostics": [
@@ -153,9 +153,9 @@
       "outcome": "provider_channel_unavailable",
       "command": "/usr/bin/python3 -m minicode.headless Reply with exactly OK.",
       "exit_code": 1,
-      "summary": "2026-07-10 09:08:49,143 [WARNING] minicode.config: Project .mcp.json found at /home/tim/\u684c\u9762/minicode/.mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).",
+      "summary": "2026-07-10 11:56:00,864 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).",
       "stdout": "",
-      "stderr": "2026-07-10 09:08:49,143 [WARNING] minicode.config: Project .mcp.json found at /home/tim/\u684c\u9762/minicode/.mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).\n2026-07-10 09:08:49,144 [ERROR] minicode.headless: Config load failed: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\nTraceback (most recent call last):\n  File \"/home/tim/\u684c\u9762/minicode/minicode/headless.py\", line 178, in run_headless\n    runtime = load_runtime_config(cwd)\n              ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/tim/\u684c\u9762/minicode/minicode/config.py\", line 560, in load_runtime_config\n    raise RuntimeError(\"No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\")\nRuntimeError: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\n2026-07-10 09:08:49,148 [WARNING] minicode.config: Project .mcp.json found at /home/tim/\u684c\u9762/minicode/.mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).\nConfig error: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\n",
+      "stderr": "2026-07-10 11:56:00,864 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).\n2026-07-10 11:56:00,865 [ERROR] minicode.headless: Config load failed: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\nTraceback (most recent call last):\n  File \"minicode/headless.py\", line 178, in run_headless\n    runtime = load_runtime_config(cwd)\n              ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"minicode/config.py\", line 560, in load_runtime_config\n    raise RuntimeError(\"No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\")\nRuntimeError: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\n2026-07-10 11:56:00,868 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).\nConfig error: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\n",
       "risk_scope": "provider-config",
       "error_code": "",
       "request_id": "",
@@ -165,11 +165,11 @@
       "recovery_action": "Repair model-to-provider channel configuration.",
       "readiness_status": "blocked",
       "repair_step_count": 6,
-      "trace_artifact": "/home/tim/\u684c\u9762/minicode/.temp/headless-provider-smoke-trace.json",
+      "trace_artifact": ".temp/headless-provider-smoke-trace.json",
       "guidance": [
         "Verify the selected model group and provider channel configuration.",
         "Add a viable fallback provider/model or credentials for the configured channel.",
-        "Inspect headless trace artifact: /home/tim/\u684c\u9762/minicode/.temp/headless-provider-smoke-trace.json"
+        "Inspect headless trace artifact: .temp/headless-provider-smoke-trace.json"
       ]
     }
   ]
