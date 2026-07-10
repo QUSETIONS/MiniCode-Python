@@ -1,0 +1,67 @@
+PS D:\Desktop\minicode> python -m minicode.main --validate-config
+Configuration Diagnostics
+========================================
+
+Status: OK
+
+Current Configuration
+----------------------------------------
+  Model: gpt-5.5
+  Provider: openai
+  Channel: openai via openaiApiKey/openaiBaseUrl
+  OpenAI Base URL: https://www.cctq.ai
+  Auth: OPENAI_API_KEY
+  Fallback Models: gpt-4o, gpt-4o-mini
+
+PS D:\Desktop\minicode> /memory
+Memory System Status
+==================================================
+
+User: 3 entries, 0.0 KB
+Project: 80 entries, 7.2 KB
+Local: 0 entries, 0.0 KB
+
+Total: 83 entries (7.2 KB)
+
+Tier Distribution:
+  working         0
+  short_term     83 ####################
+  long_term       0
+  archival        0
+
+PS D:\Desktop\minicode> python -m minicode.main --inspect-session latest
+Session inspect: 7ada2bd0
+  Workspace: D:\Desktop\minicode
+  Messages: 2
+  Transcript entries: 5
+  Checkpoints: 2
+  Runtime: phase:explore@1 -> phase:execute@2 -> guard:tool_evidence@4 -> widen:widen_needed@6 -> stop:done@8
+
+Recent checkpoints: 2 saved; latest [5c794e52] session.py, [c43731d3] README.md
+
+PS D:\Desktop\minicode> /rewind-preview latest
+Rewind preview for session 7ada2bd0:
+
+Would restore 2 checkpoint(s) across 2 file(s).
+Mode: restore pre-edit file snapshots.
+
+Planned restores:
+  1. [5c794e52] 2026-06-06 06:24:39 - D:\Desktop\minicode\minicode\session.py
+     Restores: existing file
+     Type: edit
+  2. [c43731d3] 2026-06-06 06:24:39 - D:\Desktop\minicode\README.md
+     Restores: existing file
+     Type: edit
+
+PS D:\Desktop\minicode> /readiness
+Readiness surface:
+readiness: ready (openai) [fallbacks 2/2 locally ready]
+
+Status: ready
+Provider: openai
+Provider ready: yes
+Channel: openai via openaiApiKey/openaiBaseUrl
+Fallback ready: yes
+Configured fallbacks (2/2 locally ready):
+- gpt-4o [ready]
+- gpt-4o-mini [ready]

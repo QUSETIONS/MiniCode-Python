@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from minicode.product_surfaces import build_readiness_report
 from minicode.product_surfaces import (
     DelegationStatus,
@@ -30,6 +32,8 @@ def test_build_readiness_report_surfaces_viable_fallbacks() -> None:
     assert report.status == "ready"
     assert report.provider_ready is True
     assert report.fallback_ready is True
+    assert report.risk_scope == "none"
+    assert "Keep fallback coverage in release readiness checks." in report.next_actions
     # Configured fallback should always be in candidates
     assert "gpt-4o" in report.fallback_candidates
     # Default fallback list varies by provider/env; at least one should be present
@@ -55,12 +59,24 @@ def test_build_readiness_report_warns_when_primary_ready_but_no_fallbacks() -> N
     if report.status == "warning":
         assert report.provider_ready is True
     assert report.fallback_ready is False
+    assert report.risk_scope in ("fallback-gap", "no-fallback-configured", "provider-config")
+    assert report.next_actions
     # Fallback candidates may be empty or auto-populated with defaults
     assert isinstance(report.fallback_candidates, list)
     assert any("single" in item.lower() for item in report.fallback_guidance) or \
            any("fallback" in item.lower() for item in report.fallback_guidance)
     assert any("no local fallback" in item.lower() for item in report.fallback_guidance) or \
            any("fallback" in issue.lower() for issue in report.issues)
+    assert report.fallback_config_examples
+    assert Path(report.fallback_config_examples[0]["path"]).parts[-2:] == (
+        ".mini-code",
+        "settings.json",
+    )
+    assert "OPENAI_API_KEY" in report.fallback_config_examples[0]["settings"]["env"]
+    assert report.repair_plan
+    assert any(item["step"] == "choose-fallback-provider" for item in report.repair_plan)
+    assert any(item["step"].startswith("preview-") for item in report.repair_plan)
+    assert any(item.get("command") == "minicode-readiness --json --fail-on blocked" for item in report.repair_plan)
 
 
 def test_build_readiness_report_uses_default_fallback_coverage() -> None:
@@ -78,8 +94,35 @@ def test_build_readiness_report_uses_default_fallback_coverage() -> None:
     assert report.status == "ready"
     assert report.provider_ready is True
     assert report.fallback_ready is True
+    assert report.risk_scope == "none"
     assert report.fallback_candidates[:2] == ["gpt-4o", "gpt-4o-mini"]
     assert report.viable_fallbacks[:2] == ["gpt-4o", "gpt-4o-mini"]
+    assert report.fallback_config_examples == []
+    assert any(item["step"] == "keep-fallback-gate" for item in report.repair_plan)
+    preflight = {item["label"]: item for item in report.preflight_checks}
+    assert preflight["primary-provider-config"]["status"] == "pass"
+    assert preflight["fallback-coverage"]["status"] == "pass"
+    assert preflight["live-smoke-readiness"]["status"] == "not-run"
+    assert "local-only" in preflight["live-smoke-readiness"]["summary"]
+
+
+def test_build_readiness_report_surfaces_provider_config_risk() -> None:
+    report = build_readiness_report(
+        ".",
+        runtime={
+            "model": "claude-sonnet-4-20250514",
+        },
+    )
+
+    assert report.status == "blocked"
+    assert report.provider_ready is False
+    assert report.fallback_ready is False
+    assert report.risk_scope == "provider-config"
+    assert "Fix the primary provider channel or credentials." in report.next_actions
+    assert "Configure at least one locally ready fallback model." in report.next_actions
+    preflight = {item["label"]: item for item in report.preflight_checks}
+    assert preflight["primary-provider-config"]["status"] == "blocked"
+    assert preflight["fallback-coverage"]["status"] == "blocked"
 
 
 # ---------------------------------------------------------------------------

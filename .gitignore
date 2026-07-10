@@ -57,6 +57,7 @@ paper_experiments/.secrets/
 paper_experiments/results/relative_event_target_pairs_cache.json
 
 # Temporary files
+.temp/
 *.tmp
 *.bak
 *.orig
@@ -80,3 +81,4 @@ minicode_session/
 __pycache__/
 *.git.bak/
 .dead-modules-backup/
+.worktrees/

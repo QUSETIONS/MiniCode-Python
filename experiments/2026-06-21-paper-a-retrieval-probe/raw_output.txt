@@ -1,0 +1,5 @@
+Wrote D:\Desktop\minicode\benchmarks\paper_a_retrieval_probe_eval_results.json
+Wrote D:\Desktop\minicode\benchmarks\paper_a_retrieval_probe_eval_results.md
+Wrote D:\Desktop\minicode\outputs\paper_a_retrieval_probe_eval\query_rows.json
+....                                                                     [100%]
+4 passed in 0.24s

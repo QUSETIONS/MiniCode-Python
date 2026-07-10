@@ -654,10 +654,19 @@ def load_session(session_id: str) -> SessionData | None:
         return None
 
 
-def list_sessions() -> list[SessionMetadata]:
-    """List all available sessions, newest first."""
+def list_sessions(workspace: str | None = None) -> list[SessionMetadata]:
+    """List available sessions, newest first.
+
+    When ``workspace`` is provided, only sessions created for that exact
+    workspace path are returned. Callers should pass a resolved path when they
+    want current-workspace semantics.
+    """
     index = _load_session_index()
-    sessions = list(index.values())
+    sessions = [
+        meta
+        for meta in index.values()
+        if workspace is None or meta.workspace == workspace
+    ]
     sessions.sort(key=lambda s: s.updated_at, reverse=True)
     return sessions
 
@@ -716,10 +725,9 @@ def create_new_session(workspace: str) -> SessionData:
 
 def get_latest_session(workspace: str | None = None) -> SessionData | None:
     """Get the most recent session, optionally filtered by workspace."""
-    sessions = list_sessions()
+    sessions = list_sessions(workspace=workspace)
     for meta in sessions:
-        if workspace is None or meta.workspace == workspace:
-            return load_session(meta.session_id)
+        return load_session(meta.session_id)
     return None
 
 

@@ -145,19 +145,19 @@ def estimate_tokens(text: str) -> int:
         return 0
     
     # 缓存查找（短文本优先缓存）
-    cache_key = text if len(text) < 256 else hash(text)  # 长文本用 hash 作为 key
+    cache_key = text if len(text) < 256 else str(hash(text))  # 长文本用 hash 作为 key
     cached = _token_cache.get(cache_key)
     if cached is not None:
         return cached
-    
+
     # 使用正则表达式快速统计 CJK 字符数量
     cjk_count = len(_CJK_PATTERN.findall(text))
-    
+
     # CJK 字符约 1.5 字符/token，英文约 4 字符/token
     ascii_chars = len(text) - cjk_count
-    
+
     result = max(1, int(cjk_count / 1.5 + ascii_chars / 4.0))
-    
+
     # 缓存结果（防止无限增长）
     if len(_token_cache) < _TOKEN_CACHE_MAX:
         _token_cache[cache_key] = result
@@ -315,7 +315,7 @@ class _ExtractedInfo:
 
 
 # Tool categories for classification
-_EDIT_TOOLS = frozenset({"edit_file", "write_file", "modify_file", "patch_file", "multi_edit"})
+_EDIT_TOOLS = frozenset({"edit_file", "write_file", "modify_file", "patch_file"})
 _READ_TOOLS = frozenset({"read_file", "list_files", "grep_files", "file_tree"})
 _SEARCH_TOOLS = frozenset({"grep_files", "find_symbols", "find_references", "web_search", "web_fetch"})
 _COMMAND_TOOLS = frozenset({"run_command", "execute_command", "bash"})
@@ -869,10 +869,6 @@ class ContextManager:
         # Tool-specific compression
         if tool_name in _EDIT_TOOLS:
             path = inp.get("path") or inp.get("filePath", "unknown")
-            # Preserve key edit details
-            if tool_name == "multi_edit":
-                edits = inp.get("edits", [])
-                return f"[Edited {path}: {len(edits)} changes applied]"
             return f"[Edited {path}: ok]"
         
         if tool_name in _READ_TOOLS:

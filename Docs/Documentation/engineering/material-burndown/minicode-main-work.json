@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "materialRoot": "MiniCode-main-work",
+  "auditedAt": "2026-06-29",
+  "identity": "comparison-material-workspace",
+  "boundary": "Comparison workspace with migrated parity provenance; no product runtime entry resolves through MiniCode-main-work.",
+  "archiveApproval": {
+    "approvedAt": "2026-06-29",
+    "approvedBy": "workspace owner via chat",
+    "approvedAction": "archival deletion allowed after inventory gates pass",
+    "retainedInPlace": true
+  },
+  "summary": {
+    "fileCountExcludingGitNodeModulesAndExternal": 104,
+    "typescriptSourceFileCount": 80,
+    "testSourceFileCount": 21,
+    "referenceDocAssetCount": 14,
+    "binLauncherCount": 1,
+    "externalFileCountExcludingGit": 1029,
+    "activeProductCallerCount": 0,
+    "activeParityCallerCount": 0,
+    "migratedParityProvenanceCount": 1
+  },
+  "dispositionPolicy": "Archive-approved comparison material. Python parity provenance has moved to a stable docs record; retained in place until physical deletion is executed deliberately.",
+  "entries": [
+    {
+      "path": "MiniCode-main-work/README.md",
+      "status": "comparison-readme",
+      "disposition": "retained-reference",
+      "currentReferences": [],
+      "replacementEvidence": [
+        {
+          "path": "README.md",
+          "reason": "Current product-facing README is owned at the repository root."
+        }
+      ],
+      "nextAction": "Migrate any useful narrative into current docs before deleting the workspace."
+    },
+    {
+      "path": "MiniCode-main-work/package.json",
+      "status": "comparison-node-package-no-product-caller",
+      "disposition": "retained-reference",
+      "currentReferences": [],
+      "replacementEvidence": [
+        {
+          "path": "pyproject.toml",
+          "reason": "Current package and console entry points are Python-owned."
+        }
+      ],
+      "nextAction": "Do not treat this Node package as a product launcher unless a TypeScript app boundary is restored."
+    },
+    {
+      "path": "MiniCode-main-work/src/index.ts",
+      "status": "comparison-cli-entry-no-product-caller",
+      "disposition": "retained-reference",
+      "currentReferences": [],
+      "replacementEvidence": [
+        {
+          "path": "minicode/main.py",
+          "reason": "Current interactive CLI lifecycle is owned by the Python app."
+        },
+        {
+          "path": "minicode/headless.py",
+          "reason": "Current automation lifecycle is owned by the Python app."
+        }
+      ],
+      "nextAction": "Retain only for comparison unless a current caller is documented."
+    },
+    {
+      "path": "MiniCode-main-work/test/input-parser.test.ts",
+      "status": "parity-source-provenance-migrated",
+      "disposition": "retained-reference",
+      "currentReferences": [],
+      "replacementEvidence": [
+        {
+          "path": "tests/test_ts_ported.py",
+          "reason": "Current Python tests port selected TypeScript scenarios into pytest."
+        },
+        {
+          "path": "Docs/Documentation/engineering/ts-parity-provenance.json",
+          "reason": "Stable provenance record replaces direct dependency on the comparison workspace path."
+        }
+      ],
+      "nextAction": "Keep as comparison reference unless owner approval allows archival deletion."
+    },
+    {
+      "path": "MiniCode-main-work/test/run-tests.mjs",
+      "status": "comparison-test-runner",
+      "disposition": "retained-reference",
+      "currentReferences": [],
+      "replacementEvidence": [
+        {
+          "path": "tests/test_ts_ported.py",
+          "reason": "Current verification runs pytest ports rather than the Node test runner."
+        },
+        {
+          "path": "Docs/Documentation/engineering/ts-parity-provenance.json",
+          "reason": "Stable provenance record documents the source suite status and ported scenario families."
+        }
+      ],
+      "nextAction": "Retain as reference unless owner approval allows archival deletion."
+    },
+    {
+      "path": "MiniCode-main-work/external/MiniCode-Python",
+      "status": "nested-external-reference",
+      "disposition": "retained-reference",
+      "currentReferences": [],
+      "replacementEvidence": [
+        {
+          "path": "Docs/Documentation/engineering/material-burndown/ts-src-py-src.json",
+          "reason": "The active legacy Python mirror burn-down is tracked separately under ts-src/py-src."
+        }
+      ],
+      "nextAction": "Treat this nested external copy as comparison-only unless a distinct caller or evidence value is documented."
+    }
+  ]
+}

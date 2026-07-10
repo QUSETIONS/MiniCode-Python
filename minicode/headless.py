@@ -19,7 +19,26 @@ from __future__ import annotations
 import json
 import os
 import sys
+from dataclasses import asdict, is_dataclass
 from pathlib import Path
+
+
+def _headless_response_exit_code(response: str) -> int:
+    normalized = " ".join(str(response or "").lower().split())
+    failure_prefixes = (
+        "error:",
+        "config error:",
+        "model api error",
+        "model api timeout",
+        "network error",
+        "provider availability failure",
+        "reached the maximum tool step limit",
+    )
+    if any(normalized.startswith(prefix) for prefix in failure_prefixes):
+        return 1
+    if "empty response" in normalized:
+        return 1
+    return 0
 
 
 def _write_headless_messages_trace(
@@ -34,20 +53,52 @@ def _write_headless_messages_trace(
 ) -> None:
     if not trace_path:
         return
+    readiness_report = _headless_readiness_snapshot(cwd, runtime)
     payload = {
         "cwd": cwd,
         "prompt": prompt,
         "model": (runtime or {}).get("model"),
+        "exit_code": _headless_response_exit_code(response_text or error_text or ""),
+        "readiness_report": readiness_report,
+        "repair_plan": readiness_report.get("repair_plan", []),
         "messages": result_messages or [],
         "assistant_response": response_text,
         "error": error_text,
     }
+    try:
+        from minicode.release_readiness import redact_sensitive_payload
+
+        payload = redact_sensitive_payload(payload)
+    except Exception:  # noqa: BLE001
+        pass
     path = Path(trace_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2, default=str),
         encoding="utf-8",
     )
+
+
+def _headless_readiness_snapshot(cwd: str, runtime: dict | None) -> dict:
+    try:
+        from minicode.product_surfaces import build_readiness_report
+
+        report = build_readiness_report(cwd, runtime=runtime or {})
+        if is_dataclass(report):
+            return asdict(report)
+        if isinstance(report, dict):
+            return report
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "status": "unknown",
+            "summary": f"readiness unavailable: {exc}",
+            "repair_plan": [],
+        }
+    return {
+        "status": "unknown",
+        "summary": "readiness unavailable",
+        "repair_plan": [],
+    }
 
 
 def _allow_edits_requested(cli_flag: bool = False) -> bool:
@@ -120,6 +171,7 @@ def run_headless(prompt: str | None = None, allow_edits: bool = False) -> str:
         sys.exit(1)
 
     cwd = str(Path.cwd())
+    trace_output_path = os.environ.get("MINI_CODE_HEADLESS_MESSAGES_OUT", "").strip() or None
 
     # Load config
     try:
@@ -127,6 +179,15 @@ def run_headless(prompt: str | None = None, allow_edits: bool = False) -> str:
     except Exception as exc:  # noqa: BLE001
         # Persist the failure to the log file (issue #5), not just stderr.
         logger.error("Config load failed: %s", exc, exc_info=True)
+        _write_headless_messages_trace(
+            trace_output_path,
+            cwd=cwd,
+            prompt=prompt,
+            runtime=None,
+            result_messages=[],
+            response_text=f"Config error: {exc}",
+            error_text=str(exc),
+        )
         print(f"Config error: {exc}", file=sys.stderr)
         sys.exit(1)
 
@@ -165,8 +226,6 @@ def run_headless(prompt: str | None = None, allow_edits: bool = False) -> str:
     ]
 
     logger.info("Headless run: %s", prompt[:80])
-    trace_output_path = os.environ.get("MINI_CODE_HEADLESS_MESSAGES_OUT", "").strip() or None
-
     try:
         result_messages = run_agent_turn(
             model=model,
@@ -213,15 +272,17 @@ def run_headless(prompt: str | None = None, allow_edits: bool = False) -> str:
             pass
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> int:
     """CLI entry point for headless mode."""
+    args = list(sys.argv[1:] if argv is None else argv)
     # Strip the --allow-edits flag (handled separately); everything else is the prompt.
-    allow_edits = "--allow-edits" in sys.argv
-    prompt_args = [arg for arg in sys.argv[1:] if arg != "--allow-edits"]
+    allow_edits = "--allow-edits" in args
+    prompt_args = [arg for arg in args if arg != "--allow-edits"]
     prompt = " ".join(prompt_args) if prompt_args else None
     response = run_headless(prompt, allow_edits=allow_edits)
     print(response)
+    return _headless_response_exit_code(response)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

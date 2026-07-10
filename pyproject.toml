@@ -11,11 +11,13 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0.0"]
+dev = ["pytest>=8.0.0", "hypothesis>=6.0.0", "setuptools>=68"]
 
 [project.scripts]
 minicode-py = "minicode.main:main"
 minicode-headless = "minicode.headless:main"
+minicode-readiness = "minicode.readiness:main"
+minicode-structure-check = "minicode.structure_check:main"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
@@ -26,6 +28,8 @@ package-dir = {"" = "."}
 
 [tool.setuptools.packages.find]
 where = ["."]
+include = ["minicode*", "Main*", "Package*"]
+namespaces = true
 
 
 [tool.mypy]

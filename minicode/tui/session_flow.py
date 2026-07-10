@@ -24,10 +24,16 @@ from minicode.tui.tool_lifecycle import _bump_transcript_revision
 from minicode.tui.types import TranscriptEntry
 
 
-def handle_session_listing(cwd: str, list_sessions_only: bool) -> bool:
+def handle_session_listing(
+    cwd: str,
+    list_sessions_only: bool,
+    *,
+    workspace_only: bool = False,
+) -> bool:
     if not list_sessions_only:
         return False
-    sessions = list_sessions()
+    workspace = str(Path(cwd).resolve()) if workspace_only else None
+    sessions = list_sessions(workspace=workspace)
     print(format_session_list(sessions))
     return True
 

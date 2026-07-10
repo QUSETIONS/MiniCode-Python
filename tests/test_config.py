@@ -8,6 +8,7 @@ from minicode.config import (
     merge_settings,
     validate_provider_runtime,
 )
+from minicode.model_registry import Provider, detect_provider
 
 
 def test_merge_settings_merges_env_and_mcp_servers() -> None:
@@ -69,6 +70,33 @@ def test_validate_provider_runtime_accepts_gpt55_openai_compatible() -> None:
     )
 
     assert errors == []
+
+
+def test_detect_provider_accepts_provider_exposed_model_on_custom_openai_host() -> None:
+    provider = detect_provider(
+        "claude-sonnet-4-6",
+        {
+            "openaiApiKey": "sk-test",
+            "openaiBaseUrl": "https://www.cctq.ai",
+            "_openaiExposedModels": ["claude-sonnet-4-6"],
+        },
+    )
+
+    assert provider == Provider.OPENAI
+
+
+def test_validate_provider_runtime_rejects_non_exposed_model_on_custom_openai_host() -> None:
+    errors = validate_provider_runtime(
+        {
+            "model": "gpt5.5",
+            "openaiApiKey": "sk-test",
+            "openaiBaseUrl": "https://www.cctq.ai",
+            "_openaiExposedModels": ["claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
+        }
+    )
+
+    assert any("not exposed by the current openai-compatible provider" in error.lower() for error in errors)
+    assert any("claude-sonnet-4-6" in error for error in errors)
 
 
 def test_load_runtime_config_includes_runtime_profile(monkeypatch) -> None:
@@ -304,6 +332,7 @@ def test_describe_fallback_guidance_prefers_provider_exposed_models_when_default
             "model": "gpt5.5",
             "openaiApiKey": "openai-key",
             "openaiBaseUrl": "https://www.cctq.ai",
+            "_openaiExposedModels": ["claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
         },
         provider_name="openai",
         current_model="gpt5.5",
@@ -312,7 +341,7 @@ def test_describe_fallback_guidance_prefers_provider_exposed_models_when_default
     assert guidance
     assert "default failover is already available" in guidance[0].lower()
     assert "gpt-4o, gpt-4o-mini" in guidance[0]
-    assert "provider actually exposes" in guidance[0].lower()
+    assert "currently exposes: claude-sonnet-4-6, claude-haiku-4-5-20251001" in guidance[0].lower()
     assert "add fallbackmodels or openaifallbackmodels to enable model failover" not in guidance[0].lower()
 
 

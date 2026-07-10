@@ -131,25 +131,32 @@ def _validate_mcp_args(args: list[str]) -> None:
 
 
 def _prepare_spawn(command: str, args: list[str]) -> tuple[list[str] | str, dict]:
-    """把 MCP 命令解析成可被 subprocess 启动的形式。
+    """Resolve MCP command into a form subprocess can execute.
 
-    Windows 上 npx/npm 等是 ``.cmd`` 批处理包装器。``subprocess`` 在 ``shell=False``
-    时底层走 ``CreateProcess``，它既不能直接运行 ``.cmd``/``.bat``，又不会按 PATHEXT
-    搜索，于是裸命令 ``npx`` 会被当成不存在的 ``npx.exe``，报“命令未找到: npx”
-    （GitHub issue #7）。这里用 :func:`shutil.which`（遵循 PATHEXT）解析出真正的
-    可执行文件，并把批处理包装器通过 ``cmd.exe``（即 ``shell=True``）启动。参数已经
-    过 :func:`_validate_mcp_args` 校验不含 shell 元字符，因此 ``shell=True`` 是安全的。
+    On Windows, npx/npm are .cmd batch wrappers that subprocess cannot run directly
+    with shell=False. Uses shutil.which (honoring PATHEXT) to resolve the real
+    executable, then launches .cmd/.bat wrappers via cmd.exe (shell=True).
+    Arguments are validated by _validate_mcp_args to contain no shell metacharacters,
+    so shell=True is safe here.
 
-    返回 ``(spawn_exec, extra_popen_kwargs)``：``spawn_exec`` 在 ``shell=False`` 时为
-    列表，在 ``shell=True`` 时为单条命令行字符串。
+    On non-Windows (Linux/macOS), if command=="python" but shutil.which("python")
+    is None, falls back to "python3" (many Linux distros only ship python3).
+
+    Returns (spawn_exec, extra_popen_kwargs): spawn_exec is a list for shell=False,
+    a single string for shell=True.
     """
     if os.name == "nt":
         resolved = shutil.which(command)
         if resolved:
             if resolved.lower().endswith((".cmd", ".bat")):
-                # 批处理包装器需要 cmd.exe 解释执行
                 return subprocess.list2cmdline([resolved, *args]), {"shell": True}
             return [resolved, *args], {}
+    else:
+        # Non-Windows: try python -> python3 fallback (Linux/macOS often lack plain "python")
+        if command == "python" and shutil.which(command) is None:
+            resolved = shutil.which("python3")
+            if resolved:
+                return [resolved, *args], {}
     return [command, *args], {}
 
 
@@ -815,5 +822,5 @@ def create_mcp_backed_tools(*, cwd: str, mcp_servers: dict[str, dict[str, Any]])
     return {
         "tools": tools,
         "servers": servers,
-        "dispose": lambda: [client.close() for client in clients],
+        "dispose": lambda: (_ := [client.close() for client in clients], None)[1],  # type: ignore[func-returns-value, misc]
     }

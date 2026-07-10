@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "auditedAt": "2026-06-29",
+  "identity": "typescript-parity-provenance",
+  "status": "stable-provenance-record",
+  "sourceSuite": "TypeScript main-work test suite",
+  "pythonTestPath": "tests/test_ts_ported.py",
+  "portedScenarios": [
+    {
+      "sourceFile": "test/input-parser.test.ts",
+      "pythonCoverage": "parse_input_chunk multiline paste and Enter behavior"
+    },
+    {
+      "sourceFile": "test/local-tool-shortcuts.test.ts",
+      "pythonCoverage": "parse_local_tool_shortcut slash command parsing"
+    },
+    {
+      "sourceFile": "test/token-estimator.test.ts",
+      "pythonCoverage": "context_manager token estimation and context stats"
+    },
+    {
+      "sourceFile": "test/model-context.test.ts",
+      "pythonCoverage": "model context window table behavior"
+    },
+    {
+      "sourceFile": "test/transcript-wrapping.test.ts",
+      "pythonCoverage": "transcript scroll offset and wrapping behavior"
+    }
+  ],
+  "policy": "Tests should cite this stable provenance record rather than depending on the comparison workspace path."
+}

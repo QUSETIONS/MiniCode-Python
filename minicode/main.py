@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import os
+from dataclasses import asdict
 from pathlib import Path
 
 from minicode.agent_loop import run_agent_turn
@@ -18,9 +20,11 @@ from minicode.session import (
     format_rewind_preview,
     format_session_checkpoints,
     format_session_inspect,
+    format_session_list,
     format_session_replay,
     format_session_resume,
     get_latest_session,
+    list_sessions,
     load_session,
     rewind_session,
 )
@@ -136,6 +140,29 @@ def _resolve_target_session(cwd: str, session_id: str | None):
     )
 
 
+def _handle_list_sessions_request(cwd: str, *, workspace_only: bool) -> int:
+    workspace = str(Path(cwd).resolve()) if workspace_only else None
+    print(format_session_list(list_sessions(workspace=workspace)))
+    return 0
+
+
+def _handle_readiness_request(cwd: str, *, json_output: bool) -> int:
+    if json_output:
+        from minicode.product_surfaces import build_readiness_report
+
+        print(
+            json.dumps(
+                asdict(build_readiness_report(cwd)),
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 0
+    result = try_handle_local_command("/readiness", cwd=cwd)
+    print(result or "No readiness report is available.")
+    return 0
+
+
 def _handle_list_checkpoints_request(cwd: str, session_id: str | None) -> int:
     target_session = _resolve_target_session(cwd, session_id)
     if target_session is None:
@@ -240,6 +267,21 @@ def main() -> None:
         "--list-sessions",
         action="store_true",
         help="List all saved sessions and exit",
+    )
+    parser.add_argument(
+        "--list-workspace-sessions",
+        action="store_true",
+        help="List saved sessions for the current workspace and exit",
+    )
+    parser.add_argument(
+        "--readiness",
+        action="store_true",
+        help="Print provider/runtime readiness and exit",
+    )
+    parser.add_argument(
+        "--readiness-json",
+        action="store_true",
+        help="Print provider/runtime readiness as JSON and exit",
     )
     parser.add_argument(
         "--session",
@@ -353,6 +395,19 @@ def main() -> None:
     
     cwd = str(Path.cwd())
     argv = remaining_argv
+
+    if args.list_sessions or args.list_workspace_sessions:
+        raise SystemExit(
+            _handle_list_sessions_request(
+                cwd,
+                workspace_only=args.list_workspace_sessions,
+            )
+        )
+
+    if args.readiness or args.readiness_json:
+        raise SystemExit(
+            _handle_readiness_request(cwd, json_output=args.readiness_json)
+        )
 
     if args.list_checkpoints is not None:
         raise SystemExit(_handle_list_checkpoints_request(cwd, args.list_checkpoints))
@@ -589,6 +644,7 @@ def main() -> None:
             permissions=permissions,
             resume_session=args.resume,
             list_sessions_only=args.list_sessions,
+            list_workspace_sessions_only=args.list_workspace_sessions,
             memory_manager=memory_mgr,
             context_manager=context_mgr,
             prompt_bundle=prompt_bundle,

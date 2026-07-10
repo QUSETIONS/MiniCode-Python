@@ -1,0 +1,44 @@
+# Force LF line endings for all text files on all platforms
+* text=auto
+
+# Explicitly specify text files to always use LF
+*.py     text eol=lf
+*.md     text eol=lf
+*.txt    text eol=lf
+*.json   text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.toml   text eol=lf
+*.cfg    text eol=lf
+*.ini    text eol=lf
+*.sh     text eol=lf
+*.bash   text eol=lf
+*.fish   text eol=lf
+*.ps1    text eol=lf
+*.bat    text eol=lf
+*.cmd    text eol=lf
+*.Dockerfile text eol=lf
+Makefile text eol=lf
+
+# Binary files (no conversion)
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.pdf    binary
+*.zip    binary
+*.gz     binary
+*.tar    binary
+*.whl    binary
+*.egg    binary
+*.parquet binary
+
+# Node.js files (package-lock must stay as-is to avoid npm issues)
+package-lock.json binary
+ts-src/package-lock.json binary
+
+# Exclude nested git repos from top-level tracking
+MiniCode-fork/
+claude-code-src/claude-code/
+superpowers-zh/

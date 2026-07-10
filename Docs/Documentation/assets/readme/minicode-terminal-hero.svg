@@ -1,0 +1,97 @@
+<svg width="1600" height="980" viewBox="0 0 1600 980" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="980" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1220"/>
+      <stop offset="1" stop-color="#101C35"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="980" y2="720" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111827"/>
+      <stop offset="1" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#38BDF8"/>
+      <stop offset="1" stop-color="#22C55E"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="1600" height="980" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="22" stdDeviation="28" flood-color="#020617" flood-opacity="0.38"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="980" rx="36" fill="url(#bg)"/>
+
+  <circle cx="1310" cy="140" r="210" fill="#164E63" opacity="0.18"/>
+  <circle cx="152" cy="860" r="180" fill="#14532D" opacity="0.14"/>
+  <circle cx="1540" cy="820" r="120" fill="#0EA5E9" opacity="0.1"/>
+
+  <text x="92" y="112" fill="#E2E8F0" font-family="Segoe UI, Arial, sans-serif" font-size="42" font-weight="700">
+    MiniCode Python
+  </text>
+  <text x="92" y="156" fill="#93C5FD" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="600">
+    local-first coding agent with durable memory, replayable sessions, safe rewind, and readiness diagnostics
+  </text>
+
+  <g filter="url(#shadow)">
+    <rect x="78" y="206" width="978" height="666" rx="26" fill="url(#panel)" stroke="#1E293B" stroke-width="2"/>
+    <rect x="78" y="206" width="978" height="54" rx="26" fill="#0B1220"/>
+    <circle cx="118" cy="233" r="7" fill="#FB7185"/>
+    <circle cx="144" cy="233" r="7" fill="#F59E0B"/>
+    <circle cx="170" cy="233" r="7" fill="#22C55E"/>
+    <text x="215" y="240" fill="#94A3B8" font-family="Consolas, Menlo, monospace" font-size="20">
+      minicode-py  /session  /memory  /rewind-preview  /readiness
+    </text>
+
+    <text x="116" y="312" fill="#38BDF8" font-family="Consolas, Menlo, monospace" font-size="26" font-weight="700">$ minicode-py</text>
+    <text x="116" y="354" fill="#CBD5E1" font-family="Consolas, Menlo, monospace" font-size="24">MiniCode Python  |  profile: single-deep  |  session: active</text>
+    <text x="116" y="396" fill="#CBD5E1" font-family="Consolas, Menlo, monospace" font-size="24">Task: explain repo surfaces, inspect state, keep edits recoverable</text>
+
+    <text x="116" y="468" fill="#22C55E" font-family="Consolas, Menlo, monospace" font-size="24">$ /session</text>
+    <text x="156" y="510" fill="#E2E8F0" font-family="Consolas, Menlo, monospace" font-size="22">runtime-summary: phase:explore@1 -&gt; phase:verify@4 -&gt; stop:done@5</text>
+    <text x="156" y="544" fill="#94A3B8" font-family="Consolas, Menlo, monospace" font-size="20">checkpoint-summary: 3 saved; latest edit group is rewind-safe</text>
+
+    <text x="116" y="606" fill="#22C55E" font-family="Consolas, Menlo, monospace" font-size="24">$ /memory</text>
+    <text x="156" y="648" fill="#E2E8F0" font-family="Consolas, Menlo, monospace" font-size="22">working memory: protected task anchors kept across compaction</text>
+    <text x="156" y="682" fill="#94A3B8" font-family="Consolas, Menlo, monospace" font-size="20">project memory: durable repo knowledge can be re-injected when needed</text>
+    <text x="156" y="716" fill="#94A3B8" font-family="Consolas, Menlo, monospace" font-size="20">memory pipeline: retrieve -&gt; inject -&gt; reflect -&gt; optimize</text>
+
+    <text x="116" y="778" fill="#22C55E" font-family="Consolas, Menlo, monospace" font-size="24">$ /readiness</text>
+    <text x="156" y="820" fill="#E2E8F0" font-family="Consolas, Menlo, monospace" font-size="22">fallback-ready: yes   provider-surface: explicit   release-readiness: measurable</text>
+  </g>
+
+  <g>
+    <rect x="1110" y="224" width="400" height="124" rx="24" fill="#0F172A" stroke="#1E293B" stroke-width="2"/>
+    <rect x="1134" y="248" width="72" height="72" rx="20" fill="#082F49"/>
+    <text x="1153" y="293" fill="#67E8F9" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">M</text>
+    <text x="1230" y="272" fill="#E2E8F0" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700">Memory</text>
+    <text x="1230" y="306" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="18">Protect active context and</text>
+    <text x="1230" y="330" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="18">re-inject durable project knowledge.</text>
+  </g>
+
+  <g>
+    <rect x="1110" y="374" width="400" height="124" rx="24" fill="#0F172A" stroke="#1E293B" stroke-width="2"/>
+    <rect x="1134" y="398" width="72" height="72" rx="20" fill="#172554"/>
+    <text x="1150" y="443" fill="#93C5FD" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">S</text>
+    <text x="1230" y="422" fill="#E2E8F0" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700">Session</text>
+    <text x="1230" y="456" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="18">Inspect, replay, resume, and</text>
+    <text x="1230" y="480" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="18">summarize long-running work.</text>
+  </g>
+
+  <g>
+    <rect x="1110" y="524" width="400" height="124" rx="24" fill="#0F172A" stroke="#1E293B" stroke-width="2"/>
+    <rect x="1134" y="548" width="72" height="72" rx="20" fill="#3F1D2E"/>
+    <text x="1147" y="593" fill="#FDA4AF" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">R</text>
+    <text x="1230" y="572" fill="#E2E8F0" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700">Rewind</text>
+    <text x="1230" y="606" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="18">Checkpoint every edit, preview</text>
+    <text x="1230" y="630" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="18">recovery, then undo safely.</text>
+  </g>
+
+  <g>
+    <rect x="1110" y="674" width="400" height="124" rx="24" fill="#0F172A" stroke="#1E293B" stroke-width="2"/>
+    <rect x="1134" y="698" width="72" height="72" rx="20" fill="#143124"/>
+    <text x="1145" y="743" fill="#86EFAC" font-family="Segoe UI, Arial, sans-serif" font-size="30" font-weight="700">R</text>
+    <text x="1230" y="722" fill="#E2E8F0" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700">Readiness</text>
+    <text x="1230" y="756" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="18">See provider state, fallback</text>
+    <text x="1230" y="780" fill="#94A3B8" font-family="Segoe UI, Arial, sans-serif" font-size="18">coverage, and release risk.</text>
+  </g>
+
+  <rect x="92" y="912" width="1416" height="2" fill="url(#accent)" opacity="0.8"/>
+</svg>

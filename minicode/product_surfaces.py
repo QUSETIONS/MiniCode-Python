@@ -9,6 +9,7 @@ from minicode.background_tasks import get_slot_stats, list_background_tasks
 from minicode.config import (
     MINI_CODE_EXTENSIONS_DIR,
     MINI_CODE_MANAGED_POLICY_PATH,
+    MINI_CODE_SETTINGS_PATH,
     MINI_CODE_USER_PROFILE_PATH,
     configured_model_fallbacks,
     describe_fallback_guidance,
@@ -76,6 +77,11 @@ class ReadinessReport:
     fallback_candidates: list[str] = field(default_factory=list)
     viable_fallbacks: list[str] = field(default_factory=list)
     fallback_guidance: list[str] = field(default_factory=list)
+    risk_scope: str = "unknown"
+    next_actions: list[str] = field(default_factory=list)
+    fallback_config_examples: list[dict[str, Any]] = field(default_factory=list)
+    repair_plan: list[dict[str, Any]] = field(default_factory=list)
+    preflight_checks: list[dict[str, str]] = field(default_factory=list)
     issues: list[str] = field(default_factory=list)
     summary: str = ""
 
@@ -345,6 +351,263 @@ def _classify_fallbacks(
     return fallback_candidates, viable, issues
 
 
+def _readiness_risk_scope(
+    *,
+    provider_ready: bool,
+    fallback_ready: bool,
+    fallback_candidates: list[str],
+) -> str:
+    if provider_ready and fallback_ready:
+        return "none"
+    if provider_ready:
+        return "fallback-gap" if fallback_candidates else "no-fallback-configured"
+    if fallback_ready:
+        return "degraded-fallback"
+    return "provider-config"
+
+
+def _readiness_next_actions(
+    *,
+    provider_ready: bool,
+    fallback_ready: bool,
+    fallback_guidance: list[str],
+    issues: list[str],
+) -> list[str]:
+    actions: list[str] = []
+    if not provider_ready:
+        actions.append("Fix the primary provider channel or credentials.")
+    if not fallback_ready:
+        actions.append("Configure at least one locally ready fallback model.")
+    if provider_ready and fallback_ready:
+        actions.append("Keep fallback coverage in release readiness checks.")
+    for item in [*fallback_guidance, *issues]:
+        text = str(item).strip()
+        if text and text not in actions:
+            actions.append(text)
+    return actions
+
+
+def _readiness_fallback_config_examples(
+    *,
+    runtime: dict[str, Any],
+    provider: str,
+    fallback_ready: bool,
+) -> list[dict[str, Any]]:
+    if fallback_ready:
+        return []
+    settings_path = str(MINI_CODE_SETTINGS_PATH)
+    examples: list[dict[str, Any]] = []
+
+    if not runtime.get("openaiApiKey"):
+        examples.append(
+            {
+                "label": "OpenAI fallback",
+                "path": settings_path,
+                "settings": {
+                    "fallbackModels": ["gpt-4o", "gpt-4o-mini"],
+                    "env": {
+                        "OPENAI_API_KEY": "sk-...",
+                        "OPENAI_BASE_URL": "https://api.openai.com",
+                    },
+                },
+            }
+        )
+    elif provider != "openai":
+        examples.append(
+            {
+                "label": "Use configured OpenAI credentials as fallback",
+                "path": settings_path,
+                "settings": {"fallbackModels": ["gpt-4o", "gpt-4o-mini"]},
+            }
+        )
+
+    if not runtime.get("openrouterApiKey"):
+        examples.append(
+            {
+                "label": "OpenRouter fallback",
+                "path": settings_path,
+                "settings": {
+                    "fallbackModels": ["openrouter/auto"],
+                    "env": {
+                        "OPENROUTER_API_KEY": "sk-or-...",
+                        "OPENROUTER_BASE_URL": "https://openrouter.ai/api",
+                    },
+                },
+            }
+        )
+
+    return examples[:2]
+
+
+def _repair_step_id(label: str) -> str:
+    normalized = "".join(
+        char.lower() if char.isalnum() else "-"
+        for char in str(label).strip()
+    )
+    return "-".join(part for part in normalized.split("-") if part) or "fallback"
+
+
+def _readiness_repair_plan(
+    *,
+    provider_ready: bool,
+    fallback_ready: bool,
+    risk_scope: str,
+    fallback_config_examples: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    plan: list[dict[str, Any]] = [
+        {
+            "step": "diagnose-local-readiness",
+            "status": "ready" if provider_ready else "blocked",
+            "action": "Inspect local provider and fallback readiness without calling the model provider.",
+            "command": "minicode-readiness --json --fail-on blocked",
+            "safety": "read-only",
+        }
+    ]
+    if fallback_ready:
+        plan.append(
+            {
+                "step": "keep-fallback-gate",
+                "status": "ready",
+                "action": "Keep fallback coverage in release readiness checks.",
+                "command": "python benchmarks/release_readiness.py --fail-on at-risk",
+                "safety": "read-only",
+            }
+        )
+        return plan
+
+    if fallback_config_examples:
+        target_paths = sorted(
+            {
+                str(item.get("path") or "").strip()
+                for item in fallback_config_examples
+                if str(item.get("path") or "").strip()
+            }
+        )
+        plan.append(
+            {
+                "step": "choose-fallback-provider",
+                "status": "manual",
+                "action": (
+                    "Choose one fallback provider, replace placeholder credentials locally, "
+                    "and merge only the selected settings into the target settings file."
+                ),
+                "target_paths": target_paths,
+                "risk_scope": risk_scope,
+                "safety": "preview-only; no settings are modified",
+            }
+        )
+        for item in fallback_config_examples:
+            label = str(item.get("label") or "fallback").strip()
+            settings = dict(item.get("settings", {}) or {})
+            plan.append(
+                {
+                    "step": f"preview-{_repair_step_id(label)}",
+                    "status": "preview",
+                    "action": f"Preview settings for {label}.",
+                    "target_path": str(item.get("path") or "").strip(),
+                    "settings_preview": settings,
+                    "safety": "contains placeholders only; do not commit real credentials",
+                }
+            )
+    else:
+        plan.append(
+            {
+                "step": "define-fallback-channel",
+                "status": "manual",
+                "action": "Add explicit fallbackModels and matching provider credentials to MiniCode settings.",
+                "risk_scope": risk_scope,
+                "safety": "manual configuration required",
+            }
+        )
+
+    plan.extend(
+        [
+            {
+                "step": "verify-local-readiness",
+                "status": "verify",
+                "action": "Verify that local provider config and fallback coverage are no longer blocked.",
+                "command": "minicode-readiness --json --fail-on blocked",
+                "safety": "read-only",
+            },
+            {
+                "step": "verify-release-readiness",
+                "status": "verify",
+                "action": "Run the release smoke after local readiness is configured.",
+                "command": "python benchmarks/release_readiness.py --fail-on at-risk",
+                "safety": "may call the live provider",
+            },
+        ]
+    )
+    return plan
+
+
+def _readiness_preflight_checks(
+    *,
+    provider_ready: bool,
+    fallback_ready: bool,
+    provider_channel: str,
+    configured_fallbacks: list[str],
+    default_fallbacks: list[str],
+    fallback_candidates: list[str],
+    viable_fallbacks: list[str],
+    issues: list[str],
+) -> list[dict[str, str]]:
+    issue_preview = issues[0] if issues else "No local provider configuration issues detected."
+    checks = [
+        {
+            "label": "primary-provider-config",
+            "status": "pass" if provider_ready else "blocked",
+            "summary": provider_channel or issue_preview,
+            "action": "Run a live provider smoke before release.",
+        },
+        {
+            "label": "fallback-coverage",
+            "status": "pass" if fallback_ready else "warning",
+            "summary": (
+                f"{len(viable_fallbacks)}/{len(fallback_candidates)} fallback model(s) locally ready"
+                if fallback_candidates
+                else "No configured or default fallback models are available."
+            ),
+            "action": (
+                "Keep fallback coverage in release readiness checks."
+                if fallback_ready
+                else "Configure at least one locally ready fallback model."
+            ),
+        },
+        {
+            "label": "configured-fallbacks",
+            "status": "pass" if configured_fallbacks else "warning",
+            "summary": (
+                f"{len(configured_fallbacks)} configured fallback model(s)"
+                if configured_fallbacks
+                else "No explicit fallbackModels are configured."
+            ),
+            "action": "Add fallbackModels for deterministic release behavior.",
+        },
+        {
+            "label": "default-fallbacks",
+            "status": "pass" if default_fallbacks else "warning",
+            "summary": (
+                f"{len(default_fallbacks)} default fallback model(s) inferred"
+                if default_fallbacks
+                else "No default fallback model is locally viable for this provider."
+            ),
+            "action": "Use explicit fallbackModels when defaults are unavailable.",
+        },
+        {
+            "label": "live-smoke-readiness",
+            "status": "not-run",
+            "summary": "Readiness preflight is local-only and does not call the model provider.",
+            "action": "Run benchmarks/release_readiness.py for the live provider smoke.",
+        },
+    ]
+    if not provider_ready and fallback_ready:
+        checks[0]["action"] = "Fix primary credentials while using the ready fallback path."
+    if not provider_ready and not fallback_ready:
+        checks[1]["status"] = "blocked"
+    return checks
+
+
 def build_readiness_report(
     cwd: str | Path,
     runtime: dict[str, Any] | None = None,
@@ -425,6 +688,38 @@ def build_readiness_report(
         summary += f" [fallbacks {len(viable_fallbacks)}/{len(fallback_candidates)} locally ready]"
     if issues:
         summary += f" [{issues[0]}]"
+    risk_scope = _readiness_risk_scope(
+        provider_ready=provider_ready,
+        fallback_ready=fallback_ready,
+        fallback_candidates=fallback_candidates,
+    )
+    next_actions = _readiness_next_actions(
+        provider_ready=provider_ready,
+        fallback_ready=fallback_ready,
+        fallback_guidance=fallback_guidance,
+        issues=issues,
+    )
+    fallback_config_examples = _readiness_fallback_config_examples(
+        runtime=effective_runtime,
+        provider=provider,
+        fallback_ready=fallback_ready,
+    )
+    repair_plan = _readiness_repair_plan(
+        provider_ready=provider_ready,
+        fallback_ready=fallback_ready,
+        risk_scope=risk_scope,
+        fallback_config_examples=fallback_config_examples,
+    )
+    preflight_checks = _readiness_preflight_checks(
+        provider_ready=provider_ready,
+        fallback_ready=fallback_ready,
+        provider_channel=provider_channel,
+        configured_fallbacks=configured_fallbacks,
+        default_fallbacks=default_fallbacks,
+        fallback_candidates=fallback_candidates,
+        viable_fallbacks=viable_fallbacks,
+        issues=issues,
+    )
     return ReadinessReport(
         status=status,
         provider=provider,
@@ -434,6 +729,11 @@ def build_readiness_report(
         fallback_candidates=fallback_candidates,
         viable_fallbacks=viable_fallbacks,
         fallback_guidance=fallback_guidance,
+        risk_scope=risk_scope,
+        next_actions=next_actions,
+        fallback_config_examples=fallback_config_examples,
+        repair_plan=repair_plan,
+        preflight_checks=preflight_checks,
         issues=issues,
         summary=summary,
     )

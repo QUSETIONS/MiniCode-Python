@@ -302,7 +302,9 @@ class TestAgentLoopPerformance:
     def test_concurrent_vs_serial_speedup(self):
         """Compare concurrent vs serial tool execution speedup."""
         num_tools = 4
-        tool_delay = 0.05
+        # Keep the workload well above hosted-runner scheduling jitter so the
+        # ratio measures concurrency rather than short-sleep wakeup latency.
+        tool_delay = 0.2
 
         # Serial execution
         def run_serial():
@@ -315,9 +317,16 @@ class TestAgentLoopPerformance:
 
         # Concurrent execution
         with concurrent.futures.ThreadPoolExecutor(max_workers=num_tools) as pool:
-            # Warm the pool before measuring; this test is about concurrent
-            # execution throughput, not OS thread startup jitter.
-            warmup = [pool.submit(lambda: None) for _ in range(num_tools)]
+            # A barrier forces every worker to exist before timing starts. Fast
+            # no-op submissions can otherwise all run on one worker while the
+            # executor is still creating the remaining threads.
+            warmup_barrier = threading.Barrier(num_tools + 1)
+
+            def warm_worker() -> None:
+                warmup_barrier.wait()
+
+            warmup = [pool.submit(warm_worker) for _ in range(num_tools)]
+            warmup_barrier.wait()
             for f in warmup:
                 f.result()
 

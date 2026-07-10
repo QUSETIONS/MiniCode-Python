@@ -28,7 +28,66 @@ jobs:
         run: python -m pip install -e ".[dev]"
 
       - name: Compile sources
-        run: python -m compileall -q minicode tests
+        run: python -m compileall -q minicode tests benchmarks Main Package
+
+      - name: AGENTS structure compliance
+        run: python -m minicode.structure_check --root . --hotspots 5 --max-dependency-upstream 4 --check-material-inventory --report .temp/structure-compliance.json
+
+      - name: AGENTS structure artifact gate
+        run: python -m minicode.release_readiness --check-structure-compliance-artifact .temp/structure-compliance.json
+
+      - name: Runtime readiness gate
+        run: python -m minicode.readiness --json
+
+      - name: Runtime readiness fallback examples
+        run: python -m minicode.readiness --examples-out .temp/readiness-fallback-examples.json
+
+      - name: Runtime readiness doctor
+        run: python -m minicode.readiness --doctor-out .temp/readiness-doctor.md
+
+      - name: Runtime readiness repair plan
+        run: python -m minicode.readiness --repair-plan-out .temp/readiness-repair-plan.json
+
+      - name: Runtime readiness patch preview
+        run: python -m minicode.readiness --patch-preview-out .temp/readiness-fallback-patch-preview.json
+
+      - name: Runtime readiness bundle
+        run: python -m minicode.readiness --bundle-out .temp/readiness-bundle
+
+      - name: Runtime readiness artifact redaction
+        run: >
+          python -m minicode.release_readiness --check-artifact-redaction
+          .temp/readiness-fallback-examples.json
+          .temp/readiness-doctor.md
+          .temp/readiness-repair-plan.json
+          .temp/readiness-fallback-patch-preview.json
+
+      - name: Runtime readiness artifact manifest
+        run: >
+          python -m minicode.release_readiness
+          --write-artifact-manifest .temp/readiness-artifact-manifest.json
+          --artifact fallback_examples_json=.temp/readiness-fallback-examples.json
+          --artifact doctor_markdown=.temp/readiness-doctor.md
+          --artifact repair_plan_json=.temp/readiness-repair-plan.json
+          --artifact patch_preview_json=.temp/readiness-fallback-patch-preview.json
+
+      - name: Runtime readiness artifact manifest gate
+        run: python -m minicode.release_readiness --check-artifact-manifest .temp/readiness-artifact-manifest.json
+
+      - name: Runtime readiness patch preview gate
+        run: python -m minicode.release_readiness --check-fallback-patch-preview .temp/readiness-fallback-patch-preview.json
+
+      - name: Runtime readiness fallback simulation gate
+        run: python -m minicode.release_readiness --check-fallback-simulation .temp/readiness-bundle/readiness-fallback-simulations.json
+
+      - name: Runtime fallback switch smoke
+        run: python -m minicode.release_readiness --check-fallback-switch-smoke
+
+      - name: Runtime readiness bundle manifest gate
+        run: python -m minicode.release_readiness --check-artifact-manifest .temp/readiness-bundle/readiness-artifact-manifest.json
+
+      - name: Runtime readiness bundle gate
+        run: python -m minicode.release_readiness --check-readiness-bundle .temp/readiness-bundle
 
       - name: Lint (ruff)
         run: |
@@ -36,6 +95,7 @@ jobs:
           python -m ruff check minicode/ --select=E,F --ignore=E501
 
       - name: Type check (mypy baseline)
+        shell: bash
         run: |
           python -m pip install mypy
           # Baseline: 225 errors. Gradual type hardening — fix real bugs, not just noise.
@@ -48,6 +108,18 @@ jobs:
 
       - name: Run packaging smoke tests
         run: python -m pytest tests/test_packaging.py -q
+
+      - name: Run AGENTS mirror tests
+        run: >
+          python -m pytest -q --import-mode=importlib
+          Main/MinicodeFrontline/Test/Application/Dto/AppProjection.Test.py
+          Main/MinicodeFrontline/Test/Application/Entry/MiniCodeFrontline.Test.py
+          Main/MinicodeFrontline/Test/Application/Entry/LocalCommandSurface.Test.py
+          Main/MinicodeFrontline/Test/Application/Entry/RuntimeLifecycleSurface.Test.py
+          Main/MinicodeFrontline/Test/Application/Query/CurrentRuntimeProjection.Test.py
+          Main/MinicodeFrontline/Test/Application/Query/RuntimeCapabilityInventory.Test.py
+          Package/EngineeringStructure/Test/Application/Query/ProductRootProjection.Test.py
+          Package/EngineeringStructure/Test/Application/Query/StructureCompliance.Test.py
 
       - name: Run test suite
         run: python -m pytest -q --tb=short

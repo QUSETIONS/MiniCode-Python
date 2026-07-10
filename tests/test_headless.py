@@ -127,6 +127,45 @@ def test_run_headless_provider_failure_uses_runtime_channel_details(
     assert "fallback" in response.lower()
 
 
+def test_headless_response_exit_code_marks_terminal_failures() -> None:
+    from minicode.headless import _headless_response_exit_code
+
+    assert _headless_response_exit_code("OK") == 0
+    assert _headless_response_exit_code("Model API error (RuntimeError): error code: 1010") == 1
+    assert _headless_response_exit_code("Provider availability failure: no channel") == 1
+    assert _headless_response_exit_code("Error: empty prompt") == 1
+
+
+def test_headless_main_returns_nonzero_for_provider_failure(monkeypatch, capsys) -> None:
+    import minicode.headless
+
+    monkeypatch.setattr(
+        minicode.headless,
+        "run_headless",
+        lambda prompt, allow_edits=False: "Model API error (RuntimeError): error code: 1010",
+    )
+
+    exit_code = minicode.headless.main(["Reply with exactly OK."])
+
+    assert exit_code == 1
+    assert "error code: 1010" in capsys.readouterr().out
+
+
+def test_headless_main_returns_zero_for_success(monkeypatch, capsys) -> None:
+    import minicode.headless
+
+    monkeypatch.setattr(
+        minicode.headless,
+        "run_headless",
+        lambda prompt, allow_edits=False: "OK",
+    )
+
+    exit_code = minicode.headless.main(["Reply with exactly OK."])
+
+    assert exit_code == 0
+    assert capsys.readouterr().out.strip() == "OK"
+
+
 def test_run_headless_writes_messages_trace_when_requested(monkeypatch, tmp_path: Path) -> None:
     import minicode.headless
 
@@ -172,9 +211,92 @@ def test_run_headless_writes_messages_trace_when_requested(monkeypatch, tmp_path
     assert payload["cwd"] == str(tmp_path)
     assert payload["prompt"] == "Run the visible tests."
     assert payload["model"] == "deepseek-v4-pro[1m]"
+    assert payload["exit_code"] == 0
+    assert payload["readiness_report"]["status"] in {"ready", "warning", "blocked"}
+    assert isinstance(payload["repair_plan"], list)
     assert payload["assistant_response"] == "traceable"
     assert payload["error"] is None
     assert payload["messages"][0]["role"] == "assistant"
+
+
+def test_run_headless_writes_trace_when_runtime_config_is_invalid(
+    monkeypatch, tmp_path: Path
+) -> None:
+    import minicode.headless
+
+    trace_path = tmp_path / "artifacts" / "config-failure.json"
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("MINI_CODE_HEADLESS_MESSAGES_OUT", str(trace_path))
+    monkeypatch.setattr(
+        "minicode.config.load_runtime_config",
+        lambda cwd: (_ for _ in ()).throw(RuntimeError("No model configured.")),
+    )
+
+    with pytest.raises(SystemExit) as raised:
+        minicode.headless.run_headless("Reply with exactly OK.")
+
+    assert raised.value.code == 1
+    payload = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert payload["exit_code"] == 1
+    assert payload["error"] == "No model configured."
+    assert payload["messages"] == []
+    assert payload["readiness_report"]["status"] in {"warning", "blocked", "unknown"}
+    assert isinstance(payload["repair_plan"], list)
+
+
+def test_run_headless_failure_trace_includes_redacted_repair_context(monkeypatch, tmp_path: Path) -> None:
+    import minicode.headless
+
+    runtime = {
+        "model": "gpt-4o",
+        "openaiBaseUrl": "https://api.openai.com",
+        "openaiApiKey": "sk-real-secret-1234567890",
+        "fallbackModels": ["openrouter/auto"],
+    }
+    trace_path = tmp_path / "artifacts" / "failed-messages.json"
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("MINI_CODE_HEADLESS_MESSAGES_OUT", str(trace_path))
+    monkeypatch.setattr(
+        "minicode.config.load_runtime_config",
+        lambda cwd: runtime,
+    )
+    monkeypatch.setattr(
+        "minicode.tools.create_default_tool_registry",
+        lambda cwd, runtime=None: ToolRegistry([]),
+    )
+    monkeypatch.setattr("minicode.permissions.PermissionManager", _DummyPermissions)
+    monkeypatch.setattr("minicode.memory.MemoryManager", _DummyMemoryManager)
+    monkeypatch.setattr(
+        "minicode.prompt.build_system_prompt",
+        lambda cwd, permissions, context: "sys",
+    )
+    monkeypatch.setattr(
+        "minicode.model_registry.create_model_adapter",
+        lambda model, tools, runtime=None: object(),
+    )
+
+    def _raise_provider_error(**kwargs):
+        raise RuntimeError("Model API error: OPENAI_API_KEY=sk-real-secret-1234567890")
+
+    monkeypatch.setattr(
+        "minicode.agent_loop.run_agent_turn",
+        _raise_provider_error,
+    )
+
+    response = minicode.headless.run_headless(
+        "Run with OPENAI_API_KEY=sk-real-secret-1234567890"
+    )
+
+    assert response.startswith("Error:")
+    raw_trace = trace_path.read_text(encoding="utf-8")
+    assert "sk-real-secret" not in raw_trace
+    payload = json.loads(raw_trace)
+    assert payload["exit_code"] == 1
+    assert payload["prompt"] == "Run with OPENAI_API_KEY=[REDACTED]"
+    assert payload["error"] == "Model API error: OPENAI_API_KEY=[REDACTED]"
+    assert payload["readiness_report"]["status"] in {"ready", "warning", "blocked"}
+    assert isinstance(payload["repair_plan"], list)
 
 
 # ---------------------------------------------------------------------------

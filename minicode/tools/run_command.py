@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 from typing import Sequence
@@ -238,6 +239,12 @@ def _build_execution_command(
         quoted_args = subprocess.list2cmdline(list(normalized_args))
         shell_command = normalized_command if not quoted_args else f"{normalized_command} {quoted_args}"
         return "cmd", ["/d", "/s", "/c", shell_command]
+    # On non-Windows, if "python" is not in PATH but "python3" is, use python3.
+    # This is a common situation on Linux distros that only ship "python3".
+    if os.name != "nt" and normalized_command == "python" and shutil.which("python") is None:
+        resolved = shutil.which("python3")
+        if resolved:
+            return resolved, list(normalized_args)
     return normalized_command, list(normalized_args)
 
 

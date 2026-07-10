@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
 from pathlib import Path
 
+from Main.MinicodeFrontline.Src.Application.Entry.LocalCommandSurface import (
+    SLASH_COMMANDS,
+)
 from minicode.config import (
     CLAUDE_SETTINGS_PATH,
     MINI_CODE_MCP_PATH,
@@ -30,68 +33,6 @@ from minicode.session import (
     rewind_session,
     rewind_session_data,
 )
-
-
-@dataclass(frozen=True, slots=True)
-class SlashCommand:
-    name: str
-    usage: str
-    description: str
-
-
-SLASH_COMMANDS = [
-    SlashCommand("/help", "/help", "Show available slash commands."),
-    SlashCommand("/tools", "/tools", "List tools available to the coding agent and tool shortcuts."),
-    SlashCommand("/state", "/state", "Show detailed application state and Store summary."),
-    SlashCommand("/status", "/status", "Show application state summary and current model."),
-    SlashCommand("/cost", "/cost [--detailed]", "Show API cost and usage report."),
-    SlashCommand("/context", "/context", "Show context window usage."),
-    SlashCommand("/cybernetics", "/cybernetics", "Show cybernetic control system status."),
-    SlashCommand("/tasks", "/tasks", "Show current task list."),
-    SlashCommand("/memory", "/memory", "Show memory system status."),
-    SlashCommand("/config", "/config", "Show configuration diagnostics and validation."),
-    SlashCommand("/history", "/history", "Show recent prompt history from ~/.mini-code/history.json."),
-    SlashCommand("/clear", "/clear", "Clear the current transcript view."),
-    SlashCommand("/collapse", "/collapse", "Collapse all expanded tool-output blocks in the transcript."),
-    SlashCommand("/retry", "/retry", "Retry the last natural-language prompt in this session."),
-    SlashCommand("/session", "/session", "Inspect the active session, runtime, checkpoints, and recent transcript."),
-    SlashCommand("/session", "/session <session-id|latest>", "Inspect a saved session for the current workspace."),
-    SlashCommand("/session-replay", "/session-replay", "Replay the active session with checkpoint, history, and transcript timeline."),
-    SlashCommand("/session-replay", "/session-replay <session-id|latest>", "Replay a saved session for the current workspace."),
-    SlashCommand("/sessions", "/sessions", "List saved sessions for the current workspace."),
-    SlashCommand("/instructions", "/instructions", "Inspect the active instruction layering surface."),
-    SlashCommand("/hooks", "/hooks", "Inspect active hooks and recent hook telemetry."),
-    SlashCommand("/delegation", "/delegation", "Inspect background delegation capacity and running tasks."),
-    SlashCommand("/extensions", "/extensions", "Inspect local extension manifests for this workspace."),
-    SlashCommand("/extension-inspect", "/extension-inspect <name>", "Inspect a local extension manifest and source path."),
-    SlashCommand("/extension-enable", "/extension-enable <name>", "Enable a local extension manifest."),
-    SlashCommand("/extension-disable", "/extension-disable <name>", "Disable a local extension manifest."),
-    SlashCommand("/readiness", "/readiness", "Inspect provider/runtime readiness for the current workspace."),
-    SlashCommand("/checkpoints", "/checkpoints", "List checkpoints for the active session."),
-    SlashCommand("/checkpoints", "/checkpoints <session-id|latest>", "List checkpoints for a saved session in the current workspace."),
-    SlashCommand("/rewind-preview", "/rewind-preview [latest|steps|checkpoint-id]", "Preview checkpointed file edits that would be rewound for the active session."),
-    SlashCommand("/rewind", "/rewind [latest|steps|checkpoint-id]", "Rewind checkpointed file edits for the active session."),
-    SlashCommand("/session-rewind-preview", "/session-rewind-preview <session-id|latest> [latest|steps|checkpoint-id]", "Preview checkpointed file edits that would be rewound for a saved session."),
-    SlashCommand("/session-rewind", "/session-rewind <session-id|latest> [latest|steps|checkpoint-id]", "Rewind checkpointed file edits for a saved session in the current workspace."),
-    SlashCommand("/transcript-save", "/transcript-save <path>", "Save the current session transcript to a text file."),
-    SlashCommand("/model", "/model", "Show the current model."),
-    SlashCommand("/model", "/model <model-name>", "Persist a model override into ~/.mini-code/settings.json."),
-    SlashCommand("/config-paths", "/config-paths", "Show mini-code and Claude fallback settings paths."),
-    SlashCommand("/skills", "/skills", "List discovered SKILL.md workflows."),
-    SlashCommand("/mcp", "/mcp", "Show configured MCP servers and connection state."),
-    SlashCommand("/permissions", "/permissions", "Show mini-code permission storage path."),
-    SlashCommand("/exit", "/exit", "Exit mini-code."),
-    SlashCommand("/debug", "/debug", "Show scroll and terminal diagnostics."),
-    SlashCommand("/user", "/user", "Show or manage user profile (preferences, coding style)."),
-    SlashCommand("/ls", "/ls [path]", "List files in a directory."),
-    SlashCommand("/grep", "/grep <pattern>::[path]", "Search text in files."),
-    SlashCommand("/read", "/read <path>", "Read a file directly."),
-    SlashCommand("/write", "/write <path>::<content>", "Write a file directly."),
-    SlashCommand("/modify", "/modify <path>::<content>", "Replace a file, showing a reviewable diff before applying it."),
-    SlashCommand("/edit", "/edit <path>::<search>::<replace>", "Edit a file by exact replacement."),
-    SlashCommand("/patch", "/patch <path>::<search1>::<replace1>::<search2>::<replace2>...", "Apply multiple replacements to one file in one command."),
-    SlashCommand("/cmd", "/cmd [cwd::]<command> [args...]", "Run an allowed development command directly."),
-]
 
 
 def format_slash_commands() -> str:
@@ -387,6 +328,7 @@ def try_handle_local_command(
                 f"Provider ready: {'yes' if provider_ready else 'no'}",
                 f"Channel: {str(report.get('provider_channel') or 'unknown')}",
                 f"Fallback ready: {'yes' if fallback_ready else 'no'}",
+                f"Risk scope: {str(report.get('risk_scope') or 'unknown')}",
             ]
         )
         if fallback_candidates:
@@ -408,6 +350,64 @@ def try_handle_local_command(
         if guidance:
             lines.append("Guidance:")
             lines.extend(f"- {item}" for item in guidance)
+        preflight_checks = [
+            dict(item)
+            for item in list(report.get("preflight_checks", []) or [])
+            if isinstance(item, dict)
+        ]
+        if preflight_checks:
+            lines.append("Local preflight:")
+            for check in preflight_checks:
+                label = str(check.get("label") or "check").strip()
+                status_text = str(check.get("status") or "unknown").strip()
+                summary = str(check.get("summary") or "").strip()
+                action = str(check.get("action") or "").strip()
+                detail = f"- {label}: {status_text}"
+                if summary:
+                    detail += f" - {summary}"
+                lines.append(detail)
+                if action:
+                    lines.append(f"  Action: {action}")
+        next_actions = [
+            str(item)
+            for item in list(report.get("next_actions", []) or [])
+            if str(item).strip()
+        ]
+        if next_actions:
+            lines.append("Next actions:")
+            lines.extend(f"- {item}" for item in next_actions)
+        repair_plan = [
+            dict(item)
+            for item in list(report.get("repair_plan", []) or [])
+            if isinstance(item, dict)
+        ]
+        if repair_plan:
+            lines.append("Repair plan:")
+            for item in repair_plan:
+                step = str(item.get("step") or "step").strip()
+                status_text = str(item.get("status") or "unknown").strip()
+                action = str(item.get("action") or "").strip()
+                command = str(item.get("command") or "").strip()
+                detail = f"- {step}: {status_text}"
+                if action:
+                    detail += f" - {action}"
+                lines.append(detail)
+                if command:
+                    lines.append(f"  Command: {command}")
+        config_examples = [
+            dict(item)
+            for item in list(report.get("fallback_config_examples", []) or [])
+            if isinstance(item, dict)
+        ]
+        if config_examples:
+            lines.append("Config examples:")
+            for item in config_examples:
+                label = str(item.get("label") or "fallback config").strip()
+                path = str(item.get("path") or "").strip()
+                settings = item.get("settings", {})
+                rendered_settings = json.dumps(settings, ensure_ascii=False, sort_keys=True)
+                location = f" [{path}]" if path else ""
+                lines.append(f"- {label}{location}: {rendered_settings}")
         return "\n".join(lines)
 
     def _format_extension_manifest_detail(identifier: str) -> str:

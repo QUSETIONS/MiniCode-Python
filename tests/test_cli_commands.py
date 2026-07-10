@@ -1,4 +1,8 @@
 from minicode.cli_commands import find_matching_slash_commands, format_slash_commands, try_handle_local_command
+from Main.MinicodeFrontline.Src.Application.Entry.LocalCommandSurface import (
+    SLASH_COMMANDS as MAIN_SLASH_COMMANDS,
+)
+from minicode.cli_commands import SLASH_COMMANDS as COMPAT_SLASH_COMMANDS
 from minicode.local_tool_shortcuts import parse_local_tool_shortcut
 from minicode.session import FileCheckpoint, SessionData, SessionMetadata
 
@@ -27,6 +31,10 @@ def test_find_matching_slash_commands_returns_help_variants() -> None:
     matches = find_matching_slash_commands("/mo")
     assert "/model" in matches
     assert "/model <model-name>" in matches
+
+
+def test_cli_command_compatibility_surface_uses_main_contract() -> None:
+    assert COMPAT_SLASH_COMMANDS is MAIN_SLASH_COMMANDS
 
 
 def test_find_matching_slash_commands_returns_cybernetics() -> None:
@@ -157,6 +165,47 @@ def test_product_surface_commands_use_active_session_snapshot() -> None:
                 "Primary runtime is using a single anthropic-compatible channel from baseUrl/authToken.",
                 "Add fallbackModels or anthropicFallbackModels to enable model failover.",
             ],
+            "risk_scope": "fallback-gap",
+            "next_actions": [
+                "Configure at least one locally ready fallback model.",
+                "Add fallbackModels or anthropicFallbackModels to enable model failover.",
+            ],
+            "repair_plan": [
+                {
+                    "step": "choose-fallback-provider",
+                    "status": "manual",
+                    "action": "Choose one fallback provider.",
+                },
+                {
+                    "step": "verify-local-readiness",
+                    "status": "verify",
+                    "command": "minicode-readiness --json --fail-on blocked",
+                },
+            ],
+            "fallback_config_examples": [
+                {
+                    "label": "OpenAI fallback",
+                    "path": "D:/home/.mini-code/settings.json",
+                    "settings": {
+                        "fallbackModels": ["gpt-4o"],
+                        "env": {"OPENAI_API_KEY": "sk-..."},
+                    },
+                }
+            ],
+            "preflight_checks": [
+                {
+                    "label": "primary-provider-config",
+                    "status": "pass",
+                    "summary": "anthropic-compatible via baseUrl/authToken",
+                    "action": "Run a live provider smoke before release.",
+                },
+                {
+                    "label": "fallback-coverage",
+                    "status": "warning",
+                    "summary": "1/2 fallback model(s) locally ready",
+                    "action": "Configure at least one locally ready fallback model.",
+                },
+            ],
             "issues": ["Fallback 'qwen3.6-plus' is not locally ready: Missing provider channel"],
         },
     )
@@ -192,12 +241,24 @@ def test_product_surface_commands_use_active_session_snapshot() -> None:
     assert "Readiness surface:" in readiness
     assert "Provider ready: yes" in readiness
     assert "Fallback ready: no" in readiness
+    assert "Risk scope: fallback-gap" in readiness
     assert "Channel: anthropic-compatible via baseUrl/authToken" in readiness
     assert "Configured fallbacks (1/2 locally ready):" in readiness
     assert "- qwen3.6-plus [not-ready]" in readiness
     assert "- gpt-4o [ready]" in readiness
     assert "Guidance:" in readiness
     assert "single anthropic-compatible channel" in readiness
+    assert "Local preflight:" in readiness
+    assert "primary-provider-config: pass" in readiness
+    assert "fallback-coverage: warning" in readiness
+    assert "Next actions:" in readiness
+    assert "Configure at least one locally ready fallback model." in readiness
+    assert "Repair plan:" in readiness
+    assert "choose-fallback-provider: manual" in readiness
+    assert "Command: minicode-readiness --json --fail-on blocked" in readiness
+    assert "Config examples:" in readiness
+    assert "OpenAI fallback" in readiness
+    assert "OPENAI_API_KEY" in readiness
     assert "Missing provider channel" in readiness
 
 

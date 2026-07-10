@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MiniCode Terminal Hero</title>
+<style>
+  :root {
+    --bg0: #07111f;
+    --bg1: #0b1728;
+    --panel: rgba(8, 15, 27, 0.94);
+    --panel-soft: rgba(14, 23, 41, 0.92);
+    --border: rgba(148, 163, 184, 0.18);
+    --text: #e5eefc;
+    --muted: #9cb0c9;
+    --accent: #7dd3fc;
+    --green: #86efac;
+    --gold: #fde68a;
+    --red: #fca5a5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 36px;
+    background:
+      radial-gradient(circle at 12% 0%, rgba(125, 211, 252, 0.18), transparent 28%),
+      radial-gradient(circle at 100% 100%, rgba(134, 239, 172, 0.12), transparent 30%),
+      linear-gradient(180deg, var(--bg0) 0%, var(--bg1) 100%);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .frame {
+    width: 1480px;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 24px;
+    margin-bottom: 18px;
+  }
+  .title-block h1 {
+    margin: 0;
+    font-size: 36px;
+    letter-spacing: -0.03em;
+  }
+  .title-block p {
+    margin: 10px 0 0;
+    color: var(--muted);
+    font-size: 17px;
+    max-width: 780px;
+  }
+  .chips {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .chip {
+    padding: 8px 13px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: rgba(15, 23, 42, 0.74);
+    color: var(--text);
+    font-size: 14px;
+  }
+  .terminal {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 28px 100px rgba(2, 6, 23, 0.6);
+    backdrop-filter: blur(18px);
+  }
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(15, 23, 42, 0.82);
+  }
+  .dots { display: flex; gap: 8px; }
+  .dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+  }
+  .dot.red { background: #f87171; }
+  .dot.yellow { background: #fbbf24; }
+  .dot.green { background: #34d399; }
+  .toolbar-meta {
+    display: flex;
+    gap: 14px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .content {
+    display: grid;
+    grid-template-columns: 1.35fr 0.8fr;
+    gap: 0;
+  }
+  .left {
+    padding: 24px 26px 28px;
+    border-right: 1px solid var(--border);
+  }
+  .prompt {
+    color: var(--accent);
+    font-weight: 600;
+  }
+  pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font: 17px/1.55 "Cascadia Code", "Cascadia Mono", Consolas, "Courier New", monospace;
+    color: var(--text);
+  }
+  .section {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(148, 163, 184, 0.14);
+  }
+  .right {
+    padding: 24px 22px 24px;
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.58), rgba(15, 23, 42, 0.3));
+  }
+  .metric-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+  .metric {
+    padding: 14px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: var(--panel-soft);
+  }
+  .metric .k {
+    display: block;
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+  .metric .v {
+    display: block;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .stack {
+    display: grid;
+    gap: 12px;
+  }
+  .card {
+    padding: 14px 15px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: var(--panel-soft);
+  }
+  .card .label {
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .card .body {
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .body strong.green { color: var(--green); }
+  .body strong.gold { color: var(--gold); }
+  .body strong.red { color: var(--red); }
+  .footer {
+    margin-top: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 18px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .footer b {
+    color: var(--accent);
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+  <div class="frame">
+    <div class="header">
+      <div class="title-block">
+        <h1>MiniCode Python</h1>
+        <p>A real local terminal capture showing the four product surfaces that matter most on day one: memory, sessions, rewind, and readiness.</p>
+      </div>
+      <div class="chips">
+        <span class="chip">Memory-backed continuity</span>
+        <span class="chip">Inspectable sessions</span>
+        <span class="chip">Rewind preview</span>
+        <span class="chip">Provider readiness</span>
+      </div>
+    </div>
+    <div class="terminal">
+      <div class="toolbar">
+        <div class="dots">
+          <span class="dot red"></span>
+          <span class="dot yellow"></span>
+          <span class="dot green"></span>
+        </div>
+        <div class="toolbar-meta">
+          <span>D:\Desktop\minicode</span>
+          <span>PowerShell</span>
+          <span>README hero capture</span>
+        </div>
+      </div>
+      <div class="content">
+        <div class="left">
+          <pre><span class="prompt">PS D:\Desktop\minicode&gt;</span> python -m minicode.main --validate-config
+Status: OK
+Model: gpt-5.5
+Provider: openai
+Channel: openai via openaiApiKey/openaiBaseUrl
+OpenAI Base URL: https://www.cctq.ai
+Fallback Models: gpt-4o, gpt-4o-mini
+
+<span class="prompt">PS D:\Desktop\minicode&gt;</span> /memory
+Memory System Status
+User: 3 entries
+Project: 80 entries
+Total: 83 entries (7.2 KB)
+Tier Distribution:
+  short_term     83 ####################
+</pre>
+          <div class="section">
+            <pre><span class="prompt">PS D:\Desktop\minicode&gt;</span> python -m minicode.main --inspect-session latest
+Session inspect: 7ada2bd0
+Workspace: D:\Desktop\minicode
+Messages: 2
+Transcript entries: 5
+Checkpoints: 2
+Runtime: phase:explore@1 -&gt; phase:execute@2 -&gt; guard:tool_evidence@4 -&gt; widen:widen_needed@6 -&gt; stop:done@8
+</pre>
+          </div>
+          <div class="section">
+            <pre><span class="prompt">PS D:\Desktop\minicode&gt;</span> /rewind-preview latest
+Would restore 2 checkpoint(s) across 2 file(s).
+Mode: restore pre-edit file snapshots.
+
+Planned restores:
+  [5c794e52] session.py
+  [c43731d3] README.md
+
+<span class="prompt">PS D:\Desktop\minicode&gt;</span> /readiness
+readiness: ready (openai) [fallbacks 2/2 locally ready]
+Configured fallbacks:
+  - gpt-4o [ready]
+  - gpt-4o-mini [ready]
+</pre>
+          </div>
+        </div>
+        <div class="right">
+          <div class="metric-grid">
+            <div class="metric">
+              <span class="k">Memory</span>
+              <span class="v">83 entries</span>
+            </div>
+            <div class="metric">
+              <span class="k">Readiness</span>
+              <span class="v">ready</span>
+            </div>
+            <div class="metric">
+              <span class="k">Fallbacks</span>
+              <span class="v">2 / 2</span>
+            </div>
+            <div class="metric">
+              <span class="k">Checkpoints</span>
+              <span class="v">2 saved</span>
+            </div>
+          </div>
+          <div class="stack">
+            <div class="card">
+              <div class="label">Memory</div>
+              <div class="body">Project knowledge is already on hand, so the agent can re-inject working context instead of starting from a blank chat every turn.</div>
+            </div>
+            <div class="card">
+              <div class="label">Session</div>
+              <div class="body">The runtime timeline stays inspectable: <strong class="green">explore -&gt; execute -&gt; guard -&gt; widen -&gt; done</strong>.</div>
+            </div>
+            <div class="card">
+              <div class="label">Rewind</div>
+              <div class="body">Before restoring files, MiniCode shows the exact checkpoint plan so recovery is <strong class="gold">previewable</strong>, not blind.</div>
+            </div>
+            <div class="card">
+              <div class="label">Readiness</div>
+              <div class="body">Provider state is explicit. This run is <strong class="green">ready</strong> with two local failover models already available.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>Built from <b>real MiniCode command output</b>, not an illustrative mock terminal.</span>
+      <span>Model: gpt-5.5 · Provider: openai · Date: 2026-06-06</span>
+    </div>
+  </div>
+</body>
+</html>

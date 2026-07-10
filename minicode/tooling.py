@@ -22,17 +22,13 @@ _TOOL_OUTPUT_LIMITS: dict[str, int] = {
     "read_file": 40_000,
     "grep_files": 20_000,
     "run_command": 30_000,
-    "run_with_debug": 30_000,
     "web_fetch": 20_000,
     "web_search": 15_000,
     "list_files": 15_000,
     "file_tree": 15_000,
     "code_review": 20_000,
     "diff_viewer": 20_000,
-    "db_explorer": 20_000,
-    "docker_helper": 20_000,
     "test_runner": 25_000,
-    "api_tester": 15_000,
 }
 
 
@@ -75,7 +71,7 @@ def _smart_truncate_output(output: str, tool_name: str, max_chars: int | None = 
             f"{tail}"
         )
     
-    if tool_name in ("run_command", "run_with_debug"):
+    if tool_name == "run_command":
         # Keep head + error lines + tail
         head_lines = max(1, int(max_lines * 0.4))
         tail_lines = max(1, int(max_lines * 0.4))
@@ -259,8 +255,8 @@ class ToolDefinition:
 _READ_ONLY_TOOL_NAMES: frozenset[str] = frozenset({
     "read_file", "list_files", "grep_files", "file_tree",
     "find_symbols", "find_references", "get_ast_info",
-    "code_review", "diff_viewer", "db_explorer",
-    "web_fetch", "web_search", "api_tester",
+    "code_review", "diff_viewer",
+    "web_fetch", "web_search",
     "ask_user", "todo_write",
 })
 
