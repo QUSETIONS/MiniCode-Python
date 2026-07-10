@@ -21,6 +21,7 @@ BENCHMARKS_DIR = REPO_ROOT / "benchmarks"
 
 
 def main() -> None:
+    BENCHMARKS_DIR.mkdir(parents=True, exist_ok=True)
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     generated_at = datetime.now(timezone.utc).isoformat()
     rows = evaluate_retrieval_probe()

@@ -68,6 +68,7 @@ def _validate_inventory_path_list(
     records: object,
     collection_label: str,
     findings: list[dict[str, str]],
+    allow_missing_paths: bool = False,
 ) -> None:
     if not isinstance(records, list):
         findings.append(
@@ -87,7 +88,7 @@ def _validate_inventory_path_list(
             )
             continue
         path_text = record.get("path")
-        if not _repo_path_exists(root, path_text):
+        if not allow_missing_paths and not _repo_path_exists(root, path_text):
             findings.append(
                 _material_inventory_finding(
                     f"{collection_label}[{index}] missing repo path: {path_text}",
@@ -204,7 +205,16 @@ def check_material_inventory(
             )
             continue
         path_text = material.get("path")
-        if not _repo_path_exists(root_path, path_text):
+        presence_policy = str(material.get("presencePolicy") or "required").strip()
+        optional_workspace_material = presence_policy == "optional-workspace-material"
+        if presence_policy not in {"required", "optional-workspace-material"}:
+            findings.append(
+                _material_inventory_finding(
+                    f"materials[{index}] has invalid presencePolicy: {presence_policy}",
+                    rule_id="MaterialInventoryMaterial",
+                )
+            )
+        if not optional_workspace_material and not _repo_path_exists(root_path, path_text):
             findings.append(
                 _material_inventory_finding(
                     f"materials[{index}] missing repo path: {path_text}",
@@ -244,6 +254,9 @@ def check_material_inventory(
                 records=records,
                 collection_label=f"materials[{index}].{collection}",
                 findings=findings,
+                allow_missing_paths=(
+                    optional_workspace_material and collection == "observedEntries"
+                ),
             )
         burndown_manifest = material.get("burndownManifest")
         if burndown_manifest and not _repo_path_exists(root_path, burndown_manifest):

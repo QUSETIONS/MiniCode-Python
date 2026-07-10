@@ -88,13 +88,18 @@ def test_material_inventory_materials_are_observed_and_evidenced() -> None:
         assert material["callerSummary"]
         assert material["replacementTarget"]
         assert material["retirementCondition"]
-        _assert_repo_path_exists(material["path"])
+        optional_workspace_material = (
+            material.get("presencePolicy") == "optional-workspace-material"
+        )
+        if not optional_workspace_material:
+            _assert_repo_path_exists(material["path"])
 
         assert material["observedEntries"], f"{material['path']} is missing observedEntries"
         for entry in material["observedEntries"]:
             assert entry["name"]
             assert entry["result"]
-            _assert_repo_path_exists(entry["path"])
+            if not optional_workspace_material:
+                _assert_repo_path_exists(entry["path"])
 
         assert material["coverageEvidence"], f"{material['path']} is missing coverageEvidence"
         for evidence in material["coverageEvidence"]:

@@ -172,6 +172,7 @@
     },
     {
       "path": "MiniCode-fork",
+      "presencePolicy": "optional-workspace-material",
       "historicalAliases": [],
       "identity": "comparison-material",
       "status": "archive-approved-comparison-only-retained-in-place",
@@ -220,6 +221,7 @@
     },
     {
       "path": "MiniCode-main-work",
+      "presencePolicy": "optional-workspace-material",
       "historicalAliases": [],
       "identity": "comparison-material-workspace",
       "status": "archive-approved-parity-provenance-migrated-retained-in-place",
@@ -275,6 +277,7 @@
     },
     {
       "path": "claude-code-src",
+      "presencePolicy": "optional-workspace-material",
       "historicalAliases": [],
       "identity": "fuel-reference-vendor",
       "status": "reference-only",
@@ -317,6 +320,7 @@
     },
     {
       "path": "superpowers-zh",
+      "presencePolicy": "optional-workspace-material",
       "historicalAliases": [],
       "identity": "support-or-fuel-vendor",
       "status": "support-material",
@@ -363,6 +367,7 @@
     },
     {
       "path": ".dead-modules-backup",
+      "presencePolicy": "optional-workspace-material",
       "historicalAliases": [],
       "identity": "retired-code-evidence",
       "status": "audit-evidence",
@@ -458,6 +463,7 @@
     },
     {
       "path": "outputs",
+      "presencePolicy": "optional-workspace-material",
       "historicalAliases": [],
       "identity": "generated-evidence-archive",
       "status": "evidence-archive",

@@ -154,6 +154,53 @@ def test_material_inventory_gate_reports_missing_required_gate(tmp_path: Path) -
     assert "currentProductApp.entrySurfaces" in messages
 
 
+def test_material_inventory_allows_declared_optional_workspace_material_to_be_absent(
+    tmp_path: Path,
+) -> None:
+    inventory_dir = tmp_path / "Docs" / "Documentation" / "engineering"
+    inventory_dir.mkdir(parents=True)
+    (tmp_path / "README.md").write_text("evidence", encoding="utf-8")
+    (tmp_path / "README.zh-CN.md").write_text("evidence", encoding="utf-8")
+    (inventory_dir / "material-inventory.json").write_text(
+        json.dumps(
+            {
+                "schemaVersion": 2,
+                "currentProductApp": {
+                    "logicalBoundary": "product/app/minicode_frontline",
+                    "currentSourceRoot": "minicode",
+                    "entrySurfaces": [{"path": "README.md"}],
+                    "coverageEvidence": [{"path": "README.md"}],
+                },
+                "materials": [
+                    {
+                        "path": "workspace-reference",
+                        "identity": "local reference checkout",
+                        "status": "archive-approved-reference-only",
+                        "presencePolicy": "optional-workspace-material",
+                        "callerSummary": "No current callers.",
+                        "replacementTarget": "README.md",
+                        "retirementCondition": "Retained outside clean checkout.",
+                        "observedEntries": [
+                            {"name": "reference", "path": "workspace-reference/README.md", "result": "observed locally"}
+                        ],
+                        "coverageEvidence": [{"path": "README.md", "reason": "tracked evidence"}],
+                        "currentCallers": [],
+                        "historicalReferences": [],
+                    }
+                ],
+                "focusedGates": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    check = check_material_inventory(tmp_path)
+    messages = "\n".join(finding["message"] for finding in check["findings"])
+
+    assert "missing repo path: workspace-reference" not in messages
+    assert "workspace-reference/README.md" not in messages
+
+
 def test_structure_check_cli_can_print_impact_hotspots(
     capsys: pytest.CaptureFixture[str],
 ) -> None:

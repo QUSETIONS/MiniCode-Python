@@ -997,7 +997,7 @@
     "diagnostic_upper_bound_stage": "oracle_ceiling",
     "policy": "Use BM25-only and domain-weighted rows as current retrieval evidence. Treat oracle_ceiling only as a diagnostic upper bound because it is ground-truth-guided and not a deployable pipeline result."
   },
-  "generated_at": "2026-06-21T10:48:21.869640+00:00",
-  "repo_root": "D:\\Desktop\\minicode",
-  "output_root": "D:\\Desktop\\minicode\\outputs\\paper_a_retrieval_probe_eval"
+  "generated_at": "2026-06-29T06:10:31.975612+00:00",
+  "repo_root": "/home/tim/桌面/minicode",
+  "output_root": "/home/tim/桌面/minicode/outputs/paper_a_retrieval_probe_eval"
 }

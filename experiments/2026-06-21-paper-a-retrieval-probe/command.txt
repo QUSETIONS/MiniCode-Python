@@ -1,0 +1,2 @@
+python benchmarks/paper_a_retrieval_probe_eval.py
+pytest -q tests/test_paper_a_retrieval_probe_eval.py
