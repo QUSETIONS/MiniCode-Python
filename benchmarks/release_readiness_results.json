@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-10T03:54:12.460399+00:00",
+  "generated_at": "2026-07-10T04:07:52.718360+00:00",
   "status": "blocked",
   "local_gate_status": "blocked",
   "provider_status": "at-risk",
@@ -22,8 +22,8 @@
     "command": "/usr/bin/python3 -m pytest -q",
     "exit_code": 0,
     "status": "passed",
-    "summary": "1294 passed, 2 skipped in 97.99s (0:01:37)",
-    "stdout": "........................................................................ [  5%]\n........................................................................ [ 11%]\n........................................................................ [ 16%]\n........................................................................ [ 22%]\n........................................................................ [ 27%]\n........................................................................ [ 33%]\n........................................................................ [ 38%]\n........................................................................ [ 44%]\n........................................................................ [ 50%]\n......ss................................................................ [ 55%]\n........................................................................ [ 61%]\n........................................................................ [ 66%]\n........................................................................ [ 72%]\n........................................................................ [ 77%]\n........................................................................ [ 83%]\n........................................................................ [ 88%]\n........................................................................ [ 94%]\n........................................................................ [100%]\n1294 passed, 2 skipped in 97.99s (0:01:37)",
+    "summary": "1294 passed, 2 skipped in 116.83s (0:01:56)",
+    "stdout": "........................................................................ [  5%]\n........................................................................ [ 11%]\n........................................................................ [ 16%]\n........................................................................ [ 22%]\n........................................................................ [ 27%]\n........................................................................ [ 33%]\n........................................................................ [ 38%]\n........................................................................ [ 44%]\n........................................................................ [ 50%]\n......ss................................................................ [ 55%]\n........................................................................ [ 61%]\n........................................................................ [ 66%]\n........................................................................ [ 72%]\n........................................................................ [ 77%]\n........................................................................ [ 83%]\n........................................................................ [ 88%]\n........................................................................ [ 94%]\n........................................................................ [100%]\n1294 passed, 2 skipped in 116.83s (0:01:56)",
     "stderr": ""
   },
   "runtime_eval_check": {
@@ -41,7 +41,7 @@
     "exit_code": 0,
     "status": "passed",
     "summary": "quality gate findings: 0",
-    "stdout": "AGENTS structure compliance: passed\nrecords: 80\nstructure findings: 0\ndependency edges: 5\ndependency impact nodes: 7\ndependency impact hotspots: 2\n  - 4 direct upstream: Main/MinicodeFrontline/Src/Application/Dto/AppProjection.py\n  - 1 direct upstream: Package/EngineeringStructure/Src/Application/Query/ProductRootProjection.py\nmax dependency direct upstream: 4\nimport dependency edges: 0\nsame-project import dependency edges: 0\nvendor import dependency edges: 0\ncross-project import dependency edges: 0\nimport impact nodes: 0\nimport impact hotspots: 0\nmax import transitive upstream: 0\nimport findings: 0\ndependency findings: 0\ntotal findings: 0\nmaterial inventory gates: 19\nmaterial inventory materials: 9\nmaterial inventory findings: 0\nquality gate findings: 0",
+    "stdout": "AGENTS structure compliance: passed\nrecords: 81\nstructure findings: 0\ndependency edges: 5\ndependency impact nodes: 7\ndependency impact hotspots: 2\n  - 4 direct upstream: Main/MinicodeFrontline/Src/Application/Dto/AppProjection.py\n  - 1 direct upstream: Package/EngineeringStructure/Src/Application/Query/ProductRootProjection.py\nmax dependency direct upstream: 4\nimport dependency edges: 0\nsame-project import dependency edges: 0\nvendor import dependency edges: 0\ncross-project import dependency edges: 0\nimport impact nodes: 0\nimport impact hotspots: 0\nmax import transitive upstream: 0\nimport findings: 0\ndependency findings: 0\ntotal findings: 0\nmaterial inventory gates: 19\nmaterial inventory materials: 9\nmaterial inventory findings: 0\nquality gate findings: 0",
     "stderr": ""
   },
   "smoke_checks": [
@@ -51,7 +51,7 @@
       "exit_code": 0,
       "status": "passed",
       "summary": "Total: 1 session(s)",
-      "stdout": "Saved sessions:\n\n  1. [0d5d131b] 2026-07-10 03:54 - outputs/release_smoke_workspace\n     Messages: 0 | First: (empty)\n     Checkpoints: 1\n     Runtime: phase:verify@2\n\nTotal: 1 session(s)",
+      "stdout": "Saved sessions:\n\n  1. [e86ac147] 2026-07-10 04:07 - outputs/release_smoke_workspace\n     Messages: 0 | First: (empty)\n     Checkpoints: 1\n     Runtime: phase:verify@2\n\nTotal: 1 session(s)",
       "stderr": ""
     },
     {
@@ -60,7 +60,7 @@
       "exit_code": 0,
       "status": "passed",
       "summary": "- [tool:edit_file/success] Patched demo.txt",
-      "stdout": "Session inspect: 0d5d131b\n  Created: 2026-07-10 03:54:12\n  Updated: 2026-07-10 03:54:12\n  Workspace: outputs/release_smoke_workspace\n  Messages: 0\n  Transcript entries: 2\n  History entries: 1\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 1\n  Runtime: phase:verify@2\n  Readiness: ready via anthropic-compatible\n  Instructions: 1 layer(s): project-managed\n  Hooks: 1/1 hook(s) enabled\n  Delegation: 1 running, 3 slot(s) open\n  Extensions: 1 extension(s): git-helpers\n\nRecent checkpoints: 1 saved; latest [9168d90d] demo.txt\n\nInstruction layers:\n  - project-managed [project/managed, present] Prefer verification-first delivery.\n\nHook surface:\n  1/1 hook(s) enabled\n\nDelegation surface:\n  1 running, 3 slot(s) open\n  - lint-worker :: running\n\nExtensions:\n  - git-helpers [project] 1.0.0, enabled :: Local helper bundle\n\nReadiness:\n  ready via anthropic-compatible (ready)\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] Patched demo.txt",
+      "stdout": "Session inspect: e86ac147\n  Created: 2026-07-10 04:07:52\n  Updated: 2026-07-10 04:07:53\n  Workspace: outputs/release_smoke_workspace\n  Messages: 0\n  Transcript entries: 2\n  History entries: 1\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 1\n  Runtime: phase:verify@2\n  Readiness: ready via anthropic-compatible\n  Instructions: 1 layer(s): project-managed\n  Hooks: 1/1 hook(s) enabled\n  Delegation: 1 running, 3 slot(s) open\n  Extensions: 1 extension(s): git-helpers\n\nRecent checkpoints: 1 saved; latest [829dada0] demo.txt\n\nInstruction layers:\n  - project-managed [project/managed, present] Prefer verification-first delivery.\n\nHook surface:\n  1/1 hook(s) enabled\n\nDelegation surface:\n  1 running, 3 slot(s) open\n  - lint-worker :: running\n\nExtensions:\n  - git-helpers [project] 1.0.0, enabled :: Local helper bundle\n\nReadiness:\n  ready via anthropic-compatible (ready)\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] Patched demo.txt",
       "stderr": ""
     },
     {
@@ -69,7 +69,7 @@
       "exit_code": 0,
       "status": "passed",
       "summary": "- [tool:edit_file/success] Patched demo.txt",
-      "stdout": "Session replay: 0d5d131b\n  Workspace: outputs/release_smoke_workspace\n  Created: 2026-07-10 03:54:12\n  Updated: 2026-07-10 03:54:12\n  Runtime: phase:verify@2\n  Checkpoints: 1\n  Readiness: ready via anthropic-compatible\n  Delegation: 1 running, 3 slot(s) open\n\nCheckpoint trail (1 shown):\n  - [9168d90d] 2026-07-10 03:54:12 :: demo.txt (edit)\n\nInstruction layers:\n  - project-managed [project/managed, present] Prefer verification-first delivery.\n\nExtensions:\n  - git-helpers [project] 1.0.0, enabled :: Local helper bundle\n\nPrompt history (1 shown):\n  1. continue with runtime trace\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] Patched demo.txt",
+      "stdout": "Session replay: e86ac147\n  Workspace: outputs/release_smoke_workspace\n  Created: 2026-07-10 04:07:52\n  Updated: 2026-07-10 04:07:53\n  Runtime: phase:verify@2\n  Checkpoints: 1\n  Readiness: ready via anthropic-compatible\n  Delegation: 1 running, 3 slot(s) open\n\nCheckpoint trail (1 shown):\n  - [829dada0] 2026-07-10 04:07:52 :: demo.txt (edit)\n\nInstruction layers:\n  - project-managed [project/managed, present] Prefer verification-first delivery.\n\nExtensions:\n  - git-helpers [project] 1.0.0, enabled :: Local helper bundle\n\nPrompt history (1 shown):\n  1. continue with runtime trace\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] Patched demo.txt",
       "stderr": ""
     },
     {
@@ -78,7 +78,7 @@
       "exit_code": 0,
       "status": "passed",
       "summary": "Type: edit",
-      "stdout": "Rewind preview for session 0d5d131b:\n\nWould restore 1 checkpoint(s) across 1 file(s).\nMode: restore pre-edit file snapshots.\n\nPlanned restores:\n  1. [9168d90d] 2026-07-10 03:54:12 - outputs/release_smoke_workspace/demo.txt\n     Restores: existing file\n     Type: edit",
+      "stdout": "Rewind preview for session e86ac147:\n\nWould restore 1 checkpoint(s) across 1 file(s).\nMode: restore pre-edit file snapshots.\n\nPlanned restores:\n  1. [829dada0] 2026-07-10 04:07:52 - outputs/release_smoke_workspace/demo.txt\n     Restores: existing file\n     Type: edit",
       "stderr": ""
     },
     {
@@ -259,9 +259,9 @@
       "outcome": "provider_channel_unavailable",
       "command": "/usr/bin/python3 -m minicode.headless Reply with exactly OK.",
       "exit_code": 1,
-      "summary": "2026-07-10 11:56:00,864 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).",
+      "summary": "2026-07-10 12:10:00,749 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).",
       "stdout": "",
-      "stderr": "2026-07-10 11:56:00,864 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).\n2026-07-10 11:56:00,865 [ERROR] minicode.headless: Config load failed: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\nTraceback (most recent call last):\n  File \"minicode/headless.py\", line 178, in run_headless\n    runtime = load_runtime_config(cwd)\n              ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"minicode/config.py\", line 560, in load_runtime_config\n    raise RuntimeError(\"No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\")\nRuntimeError: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\n2026-07-10 11:56:00,868 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).\nConfig error: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\n",
+      "stderr": "2026-07-10 12:10:00,749 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).\n2026-07-10 12:10:00,750 [ERROR] minicode.headless: Config load failed: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\nTraceback (most recent call last):\n  File \"minicode/headless.py\", line 178, in run_headless\n    runtime = load_runtime_config(cwd)\n              ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"minicode/config.py\", line 560, in load_runtime_config\n    raise RuntimeError(\"No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\")\nRuntimeError: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\n2026-07-10 12:10:00,754 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).\nConfig error: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\n",
       "risk_scope": "provider-config",
       "error_code": "",
       "request_id": "",
@@ -333,15 +333,15 @@
       "label": "json",
       "path": "benchmarks/runtime_profile_eval_results.json",
       "exists": true,
-      "size_bytes": 6228,
-      "sha256": "9c073a181ec7448e0bc2e49b40515d1fb3f090dcfefbdc8294a35187860f031e"
+      "size_bytes": 6224,
+      "sha256": "f184ded420f10adf1e0b09df1c4d44d2d9f5a6b9409e1e7a5cfffb8251a4800a"
     },
     {
       "label": "markdown",
       "path": "benchmarks/runtime_profile_eval_results.md",
       "exists": true,
       "size_bytes": 2375,
-      "sha256": "effb0113e34e7c1b7dcb05a6dba210350bf12de4b673604c464d29cc893f7e99"
+      "sha256": "6889ad103f81d495edada48585e503aacf611a76571212e99a0db48ed537204e"
     },
     {
       "label": "patch_preview_json",
@@ -361,8 +361,8 @@
       "label": "structure_compliance",
       "path": ".temp/structure-compliance.json",
       "exists": true,
-      "size_bytes": 88600,
-      "sha256": "4e4814bb758c433a0c7d510fc932f8b67d6f508699e13f9cc58920d0b8dd435c"
+      "size_bytes": 89486,
+      "sha256": "f75889197004160fa8f4ad25a1f23aaf27f67ca1c5a8443ea9d99796e232e980"
     }
   ],
   "readiness_report": {
