@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <img alt="Real MiniCode Python frontend demo showing memory, session, rewind, and readiness" src="./docs/assets/readme/minicode-frontend-hero.png" width="100%">
+  <img alt="Real MiniCode Python frontend demo showing memory, session, rewind, and readiness" src="./Docs/Documentation/assets/readme/minicode-frontend-hero.png" width="100%">
 </p>
 
 <p align="center">
@@ -79,6 +79,7 @@ With the current repository state, you can already:
 
 - run an interactive terminal agent with `minicode-py`;
 - run a single-shot command with `minicode-headless`;
+- run a provider/runtime readiness gate with `minicode-readiness`;
 - inspect the current session with `/session`;
 - browse previous sessions with `/sessions`;
 - replay a session with `/session-replay`;
@@ -134,6 +135,60 @@ You should expect the normal MiniCode loop here: inspect repo state, explain fin
 minicode-headless "Explain what this repo does."
 ```
 
+### 6. Run a readiness gate
+
+```bash
+minicode-readiness --json --fail-on blocked
+minicode-readiness --examples-out .temp/readiness-fallback-examples.json --fail-on blocked
+minicode-readiness --doctor-out .temp/readiness-doctor.md --fail-on blocked
+minicode-readiness --repair-plan-out .temp/readiness-repair-plan.json --fail-on blocked
+minicode-readiness --patch-preview-out .temp/readiness-fallback-patch-preview.json --fail-on blocked
+minicode-readiness --bundle-out .temp/readiness-bundle --fail-on blocked
+python -m minicode.release_readiness --check-readiness-bundle .temp/readiness-bundle
+python -m minicode.release_readiness --write-artifact-manifest .temp/readiness-artifact-manifest.json --artifact fallback_examples_json=.temp/readiness-fallback-examples.json --artifact doctor_markdown=.temp/readiness-doctor.md --artifact repair_plan_json=.temp/readiness-repair-plan.json --artifact patch_preview_json=.temp/readiness-fallback-patch-preview.json
+python -m minicode.release_readiness --check-artifact-manifest .temp/readiness-artifact-manifest.json
+python -m minicode.release_readiness --check-fallback-patch-preview .temp/readiness-fallback-patch-preview.json
+python -m minicode.release_readiness --check-fallback-simulation .temp/readiness-bundle/readiness-fallback-simulations.json
+python -m minicode.release_readiness --check-fallback-switch-smoke
+python benchmarks/release_readiness.py
+python -m minicode.release_readiness --check-fallback-evidence benchmarks/release_readiness_results.json
+python -m minicode.release_readiness --check-release-report benchmarks/release_readiness_results.json
+python -m minicode.release_readiness --check-release-markdown benchmarks/release_readiness_results.md --release-json benchmarks/release_readiness_results.json
+```
+
+Use `--fail-on blocked` for CI environments where provider warnings should be
+reported but not fail local product gates. Use `--fail-on warning` when a release
+candidate must have a ready provider and at least one ready fallback. The
+`--examples-out` artifact is read-only guidance; it never writes credentials or
+changes your MiniCode settings. The `--doctor-out` artifact adds a human-readable
+readiness repair report for CI and release bundles, including a local preflight
+checklist for primary provider config, fallback coverage, configured/default
+fallbacks, and the still-separate live provider smoke. The `--repair-plan-out`
+artifact exports the same next steps as structured, redacted JSON so CI can keep
+the repair path auditable without writing credentials. The `--patch-preview-out`
+artifact exports redacted settings merge patch previews so the chosen fallback
+provider can be reviewed before any local settings change. The artifact manifest
+command records existence, size, and SHA-256 for readiness artifacts so CI can
+detect missing or drifting evidence. `--bundle-out` writes examples, doctor,
+repair plan, patch preview, offline fallback simulations, and manifest together
+for the lowest-friction local check.
+`--check-fallback-patch-preview` validates patch preview safety fields, apply
+notes, merge patch shape, and redaction. `--check-readiness-bundle` validates
+that bundle as one unit, including schema, manifest, and redaction.
+`--check-fallback-simulation` validates every offline fallback simulation and
+rejects any live-provider claim; it does not call a provider.
+`benchmarks/release_readiness.py` is report-only by default; use
+`python benchmarks/release_readiness.py --fail-on at-risk` when a release
+candidate must fail on live-provider risk. It also validates the generated
+headless provider trace so live-smoke failures keep a machine-readable
+readiness snapshot and repair plan. `--check-release-report` validates the full
+release JSON schema and evidence links while still allowing provider `at-risk`
+when the diagnostic evidence is present. `--check-release-markdown` validates
+that the human-readable report contains the same status, smoke, provider,
+fallback, and artifact evidence as the release JSON. `--check-fallback-evidence` validates
+that provider risk is paired with fallback coverage or an auditable fallback
+repair path.
+
 ## Typical Workflow
 
 ```mermaid
@@ -175,25 +230,45 @@ The active package is the root `minicode/` package configured by `pyproject.toml
 Current local verification result:
 
 ```text
-1030 passed, 2 skipped, 3 warnings
+1290 passed, 2 skipped
 ```
 
 Verification command:
 
 ```bash
-python -m compileall -q minicode tests
-pytest -q
+python -m compileall -q minicode tests benchmarks Main Package
+python -m minicode.structure_check --root . --hotspots 5 --max-dependency-upstream 4 --check-material-inventory --report .temp/structure-compliance.json
+python -m minicode.release_readiness --check-structure-compliance-artifact .temp/structure-compliance.json
+python -m minicode.readiness --json --fail-on blocked
+python -m minicode.readiness --examples-out .temp/readiness-fallback-examples.json --fail-on blocked
+python -m minicode.readiness --doctor-out .temp/readiness-doctor.md --fail-on blocked
+python -m minicode.readiness --repair-plan-out .temp/readiness-repair-plan.json --fail-on blocked
+python -m minicode.readiness --patch-preview-out .temp/readiness-fallback-patch-preview.json --fail-on blocked
+python -m minicode.readiness --bundle-out .temp/readiness-bundle --fail-on blocked
+python -m minicode.release_readiness --check-readiness-bundle .temp/readiness-bundle
+python -m minicode.release_readiness --write-artifact-manifest .temp/readiness-artifact-manifest.json --artifact fallback_examples_json=.temp/readiness-fallback-examples.json --artifact doctor_markdown=.temp/readiness-doctor.md --artifact repair_plan_json=.temp/readiness-repair-plan.json --artifact patch_preview_json=.temp/readiness-fallback-patch-preview.json
+python -m minicode.release_readiness --check-artifact-manifest .temp/readiness-artifact-manifest.json
+python -m minicode.release_readiness --check-fallback-patch-preview .temp/readiness-fallback-patch-preview.json
+python -m minicode.release_readiness --check-fallback-simulation .temp/readiness-bundle/readiness-fallback-simulations.json
+python -m minicode.release_readiness --check-fallback-switch-smoke
+python benchmarks/release_readiness.py
+python -m minicode.release_readiness --check-fallback-evidence benchmarks/release_readiness_results.json
+python -m minicode.release_readiness --check-release-report benchmarks/release_readiness_results.json
+python -m minicode.release_readiness --check-release-markdown benchmarks/release_readiness_results.md --release-json benchmarks/release_readiness_results.json
+python -m pytest -q --import-mode=importlib
 ```
 
 Current state, honestly:
 
-- core runtime, session, replay, checkpoint, rewind, and readiness surfaces are in good shape;
+- core runtime, session, replay, checkpoint, rewind, readiness, and structure-compliance surfaces are in good shape;
 - memory is not bolted on: working memory, project memory, memory injection, and memory-aware compaction are already in the runtime path;
-- provider and fallback diagnostics are much clearer than before;
+- provider and fallback diagnostics include local preflight checks, structured live-smoke failure context, and a validated headless trace artifact;
 - real provider availability still depends on your local credentials and configured channels;
 - the project is usable today, but it is still evolving toward a more polished lightweight Claude Code experience.
 
-The 3 warnings are unregistered `pytest.mark.benchmark` markers in benchmark tests. They are not failing behavior.
+Live provider readiness still depends on configured credentials and channel
+availability, so the default CI readiness gate only fails when the runtime is
+blocked.
 
 ## Architecture
 
@@ -228,7 +303,7 @@ What matters is not the diagram itself. What matters is that runtime state is tr
 | `minicode/` | Canonical Python package used by install and tests. |
 | `tests/` | Active test suite. |
 | `benchmarks/` | Runtime profile and release-readiness runners plus generated reports. |
-| `docs/` | Architecture notes, optimization history, and productization reports. |
+| `Docs/Documentation/` | Architecture notes, optimization history, and productization reports. |
 | `openspec/` | Specs, archived change records, and build/verify planning artifacts. |
 | `.mini-code-memory/` | Workspace-level durable memory state created by the runtime. |
 
@@ -244,6 +319,7 @@ What matters is not the diagram itself. What matters is that runtime state is tr
 | `minicode/working_memory.py` | Protected working-memory entries that survive compaction pressure. |
 | `minicode/memory_pipeline.py` | Closed-loop memory retrieval, injection, reflection writeback, and optimization path. |
 | `minicode/product_surfaces.py` | User-facing summaries for readiness, hooks, instructions, delegation, and extensions. |
+| `minicode/readiness.py` | Standalone readiness CLI used by local checks and CI gates. |
 | `minicode/release_readiness.py` | Release-oriented runtime smoke and provider-readiness checks. |
 | `minicode/model_switcher.py` | Bounded fallback and failover selection. |
 | `minicode/runtime_profiles.py` | Runtime profiles such as `single` and `single-deep`. |
@@ -264,11 +340,11 @@ Start here if you want the deeper implementation and productization record:
 
 
 - [Chinese README](./README.zh-CN.md)
-- [Optimization Summary](./docs/OPTIMIZATION_SUMMARY.md)
-- [Memory Theory](./docs/memory_theory.md)
-- [Minicode-lite Productization Design](./docs/superpowers/specs/2026-06-05-minicode-lite-productization-design.md)
-- [Minicode-lite Build Plan](./docs/superpowers/plans/2026-06-05-minicode-lite-productization-build.md)
-- [Minicode-lite Verify Report](./docs/superpowers/reports/2026-06-05-minicode-lite-productization-verify.md)
+- [Optimization Summary](./Docs/Documentation/OPTIMIZATION_SUMMARY.md)
+- [Memory Theory](./Docs/Documentation/memory_theory.md)
+- [Minicode-lite Productization Design](./Docs/Documentation/superpowers/specs/2026-06-05-minicode-lite-productization-design.md)
+- [Minicode-lite Build Plan](./Docs/Documentation/superpowers/plans/2026-06-05-minicode-lite-productization-build.md)
+- [Minicode-lite Verify Report](./Docs/Documentation/superpowers/reports/2026-06-05-minicode-lite-productization-verify.md)
 - [Main MiniCode Repository](https://github.com/LiuMengxuan04/MiniCode)
 
 ## Design Principles

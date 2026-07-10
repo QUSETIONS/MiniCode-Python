@@ -616,6 +616,7 @@ def check_release_report_payload(payload: Any) -> ReleaseCheck:
     for required_label in (
         "readiness-artifacts",
         "readiness-bundle",
+        "fallback-simulation",
         "fallback-evidence",
         "fallback-patch-preview",
         "headless-trace",
@@ -652,12 +653,18 @@ def check_release_report_payload(payload: Any) -> ReleaseCheck:
         errors.append("release report provider_diagnostics is empty")
     else:
         for index, diagnostic in enumerate(provider_diagnostics):
-            _check_mapping_fields(
+            checked_diagnostic = _check_mapping_fields(
                 value=diagnostic,
                 label=f"provider_diagnostics[{index}]",
                 required=("label", "outcome", "exit_code", "summary"),
                 errors=errors,
             )
+            if checked_diagnostic and checked_diagnostic.get("outcome") != "answered":
+                for field in ("failure_category", "ownership", "recovery_action"):
+                    if not _is_nonempty_string(checked_diagnostic.get(field)):
+                        errors.append(f"provider_diagnostics[{index}] missing {field}")
+                if not isinstance(checked_diagnostic.get("retryable"), bool):
+                    errors.append(f"provider_diagnostics[{index}] retryable is not a boolean")
 
     runtime_artifacts = _check_mapping_fields(
         value=report.get("runtime_profile_artifacts"),
@@ -673,6 +680,7 @@ def check_release_report_payload(payload: Any) -> ReleaseCheck:
             "doctor_markdown",
             "repair_plan_json",
             "patch_preview_json",
+            "fallback_simulations_json",
             "bundle_directory",
             "bundle_manifest_json",
         ),
@@ -989,7 +997,16 @@ def check_release_markdown(path: str | Path, *, release_json: str | Path | None 
             for diagnostic in provider_diagnostics:
                 if not isinstance(diagnostic, dict):
                     continue
-                for key in ("label", "outcome", "risk_scope", "error_code", "request_id"):
+                for key in (
+                    "label",
+                    "outcome",
+                    "risk_scope",
+                    "error_code",
+                    "request_id",
+                    "failure_category",
+                    "ownership",
+                    "recovery_action",
+                ):
                     value = str(diagnostic.get(key) or "").strip()
                     if value:
                         diagnostic_fragments.append(value)
@@ -1209,7 +1226,7 @@ def check_fallback_patch_preview(path: str | Path) -> ReleaseCheck:
     return check_fallback_patch_preview_payload(payload)
 
 
-def check_fallback_simulation_payload(payload: Any) -> ReleaseCheck:
+def _check_single_fallback_simulation_payload(payload: Any) -> ReleaseCheck:
     errors: list[str] = []
     if not isinstance(payload, dict):
         errors.append("fallback simulation payload is not an object")
@@ -1289,6 +1306,46 @@ def check_fallback_simulation_payload(payload: Any) -> ReleaseCheck:
     )
 
 
+def check_fallback_simulation_payload(payload: Any) -> ReleaseCheck:
+    if not isinstance(payload, dict) or "simulations" not in payload:
+        return _check_single_fallback_simulation_payload(payload)
+
+    errors: list[str] = []
+    if payload.get("simulation_only") is not True:
+        errors.append("fallback simulations bundle must be simulation_only")
+    if payload.get("live_provider_claim") is not False:
+        errors.append("fallback simulations bundle must not claim a live provider result")
+    simulations = payload.get("simulations")
+    if not isinstance(simulations, list):
+        errors.append("fallback simulations bundle missing simulations list")
+        simulations = []
+    for index, simulation in enumerate(simulations):
+        check = _check_single_fallback_simulation_payload(simulation)
+        if check.status == "failed":
+            details = check.stderr or check.summary
+            errors.extend(f"simulations[{index}]: {line}" for line in details.splitlines())
+
+    structured_findings = find_sensitive_payload_leaks(payload)
+    if structured_findings:
+        errors.append(structured_findings[0])
+    if errors:
+        return ReleaseCheck(
+            label="fallback-simulation",
+            command="validate fallback simulations",
+            exit_code=1,
+            status="failed",
+            summary=errors[0],
+            stderr="\n".join(errors),
+        )
+    return ReleaseCheck(
+        label="fallback-simulation",
+        command="validate fallback simulations",
+        exit_code=0,
+        status="passed",
+        summary=f"fallback simulations valid: {len(simulations)} simulation(s)",
+    )
+
+
 def check_fallback_simulation(path: str | Path) -> ReleaseCheck:
     simulation_path = Path(path)
     try:
@@ -1323,6 +1380,7 @@ def check_readiness_bundle(directory: str | Path) -> ReleaseCheck:
         "doctor_markdown": bundle_dir / "readiness-doctor.md",
         "repair_plan_json": bundle_dir / "readiness-repair-plan.json",
         "patch_preview_json": bundle_dir / "readiness-fallback-patch-preview.json",
+        "fallback_simulations_json": bundle_dir / "readiness-fallback-simulations.json",
         "artifact_manifest_json": bundle_dir / "readiness-artifact-manifest.json",
     }
     errors: list[str] = []
@@ -1333,6 +1391,7 @@ def check_readiness_bundle(directory: str | Path) -> ReleaseCheck:
     if not errors:
         examples_payload: dict[str, Any] = {}
         patch_preview_payload: dict[str, Any] = {}
+        simulations_payload: dict[str, Any] = {}
         try:
             loaded_examples = json.loads(paths["fallback_examples_json"].read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
@@ -1365,6 +1424,38 @@ def check_readiness_bundle(directory: str | Path) -> ReleaseCheck:
             patch_preview_check = check_fallback_patch_preview_payload(loaded_patch_preview)
             if patch_preview_check.status == "failed":
                 errors.append(patch_preview_check.summary)
+
+        try:
+            loaded_simulations = json.loads(
+                paths["fallback_simulations_json"].read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError) as exc:
+            errors.append(f"invalid fallback simulations JSON: {exc}")
+        else:
+            if isinstance(loaded_simulations, dict):
+                simulations_payload = loaded_simulations
+            simulation_check = check_fallback_simulation_payload(loaded_simulations)
+            if simulation_check.status == "failed":
+                errors.append(simulation_check.summary)
+
+        if patch_preview_payload and simulations_payload:
+            previews = patch_preview_payload.get("fallback_settings_patch_preview", [])
+            simulations = simulations_payload.get("simulations", [])
+            if isinstance(previews, list) and isinstance(simulations, list):
+                preview_labels = [
+                    str(item.get("label") or "").strip()
+                    for item in previews
+                    if isinstance(item, dict)
+                ]
+                simulation_labels = [
+                    str(item.get("selected_label") or "").strip()
+                    for item in simulations
+                    if isinstance(item, dict)
+                ]
+                if simulation_labels != preview_labels:
+                    errors.append(
+                        "readiness bundle fallback simulations do not match preview order"
+                    )
 
         if examples_payload and patch_preview_payload:
             example_items = examples_payload.get("fallback_config_examples", [])
@@ -1423,6 +1514,7 @@ def check_readiness_bundle(directory: str | Path) -> ReleaseCheck:
                     "doctor_markdown": paths["doctor_markdown"],
                     "repair_plan_json": paths["repair_plan_json"],
                     "patch_preview_json": paths["patch_preview_json"],
+                    "fallback_simulations_json": paths["fallback_simulations_json"],
                 }
             )
             if isinstance(loaded_manifest, list):
@@ -2096,14 +2188,14 @@ def release_readiness_as_markdown(
             "",
             "## Provider Diagnostics",
             "",
-            "| label | outcome | risk_scope | error_code | request_id | exit_code | summary |",
-            "| --- | --- | --- | --- | --- | ---: | --- |",
+            "| label | outcome | failure_category | retryable | ownership | recovery_action | risk_scope | error_code | request_id | exit_code | summary |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | ---: | --- |",
         ]
     )
     provider_action_items: list[tuple[str, str]] = []
     if not provider_diagnostics:
         lines.append(
-            "| provider-smoke | missing | unknown | - | - | 0 | "
+            "| provider-smoke | missing | unknown | false | unknown | Run provider smoke. | unknown | - | - | 0 | "
             "No provider diagnostics were collected. |"
         )
         provider_action_items.append(
@@ -2115,6 +2207,10 @@ def release_readiness_as_markdown(
     for diagnostic in provider_diagnostics:
         lines.append(
             f"| {diagnostic.get('label', '-')} | {diagnostic.get('outcome', '-')} | "
+            f"{diagnostic.get('failure_category') or '-'} | "
+            f"{str(diagnostic.get('retryable', False)).lower()} | "
+            f"{diagnostic.get('ownership') or '-'} | "
+            f"{diagnostic.get('recovery_action') or '-'} | "
             f"{diagnostic.get('risk_scope', 'unknown')} | "
             f"{diagnostic.get('error_code') or '-'} | "
             f"{diagnostic.get('request_id') or '-'} | "

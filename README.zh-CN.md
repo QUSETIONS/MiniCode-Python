@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <img alt="真实的 MiniCode Python 前端 Demo，突出 memory、session、rewind 和 readiness" src="./docs/assets/readme/minicode-frontend-hero.png" width="100%">
+  <img alt="真实的 MiniCode Python 前端 Demo，突出 memory、session、rewind 和 readiness" src="./Docs/Documentation/assets/readme/minicode-frontend-hero.png" width="100%">
 </p>
 
 <p align="center">
@@ -79,6 +79,7 @@ MiniCode Python 是 MiniCode 家族里的 Python 运行时。它面向真实的�
 
 - 用 `minicode-py` 跑交互式终端 agent；
 - 用 `minicode-headless` 跑单次命令；
+- 用 `minicode-readiness` 跑 provider/runtime readiness 门禁；
 - 用 `/session` 查看当前会话快照；
 - 用 `/sessions` 浏览当前工作区历史会话；
 - 用 `/session-replay` 回放会话；
@@ -134,6 +135,29 @@ Explain this repository and tell me which commands matter most for day-to-day us
 minicode-headless "Explain what this repo does."
 ```
 
+### 6. 跑 readiness 门禁
+
+```bash
+minicode-readiness --json --fail-on blocked
+minicode-readiness --examples-out .temp/readiness-fallback-examples.json --fail-on blocked
+minicode-readiness --doctor-out .temp/readiness-doctor.md --fail-on blocked
+minicode-readiness --repair-plan-out .temp/readiness-repair-plan.json --fail-on blocked
+minicode-readiness --patch-preview-out .temp/readiness-fallback-patch-preview.json --fail-on blocked
+minicode-readiness --bundle-out .temp/readiness-bundle --fail-on blocked
+python -m minicode.release_readiness --check-readiness-bundle .temp/readiness-bundle
+python -m minicode.release_readiness --write-artifact-manifest .temp/readiness-artifact-manifest.json --artifact fallback_examples_json=.temp/readiness-fallback-examples.json --artifact doctor_markdown=.temp/readiness-doctor.md --artifact repair_plan_json=.temp/readiness-repair-plan.json --artifact patch_preview_json=.temp/readiness-fallback-patch-preview.json
+python -m minicode.release_readiness --check-artifact-manifest .temp/readiness-artifact-manifest.json
+python -m minicode.release_readiness --check-fallback-patch-preview .temp/readiness-fallback-patch-preview.json
+python -m minicode.release_readiness --check-fallback-simulation .temp/readiness-bundle/readiness-fallback-simulations.json
+python -m minicode.release_readiness --check-fallback-switch-smoke
+python benchmarks/release_readiness.py
+python -m minicode.release_readiness --check-fallback-evidence benchmarks/release_readiness_results.json
+python -m minicode.release_readiness --check-release-report benchmarks/release_readiness_results.json
+python -m minicode.release_readiness --check-release-markdown benchmarks/release_readiness_results.md --release-json benchmarks/release_readiness_results.json
+```
+
+CI 环境建议用 `--fail-on blocked`：provider warning 会被报告，但不会误伤本地产品门禁。发布候选如果要求 provider 和 fallback 都 ready，再用 `--fail-on warning`。`--examples-out` 只导出只读配置建议，不会写入凭据，也不会修改 MiniCode settings。`--doctor-out` 会额外导出一份给 CI 和 release bundle 使用的人工可读诊断报告，其中包含 primary provider、fallback coverage、configured/default fallback 和 live smoke 分离状态的 local preflight 清单。`--repair-plan-out` 会把同一修复路径导出为已脱敏 JSON，让 CI 可以审计下一步动作但不写入凭据。`--patch-preview-out` 会导出已脱敏的 settings merge patch 预览，方便先审查选定 fallback provider，再由人工合并到本地 settings。artifact manifest 命令会记录 readiness artifacts 的存在性、大小和 SHA-256，用于发现证据缺失或漂移。`--bundle-out` 会一次性写出 examples、doctor、repair plan、patch preview、离线 fallback simulations 和 manifest，是本地最低操作成本的检查入口。`--check-fallback-patch-preview` 会校验 patch preview 的 safety 字段、apply notes、merge patch 形态和脱敏状态。`--check-fallback-simulation` 会逐项校验离线模拟并拒绝任何 live provider 声明，不会调用 provider。`--check-readiness-bundle` 会把 bundle 作为一个整体校验 schema、manifest 和脱敏状态。`benchmarks/release_readiness.py` 默认只刷新报告；如果发布候选必须在 live-provider 风险上失败，使用 `python benchmarks/release_readiness.py --fail-on at-risk`。它也会校验 headless provider trace，确保 live-smoke 失败仍保留机器可读的 readiness 快照和 repair plan。`--check-fallback-evidence` 会校验 provider 风险是否配有 fallback 覆盖或可审计的 fallback 修复路径。`--check-release-report` 会校验完整 release JSON 的 schema 和证据链接；只要诊断证据完整，provider `at-risk` 不会被误判为本地门禁失败。`--check-release-markdown` 会校验人工可读 Markdown 报告是否覆盖 JSON 中的状态、smoke、provider、fallback 和 artifact 证据。
+
 ## Typical Workflow
 
 ```mermaid
@@ -175,25 +199,43 @@ flowchart LR
 最近一次本地验证结果：
 
 ```text
-1030 passed, 2 skipped, 3 warnings
+1290 passed, 2 skipped
 ```
 
 验证命令：
 
 ```bash
-python -m compileall -q minicode tests
-pytest -q
+python -m compileall -q minicode tests benchmarks Main Package
+python -m minicode.structure_check --root . --hotspots 5 --max-dependency-upstream 4 --check-material-inventory --report .temp/structure-compliance.json
+python -m minicode.release_readiness --check-structure-compliance-artifact .temp/structure-compliance.json
+python -m minicode.readiness --json --fail-on blocked
+python -m minicode.readiness --examples-out .temp/readiness-fallback-examples.json --fail-on blocked
+python -m minicode.readiness --doctor-out .temp/readiness-doctor.md --fail-on blocked
+python -m minicode.readiness --repair-plan-out .temp/readiness-repair-plan.json --fail-on blocked
+python -m minicode.readiness --patch-preview-out .temp/readiness-fallback-patch-preview.json --fail-on blocked
+python -m minicode.readiness --bundle-out .temp/readiness-bundle --fail-on blocked
+python -m minicode.release_readiness --check-readiness-bundle .temp/readiness-bundle
+python -m minicode.release_readiness --write-artifact-manifest .temp/readiness-artifact-manifest.json --artifact fallback_examples_json=.temp/readiness-fallback-examples.json --artifact doctor_markdown=.temp/readiness-doctor.md --artifact repair_plan_json=.temp/readiness-repair-plan.json --artifact patch_preview_json=.temp/readiness-fallback-patch-preview.json
+python -m minicode.release_readiness --check-artifact-manifest .temp/readiness-artifact-manifest.json
+python -m minicode.release_readiness --check-fallback-patch-preview .temp/readiness-fallback-patch-preview.json
+python -m minicode.release_readiness --check-fallback-simulation .temp/readiness-bundle/readiness-fallback-simulations.json
+python -m minicode.release_readiness --check-fallback-switch-smoke
+python benchmarks/release_readiness.py
+python -m minicode.release_readiness --check-fallback-evidence benchmarks/release_readiness_results.json
+python -m minicode.release_readiness --check-release-report benchmarks/release_readiness_results.json
+python -m minicode.release_readiness --check-release-markdown benchmarks/release_readiness_results.md --release-json benchmarks/release_readiness_results.json
+python -m pytest -q --import-mode=importlib
 ```
 
 实话实说，当前状态是：
 
-- runtime、session、replay、checkpoint、rewind、readiness 这些产品面已经比较稳；
+- runtime、session、replay、checkpoint、rewind、readiness 和结构合规门禁这些产品面已经比较稳；
 - memory 不是外挂：working memory、project memory、memory injection 和 memory-aware compaction 已经进了主运行路径；
-- provider 和 fallback 诊断已经比以前清楚很多；
+- provider 和 fallback 诊断已经包含 local preflight 清单、结构化 live-smoke 失败上下文和已校验的 headless trace artifact；
 - 真实 provider 是否可用，仍然取决于你本地的凭据和通道配置；
 - 这个项目今天已经能用，但还在继续往更完整的轻量级 Claude Code 体验走。
 
-那 `3` 个 warning 是 benchmark 测试里未注册的 `pytest.mark.benchmark`，不是功能失败。
+真实 provider readiness 仍然取决于本地凭据和通道可用性，所以默认 CI readiness 门禁只在 runtime blocked 时失败。
 
 ## Architecture
 
@@ -228,7 +270,7 @@ flowchart LR
 | `minicode/` | 安装和测试使用的规范 Python 包。 |
 | `tests/` | 活跃测试套件。 |
 | `benchmarks/` | runtime profile、release readiness runner 和生成报告。 |
-| `docs/` | 架构说明、优化记录和产品化报告。 |
+| `Docs/Documentation/` | 架构说明、优化记录和产品化报告。 |
 | `openspec/` | spec、归档变更记录，以及 build/verify 规划产物。 |
 | `.mini-code-memory/` | runtime 创建的 workspace 级持久记忆状态。 |
 
@@ -244,6 +286,7 @@ flowchart LR
 | `minicode/working_memory.py` | 在 compaction 压力下仍会保留的 working memory 条目。 |
 | `minicode/memory_pipeline.py` | memory retrieval、injection、reflection writeback 和优化闭环。 |
 | `minicode/product_surfaces.py` | readiness、hooks、instructions、delegation、extensions 等用户可见摘要。 |
+| `minicode/readiness.py` | 独立 readiness CLI，用于本地检查和 CI 门禁。 |
 | `minicode/release_readiness.py` | 面向 release 的 runtime smoke 与 provider readiness 检查。 |
 | `minicode/model_switcher.py` | 有界 fallback 和 failover 选择逻辑。 |
 | `minicode/runtime_profiles.py` | `single`、`single-deep` 等 runtime profile。 |
@@ -263,11 +306,11 @@ flowchart LR
 如果你想继续看更深的实现与产品化记录，可以从这里开始：
 
 - [English README](./README.md)
-- [Optimization Summary](./docs/OPTIMIZATION_SUMMARY.md)
-- [Memory Theory](./docs/memory_theory.md)
-- [Minicode-lite Productization Design](./docs/superpowers/specs/2026-06-05-minicode-lite-productization-design.md)
-- [Minicode-lite Build Plan](./docs/superpowers/plans/2026-06-05-minicode-lite-productization-build.md)
-- [Minicode-lite Verify Report](./docs/superpowers/reports/2026-06-05-minicode-lite-productization-verify.md)
+- [Optimization Summary](./Docs/Documentation/OPTIMIZATION_SUMMARY.md)
+- [Memory Theory](./Docs/Documentation/memory_theory.md)
+- [Minicode-lite Productization Design](./Docs/Documentation/superpowers/specs/2026-06-05-minicode-lite-productization-design.md)
+- [Minicode-lite Build Plan](./Docs/Documentation/superpowers/plans/2026-06-05-minicode-lite-productization-build.md)
+- [Minicode-lite Verify Report](./Docs/Documentation/superpowers/reports/2026-06-05-minicode-lite-productization-verify.md)
 - [Main MiniCode Repository](https://github.com/LiuMengxuan04/MiniCode)
 
 ## Design Principles

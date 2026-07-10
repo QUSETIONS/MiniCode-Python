@@ -4,7 +4,7 @@
       "scenario": "depth-budget-floor",
       "condition": "single",
       "runtime_profile": "single",
-      "wall_time_ms": 4.343099979450926,
+      "wall_time_ms": 17.727876002027187,
       "model_calls": 1,
       "tool_starts": 0,
       "tool_results": 0,
@@ -29,7 +29,7 @@
       "scenario": "depth-budget-floor",
       "condition": "single-deep",
       "runtime_profile": "single-deep",
-      "wall_time_ms": 1.3965999823994935,
+      "wall_time_ms": 4.584296002576593,
       "model_calls": 2,
       "tool_starts": 0,
       "tool_results": 0,
@@ -54,7 +54,7 @@
       "scenario": "widening-escalation",
       "condition": "single",
       "runtime_profile": "single",
-      "wall_time_ms": 1.2136000150348991,
+      "wall_time_ms": 4.4405810003809165,
       "model_calls": 1,
       "tool_starts": 0,
       "tool_results": 0,
@@ -79,7 +79,7 @@
       "scenario": "widening-escalation",
       "condition": "single-deep",
       "runtime_profile": "single-deep",
-      "wall_time_ms": 1.8911999941337854,
+      "wall_time_ms": 9.281582999392413,
       "model_calls": 10,
       "tool_starts": 0,
       "tool_results": 0,
@@ -117,7 +117,7 @@
       "total_tool_starts": 0,
       "total_tool_results": 0,
       "total_runtime_events": 4,
-      "total_wall_time_ms": 5.556699994485825,
+      "total_wall_time_ms": 22.168457002408104,
       "completion_rate": 0.0,
       "widened_rate": 0.0,
       "verification_guard_rate": 0.0,
@@ -125,7 +125,7 @@
       "avg_tool_starts": 0.0,
       "avg_tool_results": 0.0,
       "avg_runtime_events": 2.0,
-      "avg_wall_time_ms": 2.7783499972429127
+      "avg_wall_time_ms": 11.084228501204052
     },
     "single-deep": {
       "runs": 2,
@@ -136,7 +136,7 @@
       "total_tool_starts": 0,
       "total_tool_results": 0,
       "total_runtime_events": 9,
-      "total_wall_time_ms": 3.287799976533279,
+      "total_wall_time_ms": 13.865879001969006,
       "completion_rate": 1.0,
       "widened_rate": 0.5,
       "verification_guard_rate": 0.0,
@@ -144,18 +144,33 @@
       "avg_tool_starts": 0.0,
       "avg_tool_results": 0.0,
       "avg_runtime_events": 4.5,
-      "avg_wall_time_ms": 1.6438999882666394
+      "avg_wall_time_ms": 6.932939500984503
     }
   },
   "provider_diagnostics": [
     {
       "label": "headless-smoke",
-      "outcome": "provider_outage",
-      "command": "C:\\Users\\question\\anaconda3\\python.exe -m minicode.headless Reply with exactly OK.",
-      "exit_code": 0,
-      "summary": "Provider availability failure: deepseek-v4-pro[1m] failed and all viable fallback models were unavailable. Remaining blocker is upstream provider/channel availability, not a local retry loop. Active channel: anthropic-compatible via baseUrl/authToken. Last error (RuntimeError): No available channel for model deepseek-v4-pro[1m] under group cc (distributor) (request id: 202606060346468033683028268d9d66QHAvNlc) Next step: Primary runtime is using a single anthropic-compatible channel from baseUrl/authToken.",
-      "stdout": "Provider availability failure: deepseek-v4-pro[1m] failed and all viable fallback models were unavailable. Remaining blocker is upstream provider/channel availability, not a local retry loop. Active channel: anthropic-compatible via baseUrl/authToken. Last error (RuntimeError): No available channel for model deepseek-v4-pro[1m] under group cc (distributor) (request id: 202606060346468033683028268d9d66QHAvNlc) Next step: Primary runtime is using a single anthropic-compatible channel from baseUrl/authToken.\n",
-      "stderr": "2026-06-06 11:46:39,514 [ERROR] minicode.agent_loop: Model API error (RuntimeError): No available channel for model deepseek-v4-pro[1m] under group cc (distributor) (request id: 202606060346468033683028268d9d66QHAvNlc)\n2026-06-06 11:46:39,514 [ERROR] minicode.model_switcher: Model fallback failed: Switch [FAILED]: deepseek-v4-pro[1m] (anthropic) ->  (unknown) Errors: No viable fallback models were available\n"
+      "outcome": "provider_channel_unavailable",
+      "command": "/usr/bin/python3 -m minicode.headless Reply with exactly OK.",
+      "exit_code": 1,
+      "summary": "2026-07-10 09:08:49,143 [WARNING] minicode.config: Project .mcp.json found at /home/tim/\u684c\u9762/minicode/.mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).",
+      "stdout": "",
+      "stderr": "2026-07-10 09:08:49,143 [WARNING] minicode.config: Project .mcp.json found at /home/tim/\u684c\u9762/minicode/.mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).\n2026-07-10 09:08:49,144 [ERROR] minicode.headless: Config load failed: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\nTraceback (most recent call last):\n  File \"/home/tim/\u684c\u9762/minicode/minicode/headless.py\", line 178, in run_headless\n    runtime = load_runtime_config(cwd)\n              ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/tim/\u684c\u9762/minicode/minicode/config.py\", line 560, in load_runtime_config\n    raise RuntimeError(\"No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\")\nRuntimeError: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\n2026-07-10 09:08:49,148 [WARNING] minicode.config: Project .mcp.json found at /home/tim/\u684c\u9762/minicode/.mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).\nConfig error: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\n",
+      "risk_scope": "provider-config",
+      "error_code": "",
+      "request_id": "",
+      "failure_category": "configuration",
+      "retryable": false,
+      "ownership": "local-configuration",
+      "recovery_action": "Repair model-to-provider channel configuration.",
+      "readiness_status": "blocked",
+      "repair_step_count": 6,
+      "trace_artifact": "/home/tim/\u684c\u9762/minicode/.temp/headless-provider-smoke-trace.json",
+      "guidance": [
+        "Verify the selected model group and provider channel configuration.",
+        "Add a viable fallback provider/model or credentials for the configured channel.",
+        "Inspect headless trace artifact: /home/tim/\u684c\u9762/minicode/.temp/headless-provider-smoke-trace.json"
+      ]
     }
   ]
 }

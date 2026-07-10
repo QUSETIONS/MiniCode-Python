@@ -682,19 +682,30 @@ def test_release_readiness_script_exports_bundle_as_black_box(tmp_path: Path) ->
     doctor_path = bundle_dir / "readiness-doctor.md"
     repair_path = bundle_dir / "readiness-repair-plan.json"
     patch_preview_path = bundle_dir / "readiness-fallback-patch-preview.json"
+    simulations_path = bundle_dir / "readiness-fallback-simulations.json"
     manifest_path = bundle_dir / "readiness-artifact-manifest.json"
     examples = json.loads(examples_path.read_text(encoding="utf-8"))
     repair = json.loads(repair_path.read_text(encoding="utf-8"))
     patch_preview = json.loads(patch_preview_path.read_text(encoding="utf-8"))
+    simulations = json.loads(simulations_path.read_text(encoding="utf-8"))
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
     assert examples["risk_scope"] == "no-fallback-configured"
     assert "## Repair Plan" in doctor_path.read_text(encoding="utf-8")
     assert repair["repair_plan"]
     assert patch_preview["fallback_settings_patch_preview"]
+    preview_labels = [
+        item["label"] for item in patch_preview["fallback_settings_patch_preview"]
+    ]
+    assert simulations["simulation_only"] is True
+    assert simulations["live_provider_claim"] is False
+    assert [item["selected_label"] for item in simulations["simulations"]] == preview_labels
+    assert len(simulations["simulations"]) == len(preview_labels)
+    assert "proxy-token" not in simulations_path.read_text(encoding="utf-8")
     assert {item["label"] for item in manifest} == {
         "doctor_markdown",
         "fallback_examples_json",
+        "fallback_simulations_json",
         "patch_preview_json",
         "repair_plan_json",
     }

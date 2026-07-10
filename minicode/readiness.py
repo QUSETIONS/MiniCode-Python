@@ -134,6 +134,30 @@ def _patch_preview_payload(report) -> dict:
     }
 
 
+def _fallback_simulations_payload(cwd: str, patch_preview_payload: dict) -> dict:
+    previews = patch_preview_payload.get("fallback_settings_patch_preview", [])
+    try:
+        runtime = _load_runtime_for_simulation(cwd)
+        runtime_issue = ""
+    except RuntimeError as exc:
+        runtime = {}
+        runtime_issue = _runtime_simulation_issue(exc)
+
+    simulations: list[dict] = []
+    for preview in previews if isinstance(previews, list) else []:
+        label = str(preview.get("label") or "").strip() if isinstance(preview, dict) else ""
+        if runtime_issue:
+            simulation = _invalid_simulation_payload(label, runtime_issue)
+        else:
+            simulation = asdict(simulate_fallback_patch(cwd, runtime, preview))
+        simulations.append(simulation)
+    return {
+        "simulation_only": True,
+        "live_provider_claim": False,
+        "simulations": simulations,
+    }
+
+
 def _write_json(path: str, payload: dict) -> None:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -156,6 +180,7 @@ def _write_bundle(
     doctor_report: str,
     repair_plan_payload: dict,
     patch_preview_payload: dict,
+    fallback_simulations_payload: dict,
 ) -> dict[str, str]:
     target_dir = Path(directory)
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -163,12 +188,14 @@ def _write_bundle(
     doctor_path = target_dir / "readiness-doctor.md"
     repair_plan_path = target_dir / "readiness-repair-plan.json"
     patch_preview_path = target_dir / "readiness-fallback-patch-preview.json"
+    simulations_path = target_dir / "readiness-fallback-simulations.json"
     manifest_path = target_dir / "readiness-artifact-manifest.json"
 
     _write_json(str(examples_path), examples_payload)
     _write_text(str(doctor_path), doctor_report)
     _write_json(str(repair_plan_path), repair_plan_payload)
     _write_json(str(patch_preview_path), patch_preview_payload)
+    _write_json(str(simulations_path), fallback_simulations_payload)
     write_artifact_manifest(
         manifest_path,
         {
@@ -176,6 +203,7 @@ def _write_bundle(
             "doctor_markdown": doctor_path,
             "repair_plan_json": repair_plan_path,
             "patch_preview_json": patch_preview_path,
+            "fallback_simulations_json": simulations_path,
         },
     )
     return {
@@ -183,6 +211,7 @@ def _write_bundle(
         "doctor_markdown": str(doctor_path),
         "repair_plan_json": str(repair_plan_path),
         "patch_preview_json": str(patch_preview_path),
+        "fallback_simulations_json": str(simulations_path),
         "artifact_manifest_json": str(manifest_path),
     }
 
@@ -451,6 +480,9 @@ def main(argv: list[str] | None = None) -> int:
     examples_payload = redact_sensitive_payload(_examples_payload(report))
     repair_plan_payload = redact_sensitive_payload(_repair_plan_payload(report))
     patch_preview_payload = redact_sensitive_payload(_patch_preview_payload(report))
+    fallback_simulations_payload = redact_sensitive_payload(
+        _fallback_simulations_payload(cwd, patch_preview_payload)
+    )
     doctor_report = redact_sensitive_text(_format_doctor_report(report, cwd=cwd))
     if args.examples_out:
         _write_json(args.examples_out, examples_payload)
@@ -468,6 +500,7 @@ def main(argv: list[str] | None = None) -> int:
             doctor_report=doctor_report,
             repair_plan_payload=repair_plan_payload,
             patch_preview_payload=patch_preview_payload,
+            fallback_simulations_payload=fallback_simulations_payload,
         )
     if args.doctor:
         print(doctor_report)

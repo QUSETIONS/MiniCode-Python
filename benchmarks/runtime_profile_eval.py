@@ -133,7 +133,14 @@ def _classify_provider_diagnostic(
             "Check upstream provider availability and retry the headless provider smoke.",
             "Configure fallbackModels or provider-specific fallback models before relying on live-provider release evidence.",
         ]
-    elif "no available channel" in combined:
+    elif any(
+        marker in combined
+        for marker in (
+            "no available channel",
+            "no model configured",
+            "no auth configured",
+        )
+    ):
         outcome = "provider_channel_unavailable"
         risk_scope = "provider-config"
         guidance = [

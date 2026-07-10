@@ -11,6 +11,11 @@ import urllib.request
 from pathlib import Path
 
 import pytest
+from setuptools import find_namespace_packages
+
+from Main.MinicodeFrontline.Src.Application.Entry.RuntimeLifecycleSurface import (
+    lifecycle_script_targets,
+)
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -31,6 +36,28 @@ def test_console_script_entry_points_import() -> None:
             failures.append(f"{name}: {module_name}.{attr_name} does not exist")
 
     assert failures == []
+
+
+def test_console_script_entry_points_match_main_lifecycle_contract() -> None:
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+
+    assert pyproject["project"]["scripts"] == {
+        **lifecycle_script_targets(),
+        "minicode-structure-check": "minicode.structure_check:main",
+    }
+
+
+def test_engineering_structure_namespace_is_packaged() -> None:
+    discovered = set(
+        find_namespace_packages(
+            where=str(ROOT),
+            include=["minicode*", "Main*", "Package*"],
+        )
+    )
+
+    assert "Main.MinicodeFrontline.Src.Application.Entry" in discovered
+    assert "Package.EngineeringStructure.Src.Application.Query" in discovered
+    assert "minicode" in discovered
 
 
 def test_legacy_root_smoke_scripts_are_not_pytest_collected() -> None:
@@ -54,6 +81,51 @@ def test_ci_workflow_runs_release_quality_gates() -> None:
 
     assert workflow.exists()
     content = workflow.read_text(encoding="utf-8")
-    assert "python -m compileall -q minicode tests" in content
+    assert "python -m compileall -q minicode tests benchmarks Main Package" in content
+    assert "python -m minicode.structure_check --root ." in content
+    assert "--hotspots 5 --max-dependency-upstream 4" in content
+    assert "--check-material-inventory" in content
+    assert "--report .temp/structure-compliance.json" in content
+    assert "--check-structure-compliance-artifact .temp/structure-compliance.json" in content
+    assert "python -m minicode.readiness --json --fail-on blocked" in content
+    assert "python -m minicode.readiness --examples-out .temp/readiness-fallback-examples.json --fail-on blocked" in content
+    assert "python -m minicode.readiness --doctor-out .temp/readiness-doctor.md --fail-on blocked" in content
+    assert "python -m minicode.readiness --repair-plan-out .temp/readiness-repair-plan.json --fail-on blocked" in content
+    assert "python -m minicode.readiness --patch-preview-out .temp/readiness-fallback-patch-preview.json --fail-on blocked" in content
+    assert "python -m minicode.readiness --bundle-out .temp/readiness-bundle --fail-on blocked" in content
+    assert "python -m minicode.release_readiness --check-artifact-redaction" in content
+    assert "python -m minicode.release_readiness" in content
+    assert "--write-artifact-manifest .temp/readiness-artifact-manifest.json" in content
+    assert "--check-artifact-manifest .temp/readiness-artifact-manifest.json" in content
+    assert "--check-fallback-patch-preview .temp/readiness-fallback-patch-preview.json" in content
+    assert (
+        "--check-fallback-simulation "
+        ".temp/readiness-bundle/readiness-fallback-simulations.json"
+    ) in content
+    assert "--check-fallback-switch-smoke" in content
+    assert "--check-readiness-bundle .temp/readiness-bundle" in content
+    assert "--artifact patch_preview_json=.temp/readiness-fallback-patch-preview.json" in content
+    assert ".temp/readiness-fallback-examples.json" in content
+    assert ".temp/readiness-doctor.md" in content
+    assert ".temp/readiness-repair-plan.json" in content
+    assert ".temp/readiness-fallback-patch-preview.json" in content
+    assert ".temp/readiness-artifact-manifest.json" in content
+    assert ".temp/readiness-bundle/readiness-artifact-manifest.json" in content
+    assert "Runtime readiness gate" in content
+    assert "Runtime readiness fallback examples" in content
+    assert "Runtime readiness doctor" in content
+    assert "Runtime readiness repair plan" in content
+    assert "Runtime readiness patch preview" in content
+    assert "Runtime readiness bundle" in content
+    assert "Runtime readiness artifact redaction" in content
+    assert "Runtime readiness artifact manifest" in content
+    assert "Runtime readiness artifact manifest gate" in content
+    assert "Runtime readiness patch preview gate" in content
+    assert "Runtime fallback switch smoke" in content
+    assert "Runtime readiness bundle manifest gate" in content
+    assert "Runtime readiness bundle gate" in content
+    assert "AGENTS structure artifact gate" in content
+    assert "Run AGENTS mirror tests" in content
+    assert "StructureCompliance.Test.py" in content
     assert "python -m pytest -q" in content
     assert "tests/test_packaging.py" in content

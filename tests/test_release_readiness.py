@@ -41,6 +41,27 @@ def _check(label: str, *, status: str = "passed", exit_code: int = 0, summary: s
     )
 
 
+def _fallback_simulations_payload(label: str = "OpenAI fallback") -> dict:
+    return {
+        "simulation_only": True,
+        "live_provider_claim": False,
+        "simulations": [
+            {
+                "status": "requires-credentials",
+                "selected_label": label,
+                "credential_state": "placeholder",
+                "fallback_candidates": ["gpt-4o"],
+                "viable_fallbacks": [],
+                "issues": ["Fallback credentials are required."],
+                "next_actions": ["Configure the fallback credential locally."],
+                "effective_config": {"credential_present": {"openai": False}},
+                "simulation_only": True,
+                "live_provider_claim": False,
+            }
+        ],
+    }
+
+
 def test_classify_provider_outcome_detects_answered_and_provider_outage() -> None:
     answered = classify_provider_outcome(exit_code=0, stdout="OK", stderr="")
     outage = classify_provider_outcome(
@@ -313,6 +334,7 @@ def test_release_readiness_bundle_check_cli(tmp_path, capsys) -> None:
     doctor_path = bundle_dir / "readiness-doctor.md"
     repair_path = bundle_dir / "readiness-repair-plan.json"
     patch_preview_path = bundle_dir / "readiness-fallback-patch-preview.json"
+    simulations_path = bundle_dir / "readiness-fallback-simulations.json"
     manifest_path = bundle_dir / "readiness-artifact-manifest.json"
     fallback_settings = {"fallbackModels": ["gpt-4o"]}
     settings_path = str(tmp_path / "settings.json")
@@ -372,19 +394,24 @@ def test_release_readiness_bundle_check_cli(tmp_path, capsys) -> None:
         ),
         encoding="utf-8",
     )
+    simulations_path.write_text(
+        json.dumps(_fallback_simulations_payload()),
+        encoding="utf-8",
+    )
     manifest = build_artifact_manifest(
         {
             "fallback_examples_json": examples_path,
             "doctor_markdown": doctor_path,
             "repair_plan_json": repair_path,
             "patch_preview_json": patch_preview_path,
+            "fallback_simulations_json": simulations_path,
         }
     )
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
     assert check_readiness_bundle(bundle_dir).status == "passed"
     assert release_readiness_utility_main(["--check-readiness-bundle", str(bundle_dir)]) == 0
-    assert "readiness bundle valid: 5 artifact(s)" in capsys.readouterr().out
+    assert "readiness bundle valid: 6 artifact(s)" in capsys.readouterr().out
 
     repair_path.unlink()
     assert release_readiness_utility_main(["--check-readiness-bundle", str(bundle_dir)]) == 1
@@ -398,6 +425,7 @@ def test_release_readiness_bundle_check_fails_when_patch_preview_drifts(tmp_path
     doctor_path = bundle_dir / "readiness-doctor.md"
     repair_path = bundle_dir / "readiness-repair-plan.json"
     patch_preview_path = bundle_dir / "readiness-fallback-patch-preview.json"
+    simulations_path = bundle_dir / "readiness-fallback-simulations.json"
     manifest_path = bundle_dir / "readiness-artifact-manifest.json"
     settings_path = str(tmp_path / "settings.json")
     examples_path.write_text(
@@ -446,6 +474,10 @@ def test_release_readiness_bundle_check_fails_when_patch_preview_drifts(tmp_path
         ),
         encoding="utf-8",
     )
+    simulations_path.write_text(
+        json.dumps(_fallback_simulations_payload()),
+        encoding="utf-8",
+    )
     manifest_path.write_text(
         json.dumps(
             build_artifact_manifest(
@@ -454,6 +486,7 @@ def test_release_readiness_bundle_check_fails_when_patch_preview_drifts(tmp_path
                     "doctor_markdown": doctor_path,
                     "repair_plan_json": repair_path,
                     "patch_preview_json": patch_preview_path,
+                    "fallback_simulations_json": simulations_path,
                 }
             )
         ),
@@ -471,6 +504,7 @@ def test_release_readiness_bundle_check_fails_when_manifest_drifts(tmp_path, cap
     doctor_path = bundle_dir / "readiness-doctor.md"
     repair_path = bundle_dir / "readiness-repair-plan.json"
     patch_preview_path = bundle_dir / "readiness-fallback-patch-preview.json"
+    simulations_path = bundle_dir / "readiness-fallback-simulations.json"
     manifest_path = bundle_dir / "readiness-artifact-manifest.json"
     settings_path = str(tmp_path / "settings.json")
     fallback_settings = {"fallbackModels": ["gpt-4o"]}
@@ -520,12 +554,17 @@ def test_release_readiness_bundle_check_fails_when_manifest_drifts(tmp_path, cap
         ),
         encoding="utf-8",
     )
+    simulations_path.write_text(
+        json.dumps(_fallback_simulations_payload()),
+        encoding="utf-8",
+    )
     manifest = build_artifact_manifest(
         {
             "fallback_examples_json": examples_path,
             "doctor_markdown": doctor_path,
             "repair_plan_json": repair_path,
             "patch_preview_json": patch_preview_path,
+            "fallback_simulations_json": simulations_path,
         }
     )
     manifest[0]["sha256"] = "0" * 64
@@ -637,6 +676,45 @@ def test_release_readiness_fallback_simulation_validator_rejects_unsafe_payloads
     assert release_readiness.check_fallback_simulation_payload(object_viable_fallbacks).status == "failed"
     assert release_readiness.check_fallback_simulation_payload(empty_candidate).status == "failed"
     assert release_readiness.check_fallback_simulation_payload(missing_candidate).status == "failed"
+
+
+def test_release_readiness_fallback_simulation_validator_checks_every_bundled_result(tmp_path) -> None:
+    payload = _fallback_simulations_payload()
+    payload["simulations"].append(
+        {
+            **payload["simulations"][0],
+            "selected_label": "OpenRouter fallback",
+            "fallback_candidates": ["openrouter/auto"],
+            "effective_config": {"credential_present": {"openrouter": False}},
+        }
+    )
+    path = tmp_path / "readiness-fallback-simulations.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    check = release_readiness.check_fallback_simulation(path)
+
+    assert check.status == "passed"
+    assert "2 simulation(s)" in check.summary
+
+    payload["simulations"][1]["live_provider_claim"] = True
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    check = release_readiness.check_fallback_simulation(path)
+
+    assert check.status == "failed"
+    assert "simulations[1]" in check.stderr
+
+
+def test_release_readiness_fallback_simulation_validator_allows_no_explicit_previews() -> None:
+    check = release_readiness.check_fallback_simulation_payload(
+        {
+            "simulation_only": True,
+            "live_provider_claim": False,
+            "simulations": [],
+        }
+    )
+
+    assert check.status == "passed"
+    assert "0 simulation(s)" in check.summary
 
 
 def test_release_readiness_fallback_simulation_requires_native_nonempty_selected_label() -> None:
@@ -782,6 +860,7 @@ def test_release_readiness_release_report_check_cli_allows_provider_at_risk(tmp_
         "status_reasons": [
             "Local gates passed.",
             "Live provider status is at-risk: provider_api_error.",
+            "Provider error code(s): 1010.",
             "Fallback coverage is not locally ready (no-fallback-configured).",
         ],
         "compile_check": {
@@ -812,6 +891,7 @@ def test_release_readiness_release_report_check_cli_allows_provider_at_risk(tmp_
         "smoke_checks": [
             {"label": "readiness-artifacts", "status": "passed", "exit_code": 0, "summary": "valid"},
             {"label": "readiness-bundle", "status": "passed", "exit_code": 0, "summary": "valid"},
+            {"label": "fallback-simulation", "status": "passed", "exit_code": 0, "summary": "valid"},
             {"label": "fallback-evidence", "status": "passed", "exit_code": 0, "summary": "valid"},
             {"label": "fallback-patch-preview", "status": "passed", "exit_code": 0, "summary": "valid"},
             {"label": "fallback-switch-smoke", "status": "passed", "exit_code": 0, "summary": "valid"},
@@ -826,6 +906,11 @@ def test_release_readiness_release_report_check_cli_allows_provider_at_risk(tmp_
                 "outcome": "provider_api_error",
                 "exit_code": 1,
                 "summary": "Model API error",
+                "error_code": "1010",
+                "failure_category": "provider-rejected-request",
+                "retryable": False,
+                "ownership": "external-provider",
+                "recovery_action": "Inspect the provider contract, selected model, and sanitized request evidence.",
                 "trace_artifact": str(trace_artifact),
                 "readiness_status": "warning",
                 "repair_step_count": 2,
@@ -841,6 +926,7 @@ def test_release_readiness_release_report_check_cli_allows_provider_at_risk(tmp_
             "doctor_markdown": str(artifact),
             "repair_plan_json": str(artifact),
             "patch_preview_json": str(artifact),
+            "fallback_simulations_json": str(artifact),
             "bundle_directory": str(tmp_path),
             "bundle_manifest_json": str(artifact),
         },
@@ -876,7 +962,7 @@ def test_release_readiness_release_report_check_cli_allows_provider_at_risk(tmp_
     assert check_release_report(report_path).status == "passed"
     assert release_readiness_utility_main(["--check-release-report", str(report_path)]) == 0
     output = capsys.readouterr().out
-    assert "release report valid: status=at-risk local=pass provider=at-risk smokes=9" in output
+    assert "release report valid: status=at-risk local=pass provider=at-risk smokes=10" in output
 
     markdown_path = tmp_path / "release.md"
     markdown = release_readiness_as_markdown(
@@ -906,7 +992,28 @@ def test_release_readiness_release_report_check_cli_allows_provider_at_risk(tmp_
             str(report_path),
         ]
     ) == 0
-    assert "release markdown valid: status=at-risk smokes=9" in capsys.readouterr().out
+    assert "release markdown valid: status=at-risk smokes=10" in capsys.readouterr().out
+
+    for field in ("failure_category", "ownership", "recovery_action"):
+        missing_evidence_path = tmp_path / f"missing-{field}-release.json"
+        missing_evidence = json.loads(json.dumps(report))
+        del missing_evidence["provider_diagnostics"][0][field]
+        missing_evidence_path.write_text(json.dumps(missing_evidence), encoding="utf-8")
+
+        assert release_readiness_utility_main(
+            ["--check-release-report", str(missing_evidence_path)]
+        ) == 1
+        assert field in capsys.readouterr().out
+
+    invalid_retryable_path = tmp_path / "invalid-retryable-release.json"
+    invalid_retryable = json.loads(json.dumps(report))
+    invalid_retryable["provider_diagnostics"][0]["retryable"] = "false"
+    invalid_retryable_path.write_text(json.dumps(invalid_retryable), encoding="utf-8")
+
+    assert release_readiness_utility_main(
+        ["--check-release-report", str(invalid_retryable_path)]
+    ) == 1
+    assert "retryable" in capsys.readouterr().out
 
     broken_markdown_path = tmp_path / "broken-release.md"
     broken_markdown_path.write_text(markdown.replace("fallback-evidence", "fallback evidence"), encoding="utf-8")
@@ -1231,6 +1338,10 @@ def test_release_readiness_outputs_include_provider_diagnostics_and_artifacts() 
             "risk_scope": "external-provider",
             "error_code": "503",
             "request_id": "req-release-1",
+            "failure_category": "provider-unavailable",
+            "retryable": True,
+            "ownership": "external-provider",
+            "recovery_action": "Retry the provider smoke or switch to a ready fallback.",
             "guidance": ["Configure fallbackModels before release."],
         }
     ]
@@ -1243,6 +1354,7 @@ def test_release_readiness_outputs_include_provider_diagnostics_and_artifacts() 
         "fallback_examples_json": ".temp/readiness-fallback-examples.json",
         "repair_plan_json": ".temp/readiness-repair-plan.json",
         "patch_preview_json": ".temp/readiness-fallback-patch-preview.json",
+        "fallback_simulations_json": ".temp/readiness-bundle/readiness-fallback-simulations.json",
         "bundle_directory": ".temp/readiness-bundle",
         "bundle_manifest_json": ".temp/readiness-bundle/readiness-artifact-manifest.json",
     }
@@ -1379,6 +1491,8 @@ def test_release_readiness_outputs_include_provider_diagnostics_and_artifacts() 
     assert "## Provider Diagnostics" in rendered
     assert "external-provider" in rendered
     assert "req-release-1" in rendered
+    assert "provider-unavailable" in rendered
+    assert "Retry the provider smoke or switch to a ready fallback." in rendered
     assert "## Provider Action Items" in rendered
     assert "Configure fallbackModels before release." in rendered
     assert "## Provider Fallback Coverage" in rendered

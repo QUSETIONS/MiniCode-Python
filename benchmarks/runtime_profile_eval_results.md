@@ -4,17 +4,17 @@
 
 | condition | runs | completion_rate | widened_rate | verification_guard_rate | avg_model_calls | avg_runtime_events | avg_wall_time_ms |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| single | 2 | 0.00 | 0.00 | 0.00 | 1.00 | 2.00 | 2.78 |
-| single-deep | 2 | 1.00 | 0.50 | 0.00 | 6.00 | 4.50 | 1.64 |
+| single | 2 | 0.00 | 0.00 | 0.00 | 1.00 | 2.00 | 11.08 |
+| single-deep | 2 | 1.00 | 0.50 | 0.00 | 6.00 | 4.50 | 6.93 |
 
 ## Scenario Rows
 
 | scenario | condition | completed | stop_reason | widened | verification_guard | runtime_events | model_calls | wall_time_ms | final_message |
 | --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | --- |
-| depth-budget-floor | single | no | max_steps | no | no | 2 | 1 | 4.34 | Reached the maximum tool step limit for this turn. |
-| depth-budget-floor | single-deep | yes | done | no | no | 2 | 2 | 1.40 | done |
-| widening-escalation | single | no | max_steps | no | no | 2 | 1 | 1.21 | Reached the maximum tool step limit for this turn. |
-| widening-escalation | single-deep | yes | done | yes | no | 7 | 10 | 1.89 | done with a broader plan |
+| depth-budget-floor | single | no | max_steps | no | no | 2 | 1 | 17.73 | Reached the maximum tool step limit for this turn. |
+| depth-budget-floor | single-deep | yes | done | no | no | 2 | 2 | 4.58 | done |
+| widening-escalation | single | no | max_steps | no | no | 2 | 1 | 4.44 | Reached the maximum tool step limit for this turn. |
+| widening-escalation | single-deep | yes | done | yes | no | 7 | 10 | 9.28 | done with a broader plan |
 
 ## Runtime Timelines
 
@@ -25,6 +25,11 @@
 
 ## Provider Diagnostics
 
-| label | outcome | exit_code | summary |
-| --- | --- | ---: | --- |
-| headless-smoke | provider_outage | 0 | Provider availability failure: deepseek-v4-pro[1m] failed and all viable fallback models were unavailable. Remaining blo... |
+| label | outcome | category | retryable | ownership | recovery_action | risk_scope | readiness | repair_steps | trace | error_code | request_id | exit_code | summary |
+| --- | --- | --- | --- | --- | --- | --- | --- | ---: | --- | --- | --- | ---: | --- |
+| headless-smoke | provider_channel_unavailable | configuration | no | local-configuration | Repair model-to-provider channel configuration. | provider-config | blocked | 6 | /home/tim/桌面/minicode/.temp/headless-provider-smoke-trace.json | - | - | 1 | 2026-07-10 09:08:49,143 [WARNING] minicode.config: Project .mcp.json found at /home/tim/桌面/minicode/.mcp.json but NOT lo... |
+
+Guidance for `headless-smoke`:
+- Verify the selected model group and provider channel configuration.
+- Add a viable fallback provider/model or credentials for the configured channel.
+- Inspect headless trace artifact: /home/tim/桌面/minicode/.temp/headless-provider-smoke-trace.json

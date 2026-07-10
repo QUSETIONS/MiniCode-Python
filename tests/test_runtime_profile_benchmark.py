@@ -44,3 +44,19 @@ def test_runtime_profile_provider_diagnostic_includes_headless_trace_context(tmp
     assert diagnostic.repair_step_count == 2
     assert diagnostic.trace_artifact == str(trace_path)
     assert any(str(trace_path) in item for item in diagnostic.guidance)
+
+
+def test_runtime_profile_provider_diagnostic_classifies_local_config_failure() -> None:
+    diagnostic = _classify_provider_diagnostic(
+        label="headless-smoke",
+        command="python -m minicode.headless Reply with exactly OK.",
+        exit_code=1,
+        stdout="",
+        stderr="Config error: No model configured.",
+    )
+
+    assert diagnostic.outcome == "provider_channel_unavailable"
+    assert diagnostic.risk_scope == "provider-config"
+    assert diagnostic.failure_category == "configuration"
+    assert diagnostic.retryable is False
+    assert diagnostic.ownership == "local-configuration"
