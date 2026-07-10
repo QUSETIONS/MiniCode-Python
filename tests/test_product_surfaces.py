@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from minicode.product_surfaces import build_readiness_report
 from minicode.product_surfaces import (
     DelegationStatus,
@@ -66,7 +68,10 @@ def test_build_readiness_report_warns_when_primary_ready_but_no_fallbacks() -> N
     assert any("no local fallback" in item.lower() for item in report.fallback_guidance) or \
            any("fallback" in issue.lower() for issue in report.issues)
     assert report.fallback_config_examples
-    assert report.fallback_config_examples[0]["path"].endswith(".mini-code/settings.json")
+    assert Path(report.fallback_config_examples[0]["path"]).parts[-2:] == (
+        ".mini-code",
+        "settings.json",
+    )
     assert "OPENAI_API_KEY" in report.fallback_config_examples[0]["settings"]["env"]
     assert report.repair_plan
     assert any(item["step"] == "choose-fallback-provider" for item in report.repair_plan)

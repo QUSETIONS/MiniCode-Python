@@ -55,13 +55,25 @@ def normalize_evidence_paths(
 
     repo_text = str(repo_root.resolve())
     home_text = str((home or Path.home()).resolve())
-    normalized = value.replace(f"{repo_text}{os.sep}", "")
+    normalized = value
+    replaced_path = False
+    repo_prefix = f"{repo_text}{os.sep}"
+    if repo_prefix in normalized:
+        normalized = normalized.replace(repo_prefix, "")
+        replaced_path = True
     if normalized == repo_text:
         normalized = "."
+        replaced_path = True
     if home_text != repo_text:
-        normalized = normalized.replace(f"{home_text}{os.sep}", f"~{os.sep}")
+        home_prefix = f"{home_text}{os.sep}"
+        if home_prefix in normalized:
+            normalized = normalized.replace(home_prefix, "~/")
+            replaced_path = True
         if normalized == home_text:
             normalized = "~"
+            replaced_path = True
+    if replaced_path and os.sep != "/":
+        normalized = normalized.replace(os.sep, "/")
     return normalized
 
 

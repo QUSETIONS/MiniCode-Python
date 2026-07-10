@@ -336,7 +336,7 @@ def test_release_readiness_artifact_manifest_write_cli(tmp_path, capsys) -> None
     assert "artifact manifest valid: 1 artifact(s)" in output
     assert manifest[0]["label"] == "evidence"
     assert manifest[0]["exists"] is True
-    assert manifest[0]["size_bytes"] == len("release evidence\n")
+    assert manifest[0]["size_bytes"] == artifact.stat().st_size
     assert len(manifest[0]["sha256"]) == 64
 
     assert release_readiness_utility_main(
