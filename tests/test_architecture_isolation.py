@@ -117,6 +117,7 @@ def test_core_context_manager_without_cybernetic():
 def test_core_config_without_cybernetic(monkeypatch):
     """Config loading must work without cybernetic."""
     monkeypatch.setenv("ANTHROPIC_MODEL", "claude-haiku-3-20240307")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     from minicode.config import load_runtime_config
     config = load_runtime_config(".", trust_project_mcp=False)
     assert isinstance(config, dict)

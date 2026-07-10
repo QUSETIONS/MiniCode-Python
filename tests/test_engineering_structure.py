@@ -558,19 +558,17 @@ def test_product_root_projection_keeps_root_basename_out_of_canonical_paths(
     assert tmp_path.name not in role_record["canonicalPathSegments"]
 
 
-def test_project_direct_vendor_and_workspace_are_findings(tmp_path: Path) -> None:
-    (tmp_path / "Vendor").mkdir()
-    (tmp_path / "Workspace").mkdir()
-    (tmp_path / "vendor").mkdir()
+@pytest.mark.parametrize("reserved_name", ["Vendor", "Workspace", "vendor"])
+def test_project_direct_vendor_and_workspace_are_findings(
+    tmp_path: Path,
+    reserved_name: str,
+) -> None:
+    (tmp_path / reserved_name).mkdir()
 
     records = scan_product_project_root(tmp_path)
     findings = [record for record in records if record["recordKind"] == "Finding"]
 
-    assert {finding["pathFromRoot"][0] for finding in findings} == {
-        "Vendor",
-        "Workspace",
-        "vendor",
-    }
+    assert {finding["pathFromRoot"][0] for finding in findings} == {reserved_name}
     assert {finding["findingKind"] for finding in findings} == {"StructureClosureError"}
     assert {finding["ruleId"] for finding in findings} == {"ProjectDirectReservedName"}
     assert all(finding["severity"] == "error" for finding in findings)

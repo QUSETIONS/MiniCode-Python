@@ -21,6 +21,12 @@ from Main.MinicodeFrontline.Src.Application.Entry.RuntimeLifecycleSurface import
 ROOT = Path(__file__).resolve().parent.parent
 
 
+def test_dev_extra_declares_packaging_test_dependencies() -> None:
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+
+    assert "setuptools>=68" in pyproject["project"]["optional-dependencies"]["dev"]
+
+
 def test_console_script_entry_points_import() -> None:
     pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
