@@ -3,6 +3,7 @@ from minicode.model_registry import (
     ModelSelectionSignal,
     ReasoningEffort,
     format_model_status,
+    model_id_supports_agent_tools,
     resolve_model_info,
 )
 
@@ -79,3 +80,11 @@ class TestModelSelectionController:
         assert "Cybernetic Recommendation" in status
         assert "Effort:" in status
         assert "Score:" in status
+
+    def test_dynamic_model_ids_filter_non_agent_modalities(self):
+        assert model_id_supports_agent_tools("qwen3.7-max") is True
+        assert model_id_supports_agent_tools("kimi-k2.7-code") is True
+        assert model_id_supports_agent_tools("gpt-image-1.5") is False
+        assert model_id_supports_agent_tools("gpt-4o-audio-preview") is False
+        assert model_id_supports_agent_tools("gpt-4o-realtime-preview") is False
+        assert model_id_supports_agent_tools("o1") is False

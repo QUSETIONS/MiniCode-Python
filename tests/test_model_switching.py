@@ -147,3 +147,24 @@ def test_switch_to_failure_does_not_crash_or_mutate(monkeypatch):
     assert result.success is False
     assert switcher.current_model == "claude-sonnet-4-6"  # unchanged
     assert runtime["model"] == "claude-sonnet-4-6"         # runtime unchanged
+
+
+def test_fallback_candidates_exclude_models_without_tool_support(monkeypatch):
+    monkeypatch.setattr(
+        "minicode.model_switcher.build_provider_config",
+        lambda model, runtime=None: type("Provider", (), {"api_key": "test-key"})(),
+    )
+
+    switcher = ModelSwitcher(
+        current_model="claude-sonnet-4-6",
+        current_runtime={
+            "model": "claude-sonnet-4-6",
+            "fallbackModels": ["o1", "gpt-4o-audio-preview", "gpt-4o"],
+        },
+        current_tools=object(),
+    )
+
+    candidates = switcher._fallback_candidates()
+    assert "gpt-4o" in candidates
+    assert "o1" not in candidates
+    assert "gpt-4o-audio-preview" not in candidates

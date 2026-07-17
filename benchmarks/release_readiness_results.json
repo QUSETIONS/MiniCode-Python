@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-10T04:23:46.564243+00:00",
+  "generated_at": "2026-07-17T06:54:02.128764+00:00",
   "status": "blocked",
   "local_gate_status": "blocked",
   "provider_status": "at-risk",
@@ -10,7 +10,7 @@
   ],
   "compile_check": {
     "label": "compileall",
-    "command": "/usr/bin/python3 -m compileall -q minicode tests benchmarks Main Package",
+    "command": "~/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m compileall -q minicode tests benchmarks Main Package",
     "exit_code": 0,
     "status": "passed",
     "summary": "compileall completed.",
@@ -19,16 +19,16 @@
   },
   "test_check": {
     "label": "pytest-q",
-    "command": "/usr/bin/python3 -m pytest -q",
+    "command": "~/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m pytest -q",
     "exit_code": 0,
     "status": "passed",
-    "summary": "1297 passed, 2 skipped in 106.00s (0:01:46)",
-    "stdout": "........................................................................ [  5%]\n........................................................................ [ 11%]\n........................................................................ [ 16%]\n........................................................................ [ 22%]\n........................................................................ [ 27%]\n........................................................................ [ 33%]\n........................................................................ [ 38%]\n........................................................................ [ 44%]\n........................................................................ [ 49%]\n........ss.............................................................. [ 55%]\n........................................................................ [ 60%]\n........................................................................ [ 66%]\n........................................................................ [ 72%]\n........................................................................ [ 77%]\n........................................................................ [ 83%]\n........................................................................ [ 88%]\n........................................................................ [ 94%]\n........................................................................ [ 99%]\n...                                                                      [100%]\n1297 passed, 2 skipped in 106.00s (0:01:46)",
+    "summary": "1310 passed, 2 skipped in 27.20s",
+    "stdout": "........................................................................ [  5%]\n........................................................................ [ 10%]\n........................................................................ [ 16%]\n........................................................................ [ 21%]\n........................................................................ [ 27%]\n........................................................................ [ 32%]\n........................................................................ [ 38%]\n........................................................................ [ 43%]\n........................................................................ [ 49%]\n............ss.......................................................... [ 54%]\n........................................................................ [ 60%]\n........................................................................ [ 65%]\n........................................................................ [ 71%]\n........................................................................ [ 76%]\n........................................................................ [ 82%]\n........................................................................ [ 87%]\n........................................................................ [ 93%]\n........................................................................ [ 98%]\n................                                                         [100%]\n1310 passed, 2 skipped in 27.20s",
     "stderr": ""
   },
   "runtime_eval_check": {
     "label": "runtime-profile-eval",
-    "command": "/usr/bin/python3 benchmarks/runtime_profile_eval.py",
+    "command": "~/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 benchmarks/runtime_profile_eval.py",
     "exit_code": 0,
     "status": "passed",
     "summary": "benchmarks/runtime_profile_eval_results.md",
@@ -37,53 +37,53 @@
   },
   "structure_check": {
     "label": "structure-compliance",
-    "command": "/usr/bin/python3 -m minicode.structure_check --root . --hotspots 5 --max-dependency-upstream 4 --check-material-inventory --report .temp/structure-compliance.json",
+    "command": "~/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m minicode.structure_check --root . --hotspots 5 --max-dependency-upstream 4 --check-material-inventory --report .temp/structure-compliance.json",
     "exit_code": 0,
     "status": "passed",
     "summary": "quality gate findings: 0",
-    "stdout": "AGENTS structure compliance: passed\nrecords: 81\nstructure findings: 0\ndependency edges: 5\ndependency impact nodes: 7\ndependency impact hotspots: 2\n  - 4 direct upstream: Main/MinicodeFrontline/Src/Application/Dto/AppProjection.py\n  - 1 direct upstream: Package/EngineeringStructure/Src/Application/Query/ProductRootProjection.py\nmax dependency direct upstream: 4\nimport dependency edges: 0\nsame-project import dependency edges: 0\nvendor import dependency edges: 0\ncross-project import dependency edges: 0\nimport impact nodes: 0\nimport impact hotspots: 0\nmax import transitive upstream: 0\nimport findings: 0\ndependency findings: 0\ntotal findings: 0\nmaterial inventory gates: 19\nmaterial inventory materials: 9\nmaterial inventory findings: 0\nquality gate findings: 0",
+    "stdout": "AGENTS structure compliance: passed\nrecords: 91\nstructure findings: 0\ndependency edges: 5\ndependency impact nodes: 7\ndependency impact hotspots: 2\n  - 4 direct upstream: Main/MinicodeFrontline/Src/Application/Dto/AppProjection.py\n  - 1 direct upstream: Package/EngineeringStructure/Src/Application/Query/ProductRootProjection.py\nmax dependency direct upstream: 4\nimport dependency edges: 0\nsame-project import dependency edges: 0\nvendor import dependency edges: 0\ncross-project import dependency edges: 0\nimport impact nodes: 0\nimport impact hotspots: 0\nmax import transitive upstream: 0\nimport findings: 0\ndependency findings: 0\ntotal findings: 0\nmaterial inventory gates: 19\nmaterial inventory materials: 9\nmaterial inventory findings: 0\nquality gate findings: 0",
     "stderr": ""
   },
   "smoke_checks": [
     {
       "label": "list-workspace-sessions",
-      "command": "/usr/bin/python3 -m minicode.main --list-workspace-sessions",
+      "command": "~/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m minicode.main --list-workspace-sessions",
       "exit_code": 0,
       "status": "passed",
       "summary": "Total: 1 session(s)",
-      "stdout": "Saved sessions:\n\n  1. [3deaf1c7] 2026-07-10 04:23 - outputs/release_smoke_workspace\n     Messages: 0 | First: (empty)\n     Checkpoints: 1\n     Runtime: phase:verify@2\n\nTotal: 1 session(s)",
+      "stdout": "Saved sessions:\n\n  1. [ee9037a5] 2026-07-17 06:54 - outputs/release_smoke_workspace\n     Messages: 0 | First: (empty)\n     Checkpoints: 1\n     Runtime: phase:verify@2\n\nTotal: 1 session(s)",
       "stderr": ""
     },
     {
       "label": "inspect-session",
-      "command": "/usr/bin/python3 -m minicode.main --inspect-session latest",
+      "command": "~/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m minicode.main --inspect-session latest",
       "exit_code": 0,
       "status": "passed",
       "summary": "- [tool:edit_file/success] Patched demo.txt",
-      "stdout": "Session inspect: 3deaf1c7\n  Created: 2026-07-10 04:23:46\n  Updated: 2026-07-10 04:23:46\n  Workspace: outputs/release_smoke_workspace\n  Messages: 0\n  Transcript entries: 2\n  History entries: 1\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 1\n  Runtime: phase:verify@2\n  Readiness: ready via anthropic-compatible\n  Instructions: 1 layer(s): project-managed\n  Hooks: 1/1 hook(s) enabled\n  Delegation: 1 running, 3 slot(s) open\n  Extensions: 1 extension(s): git-helpers\n\nRecent checkpoints: 1 saved; latest [b2fa7806] demo.txt\n\nInstruction layers:\n  - project-managed [project/managed, present] Prefer verification-first delivery.\n\nHook surface:\n  1/1 hook(s) enabled\n\nDelegation surface:\n  1 running, 3 slot(s) open\n  - lint-worker :: running\n\nExtensions:\n  - git-helpers [project] 1.0.0, enabled :: Local helper bundle\n\nReadiness:\n  ready via anthropic-compatible (ready)\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] Patched demo.txt",
+      "stdout": "Session inspect: ee9037a5\n  Created: 2026-07-17 06:54:02\n  Updated: 2026-07-17 06:54:02\n  Workspace: outputs/release_smoke_workspace\n  Messages: 0\n  Transcript entries: 2\n  History entries: 1\n  Skills: (none)\n  MCP servers: (none)\n  Checkpoints: 1\n  Runtime: phase:verify@2\n  Readiness: ready via anthropic-compatible\n  Instructions: 1 layer(s): project-managed\n  Hooks: 1/1 hook(s) enabled\n  Delegation: 1 running, 3 slot(s) open\n  Extensions: 1 extension(s): git-helpers\n\nRecent checkpoints: 1 saved; latest [55f27fe1] demo.txt\n\nInstruction layers:\n  - project-managed [project/managed, present] Prefer verification-first delivery.\n\nHook surface:\n  1/1 hook(s) enabled\n\nDelegation surface:\n  1 running, 3 slot(s) open\n  - lint-worker :: running\n\nExtensions:\n  - git-helpers [project] 1.0.0, enabled :: Local helper bundle\n\nReadiness:\n  ready via anthropic-compatible (ready)\n\nRecent transcript (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] Patched demo.txt",
       "stderr": ""
     },
     {
       "label": "replay-session",
-      "command": "/usr/bin/python3 -m minicode.main --replay-session latest",
+      "command": "~/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m minicode.main --replay-session latest",
       "exit_code": 0,
       "status": "passed",
       "summary": "- [tool:edit_file/success] Patched demo.txt",
-      "stdout": "Session replay: 3deaf1c7\n  Workspace: outputs/release_smoke_workspace\n  Created: 2026-07-10 04:23:46\n  Updated: 2026-07-10 04:23:46\n  Runtime: phase:verify@2\n  Checkpoints: 1\n  Readiness: ready via anthropic-compatible\n  Delegation: 1 running, 3 slot(s) open\n\nCheckpoint trail (1 shown):\n  - [b2fa7806] 2026-07-10 04:23:46 :: demo.txt (edit)\n\nInstruction layers:\n  - project-managed [project/managed, present] Prefer verification-first delivery.\n\nExtensions:\n  - git-helpers [project] 1.0.0, enabled :: Local helper bundle\n\nPrompt history (1 shown):\n  1. continue with runtime trace\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] Patched demo.txt",
+      "stdout": "Session replay: ee9037a5\n  Workspace: outputs/release_smoke_workspace\n  Created: 2026-07-17 06:54:02\n  Updated: 2026-07-17 06:54:02\n  Runtime: phase:verify@2\n  Checkpoints: 1\n  Readiness: ready via anthropic-compatible\n  Delegation: 1 running, 3 slot(s) open\n\nCheckpoint trail (1 shown):\n  - [55f27fe1] 2026-07-17 06:54:02 :: demo.txt (edit)\n\nInstruction layers:\n  - project-managed [project/managed, present] Prefer verification-first delivery.\n\nExtensions:\n  - git-helpers [project] 1.0.0, enabled :: Local helper bundle\n\nPrompt history (1 shown):\n  1. continue with runtime trace\n\nTranscript timeline (2 shown):\n  - [runtime:phase] Runtime phase: verify.\n  - [tool:edit_file/success] Patched demo.txt",
       "stderr": ""
     },
     {
       "label": "preview-rewind",
-      "command": "/usr/bin/python3 -m minicode.main --preview-rewind latest",
+      "command": "~/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m minicode.main --preview-rewind latest",
       "exit_code": 0,
       "status": "passed",
       "summary": "Type: edit",
-      "stdout": "Rewind preview for session 3deaf1c7:\n\nWould restore 1 checkpoint(s) across 1 file(s).\nMode: restore pre-edit file snapshots.\n\nPlanned restores:\n  1. [b2fa7806] 2026-07-10 04:23:46 - outputs/release_smoke_workspace/demo.txt\n     Restores: existing file\n     Type: edit",
+      "stdout": "Rewind preview for session ee9037a5:\n\nWould restore 1 checkpoint(s) across 1 file(s).\nMode: restore pre-edit file snapshots.\n\nPlanned restores:\n  1. [55f27fe1] 2026-07-17 06:54:02 - outputs/release_smoke_workspace/demo.txt\n     Restores: existing file\n     Type: edit",
       "stderr": ""
     },
     {
       "label": "readiness-cli",
-      "command": "/usr/bin/python3 -m minicode.main --readiness",
+      "command": "~/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m minicode.main --readiness",
       "exit_code": 0,
       "status": "passed",
       "summary": "readiness: blocked (unknown) [No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.]",
@@ -92,7 +92,7 @@
     },
     {
       "label": "readiness-json",
-      "command": "/usr/bin/python3 -m minicode.main --readiness-json",
+      "command": "~/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m minicode.main --readiness-json",
       "exit_code": 0,
       "status": "passed",
       "summary": "readiness blocked (provider-config)",
@@ -101,7 +101,7 @@
     },
     {
       "label": "readiness-script-json",
-      "command": "/usr/bin/python3 -m minicode.readiness --cwd outputs/release_smoke_workspace --json",
+      "command": "~/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m minicode.readiness --cwd outputs/release_smoke_workspace --json",
       "exit_code": 0,
       "status": "passed",
       "summary": "readiness blocked (provider-config)",
@@ -110,7 +110,7 @@
     },
     {
       "label": "readiness-threshold",
-      "command": "/usr/bin/python3 -m minicode.readiness --cwd outputs/release_smoke_workspace --json --fail-on blocked",
+      "command": "~/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m minicode.readiness --cwd outputs/release_smoke_workspace --json --fail-on blocked",
       "exit_code": 1,
       "status": "failed",
       "summary": "readiness blocked (provider-config)",
@@ -119,7 +119,7 @@
     },
     {
       "label": "readiness-examples",
-      "command": "/usr/bin/python3 -m minicode.readiness --cwd outputs/release_smoke_workspace --examples --examples-out .temp/readiness-fallback-examples.json --fail-on blocked",
+      "command": "~/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m minicode.readiness --cwd outputs/release_smoke_workspace --examples --examples-out .temp/readiness-fallback-examples.json --fail-on blocked",
       "exit_code": 1,
       "status": "failed",
       "summary": "fallback examples 2 (provider-config)",
@@ -128,7 +128,7 @@
     },
     {
       "label": "readiness-doctor",
-      "command": "/usr/bin/python3 -m minicode.readiness --cwd outputs/release_smoke_workspace --doctor --doctor-out .temp/readiness-doctor.md --fail-on blocked",
+      "command": "~/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m minicode.readiness --cwd outputs/release_smoke_workspace --doctor --doctor-out .temp/readiness-doctor.md --fail-on blocked",
       "exit_code": 1,
       "status": "failed",
       "summary": "doctor blocked (provider-config)",
@@ -137,7 +137,7 @@
     },
     {
       "label": "readiness-repair-plan",
-      "command": "/usr/bin/python3 -m minicode.readiness --cwd outputs/release_smoke_workspace --repair-plan --repair-plan-out .temp/readiness-repair-plan.json --fail-on blocked",
+      "command": "~/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m minicode.readiness --cwd outputs/release_smoke_workspace --repair-plan --repair-plan-out .temp/readiness-repair-plan.json --fail-on blocked",
       "exit_code": 1,
       "status": "failed",
       "summary": "repair plan 6 (provider-config)",
@@ -146,7 +146,7 @@
     },
     {
       "label": "readiness-patch-preview",
-      "command": "/usr/bin/python3 -m minicode.readiness --cwd outputs/release_smoke_workspace --patch-preview --patch-preview-out .temp/readiness-fallback-patch-preview.json --fail-on blocked",
+      "command": "~/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m minicode.readiness --cwd outputs/release_smoke_workspace --patch-preview --patch-preview-out .temp/readiness-fallback-patch-preview.json --fail-on blocked",
       "exit_code": 1,
       "status": "failed",
       "summary": "patch preview 2 (provider-config)",
@@ -155,7 +155,7 @@
     },
     {
       "label": "readiness-bundle-generate",
-      "command": "/usr/bin/python3 -m minicode.readiness --cwd outputs/release_smoke_workspace --bundle-out .temp/readiness-bundle --fail-on blocked",
+      "command": "~/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m minicode.readiness --cwd outputs/release_smoke_workspace --bundle-out .temp/readiness-bundle --fail-on blocked",
       "exit_code": 1,
       "status": "failed",
       "summary": "- repair_plan_json: .temp/readiness-bundle/readiness-repair-plan.json",
@@ -257,11 +257,11 @@
     {
       "label": "headless-smoke",
       "outcome": "provider_channel_unavailable",
-      "command": "/usr/bin/python3 -m minicode.headless Reply with exactly OK.",
+      "command": "~/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m minicode.headless Reply with exactly OK.",
       "exit_code": 1,
-      "summary": "2026-07-10 12:25:41,644 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).",
+      "summary": "2026-07-17 14:57:56,583 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).",
       "stdout": "",
-      "stderr": "2026-07-10 12:25:41,644 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).\n2026-07-10 12:25:41,645 [ERROR] minicode.headless: Config load failed: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\nTraceback (most recent call last):\n  File \"minicode/headless.py\", line 178, in run_headless\n    runtime = load_runtime_config(cwd)\n              ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"minicode/config.py\", line 560, in load_runtime_config\n    raise RuntimeError(\"No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\")\nRuntimeError: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\n2026-07-10 12:25:41,648 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).\nConfig error: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\n",
+      "stderr": "2026-07-17 14:57:56,583 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).\n2026-07-17 14:57:56,583 [ERROR] minicode.headless: Config load failed: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\nTraceback (most recent call last):\n  File \"minicode/headless.py\", line 178, in run_headless\n    runtime = load_runtime_config(cwd)\n              ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"minicode/config.py\", line 608, in load_runtime_config\n    raise RuntimeError(\"No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\")\nRuntimeError: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\n2026-07-17 14:57:56,585 [WARNING] minicode.config: Project .mcp.json found at .mcp.json but NOT loaded (security: use --trust-project-mcp or MINI_CODE_TRUST_PROJECT_MCP=1).\nConfig error: No model configured. Set ~/.mini-code/settings.json or ANTHROPIC_MODEL.\n",
       "risk_scope": "provider-config",
       "error_code": "",
       "request_id": "",
@@ -298,22 +298,22 @@
       "label": "bundle_manifest_json",
       "path": ".temp/readiness-bundle/readiness-artifact-manifest.json",
       "exists": true,
-      "size_bytes": 1526,
-      "sha256": "16da44b19a63c285833f903df5077274aedf89237e162f69a4178f2427cf45a3"
+      "size_bytes": 1346,
+      "sha256": "e1756d9f9d9747e2cc36fe19cf5f870a36891f418b52b7411cf240b1dcd97dae"
     },
     {
       "label": "doctor_markdown",
       "path": ".temp/readiness-doctor.md",
       "exists": true,
-      "size_bytes": 3307,
-      "sha256": "66b1462dca5011b5cc353aa1f901876f735c27fdd125dbeba52138f077a1fe9e"
+      "size_bytes": 3277,
+      "sha256": "1cee8e1f80c8d2a267a20297aaca4e4c98fa0e517b17a32d70daf58ed2bb6eaa"
     },
     {
       "label": "fallback_examples_json",
       "path": ".temp/readiness-fallback-examples.json",
       "exists": true,
-      "size_bytes": 876,
-      "sha256": "ceee505c6b4d879a2ba3bb20b349fb15d969ba8b2088db3fda95952bd3d3e6dd"
+      "size_bytes": 882,
+      "sha256": "f3664ba7de4a53f32be1ca42223f3a5096d0ee27f234e4c6a308d65f2e7427fe"
     },
     {
       "label": "fallback_simulations_json",
@@ -326,43 +326,43 @@
       "label": "headless_trace",
       "path": ".temp/headless-provider-smoke-trace.json",
       "exists": true,
-      "size_bytes": 7947,
-      "sha256": "642d9adad0bcaa3029df2180d7176ca62947b437acc2a1b19dfc858cfe5f9ccc"
+      "size_bytes": 7935,
+      "sha256": "1bfddc2dd3f9ed4b5f499a14c2268b65de4e15efee6a7dfcf3e09fcf3cd61531"
     },
     {
       "label": "json",
       "path": "benchmarks/runtime_profile_eval_results.json",
       "exists": true,
-      "size_bytes": 6227,
-      "sha256": "bc160c17a80ffec90b19d00680be7379a2f337dc3aebe461ed7d87d356e595b9"
+      "size_bytes": 6289,
+      "sha256": "12acb423538923629e186a507136d631a7e50e4d52ffeae044ed79c1157041f6"
     },
     {
       "label": "markdown",
       "path": "benchmarks/runtime_profile_eval_results.md",
       "exists": true,
-      "size_bytes": 2374,
-      "sha256": "4b88fb8c3795d9c5cbba56d1eebe47e774c4c380d00509949d59ff90adb7d6cd"
+      "size_bytes": 2373,
+      "sha256": "5a41364c9693f42d20c4009a9ad10920883f23ad5ced8abadd5416d8b68f2121"
     },
     {
       "label": "patch_preview_json",
       "path": ".temp/readiness-fallback-patch-preview.json",
       "exists": true,
-      "size_bytes": 1611,
-      "sha256": "d3f81131954a13655ac3f46452a334b0268504e537f001b68777f9bb3d53e60f"
+      "size_bytes": 1617,
+      "sha256": "87f7c97f4566dcf156e3dc1660992852fd22f3b295fe300c2c63c082aea96a0c"
     },
     {
       "label": "repair_plan_json",
       "path": ".temp/readiness-repair-plan.json",
       "exists": true,
-      "size_bytes": 2473,
-      "sha256": "d037b485452959d8af55e2f9b69599d2ebba8dbe04bc12b01841222cf2afca71"
+      "size_bytes": 2482,
+      "sha256": "5d9d0551e73ca6abe1f027b41de4461995c9ab4089014250fa97163eb9ce28a6"
     },
     {
       "label": "structure_compliance",
       "path": ".temp/structure-compliance.json",
       "exists": true,
-      "size_bytes": 89486,
-      "sha256": "ae1d66d73debe0588536f4d3d1d4c5fb45d763a37b7c07094e87e4fd87e47849"
+      "size_bytes": 98320,
+      "sha256": "a0d95a4c996e1a71b6c3da740ba96ff660f6a3502addfcf5894ad02ac5633cea"
     }
   ],
   "readiness_report": {

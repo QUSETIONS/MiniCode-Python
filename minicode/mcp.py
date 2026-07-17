@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import threading
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -139,8 +140,10 @@ def _prepare_spawn(command: str, args: list[str]) -> tuple[list[str] | str, dict
     Arguments are validated by _validate_mcp_args to contain no shell metacharacters,
     so shell=True is safe here.
 
-    On non-Windows (Linux/macOS), if command=="python" but shutil.which("python")
-    is None, falls back to "python3" (many Linux distros only ship python3).
+    On non-Windows (Linux/macOS), if command=="python" is unavailable, prefer the
+    interpreter running MiniCode and then fall back to "python3". This keeps MCP
+    helpers inside the same virtualenv/runtime instead of selecting a broken or
+    unrelated system Python.
 
     Returns (spawn_exec, extra_popen_kwargs): spawn_exec is a list for shell=False,
     a single string for shell=True.
@@ -152,8 +155,11 @@ def _prepare_spawn(command: str, args: list[str]) -> tuple[list[str] | str, dict
                 return subprocess.list2cmdline([resolved, *args]), {"shell": True}
             return [resolved, *args], {}
     else:
-        # Non-Windows: try python -> python3 fallback (Linux/macOS often lack plain "python")
+        # Non-Windows: keep python MCP helpers in the current runtime when the
+        # plain command is unavailable (Linux/macOS often lack plain "python").
         if command == "python" and shutil.which(command) is None:
+            if sys.executable:
+                return [sys.executable, *args], {}
             resolved = shutil.which("python3")
             if resolved:
                 return [resolved, *args], {}

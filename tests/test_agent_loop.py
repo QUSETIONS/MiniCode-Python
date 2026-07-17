@@ -763,8 +763,16 @@ def test_model_switcher_probes_provider_exposed_models_on_custom_openai_host(mon
 
     def _fake_probe(current_runtime):
         probed.append(True)
-        current_runtime["_openaiExposedModels"] = ["claude-sonnet-4-6"]
-        return ("claude-sonnet-4-6",)
+        current_runtime["_openaiExposedModels"] = [
+            "claude-sonnet-4-6",
+            "gpt-image-1.5",
+            "gpt-4o-audio-preview",
+        ]
+        return (
+            "claude-sonnet-4-6",
+            "gpt-image-1.5",
+            "gpt-4o-audio-preview",
+        )
 
     monkeypatch.setattr("minicode.model_switcher.probe_openai_exposed_models", _fake_probe)
 

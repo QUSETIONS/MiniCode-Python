@@ -13,6 +13,7 @@ Tests all core modules after 7 rounds of optimization:
 from __future__ import annotations
 
 import os
+import shlex
 import tempfile
 from pathlib import Path
 
@@ -123,7 +124,10 @@ class TestToolExecution:
     def test_run_command_tool(self, context):
         """Test run_command_tool executes successfully."""
         from minicode.tools.run_command import run_command_tool
-        result = run_command_tool.run({"command": "python --version"}, context)
+        result = run_command_tool.run(
+            {"command": f"{shlex.quote(sys.executable)} --version"},
+            context,
+        )
         assert result.ok
         assert "Python" in result.output
 

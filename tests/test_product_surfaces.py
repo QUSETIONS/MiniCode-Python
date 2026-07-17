@@ -106,6 +106,46 @@ def test_build_readiness_report_uses_default_fallback_coverage() -> None:
     assert "local-only" in preflight["live-smoke-readiness"]["summary"]
 
 
+def test_build_readiness_report_uses_custom_gateway_exposed_fallbacks() -> None:
+    report = build_readiness_report(
+        ".",
+        runtime={
+            "model": "qwen3.7-max",
+            "openaiApiKey": "openai-key",
+            "openaiBaseUrl": "https://ai.space.cx",
+            "_openaiExposedModels": ["qwen3.7-max", "kimi-k2.7-code"],
+        },
+    )
+
+    assert report.status == "ready"
+    assert report.provider_ready is True
+    assert report.fallback_ready is True
+    assert report.fallback_candidates == ["kimi-k2.7-code"]
+    assert report.viable_fallbacks == ["kimi-k2.7-code"]
+    assert report.fallback_config_examples == []
+    assert not any("gpt-4o" in issue for issue in report.issues)
+
+
+def test_build_readiness_report_does_not_probe_custom_gateway(monkeypatch) -> None:
+    def fail_probe(*_args, **_kwargs):
+        raise AssertionError("readiness preflight must remain local-only")
+
+    monkeypatch.setattr("minicode.model_registry.probe_openai_exposed_models", fail_probe)
+    report = build_readiness_report(
+        ".",
+        runtime={
+            "model": "qwen3.7-max",
+            "openaiApiKey": "openai-key",
+            "openaiBaseUrl": "https://provider.example.test/v1",
+        },
+    )
+
+    assert report.provider == "openai"
+    assert report.provider_ready is True
+    assert report.fallback_ready is True
+    assert report.fallback_candidates[:2] == ["gpt-4o", "gpt-4o-mini"]
+
+
 def test_build_readiness_report_surfaces_provider_config_risk() -> None:
     report = build_readiness_report(
         ".",

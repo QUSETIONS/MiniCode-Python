@@ -50,6 +50,20 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 BENCHMARKS_DIR = REPO_ROOT / "benchmarks"
 
 
+def _clear_test_provider_environment(env: dict[str, str]) -> None:
+    """Keep the release test suite hermetic while live smoke uses real config."""
+    for key in list(env):
+        if key.startswith((
+            "MINI_CODE_",
+            "OPENAI_",
+            "ANTHROPIC_",
+            "OPENROUTER_",
+            "CUSTOM_",
+            "DEEPSEEK_",
+        )):
+            env.pop(key, None)
+
+
 def _normalize_evidence_paths(
     value: object,
     *,
@@ -61,6 +75,8 @@ def _normalize_evidence_paths(
 
 def _run_command(label: str, command: list[str], *, cwd: Path, timeout: int = 1800) -> ReleaseCheck:
     env = dict(os.environ)
+    if label == "pytest-q":
+        _clear_test_provider_environment(env)
     existing_pythonpath = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = (
         str(REPO_ROOT)

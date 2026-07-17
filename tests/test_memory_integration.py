@@ -124,6 +124,38 @@ def memory_with_entries(memory_manager: MemoryManager) -> MemoryManager:
 class TestMemoryContextManagerIntegration:
     """Memory injected into prompt works with ContextManager lifecycle."""
 
+    def test_agent_loop_reuses_supplied_memory_manager(
+        self,
+        mock_model,
+        tools,
+        tmp_workspace,
+        auto_allow_permissions,
+        monkeypatch,
+    ):
+        """A resumed frontend must keep one memory state object per turn."""
+        context = ContextManager(model="default", context_window=1000)
+        memory_manager = MemoryManager(project_root=tmp_workspace)
+
+        def fail_if_recreated(*_args, **_kwargs):
+            raise AssertionError("agent loop recreated the frontend memory manager")
+
+        monkeypatch.setattr("minicode.agent_loop.MemoryManager", fail_if_recreated)
+
+        result = run_agent_turn(
+            model=mock_model,
+            tools=tools,
+            messages=[
+                {"role": "system", "content": "sys"},
+                {"role": "user", "content": "/ls"},
+            ],
+            cwd=str(tmp_workspace),
+            permissions=auto_allow_permissions,
+            context_manager=context,
+            memory_manager=memory_manager,
+        )
+
+        assert result
+
     def test_memory_context_injection_with_context_manager(self, memory_with_entries):
         context = memory_with_entries.get_relevant_context()
         assert context != ""

@@ -14,8 +14,8 @@ from minicode.config import (
     configured_model_fallbacks,
     describe_fallback_guidance,
     describe_provider_channel,
+    discovered_openai_fallbacks,
     default_model_fallbacks,
-    effective_model_fallbacks,
     load_runtime_config,
     project_extensions_dir,
     project_managed_policy_path,
@@ -328,22 +328,42 @@ def build_delegation_status() -> DelegationStatus:
 def _classify_fallbacks(
     runtime: dict[str, Any],
     provider: str,
+    *,
+    probe_openai_models: bool = True,
 ) -> tuple[list[str], list[str], list[str]]:
-    fallback_candidates = [
-        candidate
-        for candidate in effective_model_fallbacks(
+    current_model = str(runtime.get("model", "")).strip()
+    configured = configured_model_fallbacks(runtime, provider)
+    discovered = (
+        discovered_openai_fallbacks(
             runtime,
-            provider,
-            current_model=str(runtime.get("model", "")).strip(),
+            current_model=current_model,
+            probe_openai_models=probe_openai_models,
         )
-        if candidate != str(runtime.get("model", "")).strip()
-    ]
+        if provider == "openai"
+        else []
+    )
+    defaults = discovered or default_model_fallbacks(
+        runtime,
+        provider,
+        current_model=current_model,
+    )
+    fallback_candidates: list[str] = []
+    seen: set[str] = set()
+    for candidate in [*configured, *defaults]:
+        normalized = str(candidate or "").strip()
+        if not normalized or normalized == current_model or normalized in seen:
+            continue
+        seen.add(normalized)
+        fallback_candidates.append(normalized)
     viable: list[str] = []
     issues: list[str] = []
     for candidate in fallback_candidates:
         candidate_runtime = dict(runtime)
         candidate_runtime["model"] = candidate
-        candidate_issues = validate_provider_runtime(candidate_runtime)
+        candidate_issues = validate_provider_runtime(
+            candidate_runtime,
+            probe_openai_models=probe_openai_models,
+        )
         if candidate_issues:
             issues.append(f"Fallback '{candidate}' is not locally ready: {candidate_issues[0]}")
             continue
@@ -614,25 +634,42 @@ def build_readiness_report(
 ) -> ReadinessReport:
     try:
         effective_runtime = runtime or load_runtime_config(cwd)
-        issues = validate_provider_runtime(effective_runtime)
+        issues = validate_provider_runtime(
+            effective_runtime,
+            probe_openai_models=False,
+        )
         provider = detect_provider(
             str(effective_runtime.get("model", "")).strip(),
             effective_runtime,
+            probe_openai_models=False,
         ).value
         provider_ready = not issues
         configured_fallbacks = configured_model_fallbacks(effective_runtime, provider)
+        discovered_fallbacks = (
+            discovered_openai_fallbacks(
+                effective_runtime,
+                current_model=str(effective_runtime.get("model", "")).strip(),
+                probe_openai_models=False,
+            )
+            if provider == "openai"
+            else []
+        )
         default_fallbacks = [
             candidate
-            for candidate in default_model_fallbacks(
-                effective_runtime,
-                provider,
-                current_model=str(effective_runtime.get("model", "")).strip(),
+            for candidate in (
+                discovered_fallbacks
+                or default_model_fallbacks(
+                    effective_runtime,
+                    provider,
+                    current_model=str(effective_runtime.get("model", "")).strip(),
+                )
             )
             if candidate not in configured_fallbacks
         ]
         fallback_candidates, viable_fallbacks, fallback_issues = _classify_fallbacks(
             effective_runtime,
             provider,
+            probe_openai_models=False,
         )
         provider_channel = describe_provider_channel(effective_runtime, provider)
         fallback_guidance = describe_fallback_guidance(

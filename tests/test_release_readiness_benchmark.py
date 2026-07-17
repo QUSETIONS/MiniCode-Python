@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 import json
@@ -76,6 +77,41 @@ def test_release_readiness_command_summarizes_readiness_json(tmp_path: Path) -> 
 
     assert check.status == "passed"
     assert check.summary == "readiness warning (fallback-gap)"
+
+
+def test_release_pytest_command_does_not_inherit_live_provider_environment(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "live-secret")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://ai.space.cx")
+    monkeypatch.setenv("MINI_CODE_MODEL", "qwen3.7-max")
+    monkeypatch.setenv("OPENAI_MODEL_FALLBACKS", "kimi-k2.7-code")
+    captured: dict[str, str] = {}
+
+    def fake_run(*args, **kwargs):
+        captured.update(kwargs["env"])
+        return subprocess.CompletedProcess(
+            args=args[0],
+            returncode=0,
+            stdout="pytest ok\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr("benchmarks.release_readiness.subprocess.run", fake_run)
+
+    check = _run_command(
+        "pytest-q",
+        [sys.executable, "-m", "pytest", "-q"],
+        cwd=tmp_path,
+        timeout=30,
+    )
+
+    assert check.status == "passed"
+    assert "OPENAI_API_KEY" not in captured
+    assert "OPENAI_BASE_URL" not in captured
+    assert "MINI_CODE_MODEL" not in captured
+    assert "OPENAI_MODEL_FALLBACKS" not in captured
 
 
 def test_release_readiness_snapshot_preserves_local_preflight() -> None:
