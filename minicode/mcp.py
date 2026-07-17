@@ -140,29 +140,29 @@ def _prepare_spawn(command: str, args: list[str]) -> tuple[list[str] | str, dict
     Arguments are validated by _validate_mcp_args to contain no shell metacharacters,
     so shell=True is safe here.
 
-    On non-Windows (Linux/macOS), if command=="python" is unavailable, prefer the
-    interpreter running MiniCode and then fall back to "python3". This keeps MCP
-    helpers inside the same virtualenv/runtime instead of selecting a broken or
-    unrelated system Python.
+    If command=="python" is unavailable, prefer the interpreter running MiniCode
+    and then fall back to "python3". This keeps MCP helpers inside the same
+    virtualenv/runtime instead of selecting a broken or unrelated system Python.
 
     Returns (spawn_exec, extra_popen_kwargs): spawn_exec is a list for shell=False,
     a single string for shell=True.
     """
+    resolved = shutil.which(command)
     if os.name == "nt":
-        resolved = shutil.which(command)
         if resolved:
             if resolved.lower().endswith((".cmd", ".bat")):
                 return subprocess.list2cmdline([resolved, *args]), {"shell": True}
             return [resolved, *args], {}
-    else:
-        # Non-Windows: keep python MCP helpers in the current runtime when the
-        # plain command is unavailable (Linux/macOS often lack plain "python").
-        if command == "python" and shutil.which(command) is None:
-            if sys.executable:
-                return [sys.executable, *args], {}
-            resolved = shutil.which("python3")
-            if resolved:
-                return [resolved, *args], {}
+
+    # Keep python MCP helpers in the current runtime when the plain command is
+    # unavailable. This applies on Windows too, where the launcher may be
+    # absent even though the current interpreter is available.
+    if command == "python" and resolved is None:
+        if sys.executable:
+            return [sys.executable, *args], {}
+        fallback = shutil.which("python3")
+        if fallback:
+            return [fallback, *args], {}
     return [command, *args], {}
 
 

@@ -60,6 +60,7 @@ def test_create_mcp_backed_tools_supports_newline_json(tmp_path: Path) -> None:
 def test_prepare_spawn_uses_running_python_when_plain_python_is_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(mcp_module.os, "name", "nt")
     monkeypatch.setattr(mcp_module.shutil, "which", lambda command: None)
     monkeypatch.setattr(mcp_module.sys, "executable", "/runtime/python")
 
