@@ -227,10 +227,10 @@ This repository is past the prototype stage. It already behaves like a usable lo
 
 The active package is the root `minicode/` package configured by `pyproject.toml` as `minicode-py`.
 
-Current local verification result:
+Current cross-platform CI verification result:
 
 ```text
-1290 passed, 2 skipped
+1311 passed, 2 skipped
 ```
 
 Verification command:

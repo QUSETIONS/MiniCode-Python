@@ -196,10 +196,10 @@ flowchart LR
 
 当前生效的主包是根目录 `minicode/`，由 `pyproject.toml` 里的 `minicode-py` 配置驱动。
 
-最近一次本地验证结果：
+最近一次跨平台 CI 验证结果：
 
 ```text
-1290 passed, 2 skipped
+1311 passed, 2 skipped
 ```
 
 验证命令：

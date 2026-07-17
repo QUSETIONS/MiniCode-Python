@@ -169,6 +169,22 @@ def test_headless_main_returns_zero_for_success(monkeypatch, capsys) -> None:
     assert capsys.readouterr().out.strip() == "OK"
 
 
+def test_headless_main_help_does_not_load_config(monkeypatch, capsys) -> None:
+    import minicode.headless
+
+    monkeypatch.setattr(
+        minicode.headless,
+        "run_headless",
+        lambda *args, **kwargs: pytest.fail("--help must not run headless"),
+    )
+
+    with pytest.raises(SystemExit) as raised:
+        minicode.headless.main(["--help"])
+
+    assert raised.value.code == 0
+    assert "usage: minicode-headless" in capsys.readouterr().out
+
+
 def test_run_headless_writes_messages_trace_when_requested(monkeypatch, tmp_path: Path) -> None:
     import minicode.headless
 

@@ -142,6 +142,9 @@ def test_ci_workflow_runs_release_quality_gates() -> None:
     assert "AGENTS structure artifact gate" in content
     assert "Run AGENTS mirror tests" in content
     assert "StructureCompliance.Test.py" in content
+    assert "Build and install package artifacts" in content
+    assert "python -m pip install build" in content
+    assert "python benchmarks/package_smoke.py" in content
     mypy_step = content.split("- name: Type check (mypy baseline)", 1)[1]
     mypy_step = mypy_step.split("- name: Run packaging smoke tests", 1)[0]
     assert "shell: bash" in mypy_step

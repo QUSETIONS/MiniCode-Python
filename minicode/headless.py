@@ -16,6 +16,7 @@ Usage:
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import sys
@@ -273,14 +274,30 @@ def run_headless(prompt: str | None = None, allow_edits: bool = False) -> str:
             pass
 
 
+def _build_argument_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="minicode-headless",
+        description="Run one MiniCode agent turn without a TTY.",
+    )
+    parser.add_argument(
+        "--allow-edits",
+        action="store_true",
+        help="Auto-approve edits, commands, and out-of-cwd access for this run.",
+    )
+    parser.add_argument(
+        "prompt",
+        nargs="*",
+        help="Prompt to send; reads stdin when omitted.",
+    )
+    return parser
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point for headless mode."""
-    args = list(sys.argv[1:] if argv is None else argv)
-    # Strip the --allow-edits flag (handled separately); everything else is the prompt.
-    allow_edits = "--allow-edits" in args
-    prompt_args = [arg for arg in args if arg != "--allow-edits"]
-    prompt = " ".join(prompt_args) if prompt_args else None
-    response = run_headless(prompt, allow_edits=allow_edits)
+    parser = _build_argument_parser()
+    parsed = parser.parse_args(list(sys.argv[1:] if argv is None else argv))
+    prompt = " ".join(parsed.prompt) if parsed.prompt else None
+    response = run_headless(prompt, allow_edits=parsed.allow_edits)
     print(response)
     return _headless_response_exit_code(response)
 
