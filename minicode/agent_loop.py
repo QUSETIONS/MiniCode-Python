@@ -751,6 +751,7 @@ def run_agent_turn(
     on_assistant_stream_chunk: Callable[[str], None] | None = None,
     on_thinking_chunk: Callable[[str], None] | None = None,
     context_manager: ContextManager | None = None,
+    memory_manager: MemoryManager | None = None,
     runtime: dict | None = None,
     metrics_collector: AgentMetricsCollector | None = None,
     system_prompt: str = "",
@@ -955,7 +956,11 @@ def run_agent_turn(
                 circuit_breaker_limit=3,
                 session_memory_enabled=True,
             )
-            memory_mgr = MemoryManager(project_root=cwd)
+            memory_mgr = (
+                memory_manager
+                if memory_manager is not None
+                else MemoryManager(project_root=cwd)
+            )
             # 将 memory_mgr 注入 ReflectionEngine，使自省经验持久化
             if reflection_engine:
                 reflection_engine.memory = memory_mgr
@@ -2416,4 +2421,3 @@ def run_agent_turn(
                 supervisor_report.risk_level.value,
                 "; ".join(supervisor_report.recommended_actions[:3]),
             )
-

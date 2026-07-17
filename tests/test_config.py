@@ -2,6 +2,7 @@ import minicode.config as config_module
 from minicode.config import (
     describe_fallback_guidance,
     default_model_fallbacks,
+    discovered_openai_fallbacks,
     effective_model_fallbacks,
     format_config_diagnostic,
     load_runtime_config,
@@ -80,6 +81,25 @@ def test_detect_provider_accepts_provider_exposed_model_on_custom_openai_host() 
             "openaiBaseUrl": "https://www.cctq.ai",
             "_openaiExposedModels": ["claude-sonnet-4-6"],
         },
+    )
+
+    assert provider == Provider.OPENAI
+
+
+def test_detect_provider_can_classify_unknown_openai_model_without_probe(
+    monkeypatch,
+) -> None:
+    def fail_probe(*_args, **_kwargs):
+        raise AssertionError("local provider detection must not probe the gateway")
+
+    monkeypatch.setattr("minicode.model_registry.probe_openai_exposed_models", fail_probe)
+    provider = detect_provider(
+        "qwen3.7-max",
+        {
+            "openaiApiKey": "openai-key",
+            "openaiBaseUrl": "https://provider.example.test/v1",
+        },
+        probe_openai_models=False,
     )
 
     assert provider == Provider.OPENAI
@@ -323,6 +343,32 @@ def test_format_config_diagnostic_scopes_openai_provider_details(monkeypatch) ->
     assert "Fallback Models: gpt-4o, gpt-4o-mini" in result
     assert "Base URL: https://ai.space.cx" not in result
     assert "ANTHROPIC_AUTH_TOKEN" not in result
+
+
+def test_format_config_diagnostic_does_not_probe_openai_gateway(monkeypatch) -> None:
+    runtime = {
+        "model": "gpt-4o",
+        "openaiBaseUrl": "https://api.openai.com",
+        "openaiApiKey": "openai-key",
+        "baseUrl": "https://api.anthropic.com",
+        "apiKey": "",
+        "authToken": "",
+        "fallbackModels": [],
+        "openaiFallbackModels": [],
+        "mcpServers": {},
+        "toolProfile": "core",
+    }
+
+    def fail_probe(*_args, **_kwargs):
+        raise AssertionError("configuration diagnostics must remain local-only")
+
+    monkeypatch.setattr(config_module, "load_runtime_config", lambda cwd=None: runtime)
+    monkeypatch.setattr("minicode.model_registry.probe_openai_exposed_models", fail_probe)
+
+    result = format_config_diagnostic()
+
+    assert "Provider: openai" in result
+    assert "Status: OK" in result
     assert "CUSTOM_API_KEY" not in result
 
 
@@ -340,9 +386,39 @@ def test_describe_fallback_guidance_prefers_provider_exposed_models_when_default
 
     assert guidance
     assert "default failover is already available" in guidance[0].lower()
-    assert "gpt-4o, gpt-4o-mini" in guidance[0]
     assert "currently exposes: claude-sonnet-4-6, claude-haiku-4-5-20251001" in guidance[0].lower()
+    assert "gpt-4o, gpt-4o-mini" not in guidance[0]
     assert "add fallbackmodels or openaifallbackmodels to enable model failover" not in guidance[0].lower()
+
+
+def test_discovered_openai_fallbacks_excludes_active_model() -> None:
+    assert discovered_openai_fallbacks(
+        {
+            "model": "qwen3.7-max",
+            "openaiApiKey": "openai-key",
+            "openaiBaseUrl": "https://ai.space.cx",
+            "_openaiExposedModels": ["qwen3.7-max", "kimi-k2.7-code"],
+        },
+        current_model="qwen3.7-max",
+    ) == ["kimi-k2.7-code"]
+
+
+def test_discovered_openai_fallbacks_excludes_non_agent_modalities() -> None:
+    assert discovered_openai_fallbacks(
+        {
+            "model": "qwen3.7-max",
+            "openaiApiKey": "openai-key",
+            "openaiBaseUrl": "https://ai.space.cx",
+            "_openaiExposedModels": [
+                "qwen3.7-max",
+                "kimi-k2.7-code",
+                "gpt-image-1.5",
+                "gpt-4o-audio-preview",
+                "gpt-4o-realtime-preview",
+            ],
+        },
+        current_model="qwen3.7-max",
+    ) == ["kimi-k2.7-code"]
 
 
 def test_load_runtime_config_falls_back_to_model_for_missing_anthropic_family_defaults(monkeypatch) -> None:

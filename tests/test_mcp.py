@@ -57,6 +57,19 @@ def test_create_mcp_backed_tools_supports_newline_json(tmp_path: Path) -> None:
     mcp["dispose"]()
 
 
+def test_prepare_spawn_uses_running_python_when_plain_python_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(mcp_module.os, "name", "nt")
+    monkeypatch.setattr(mcp_module.shutil, "which", lambda command: None)
+    monkeypatch.setattr(mcp_module.sys, "executable", "/runtime/python")
+
+    spawn_exec, extra = mcp_module._prepare_spawn("python", ["server.py"])
+
+    assert spawn_exec == ["/runtime/python", "server.py"]
+    assert extra == {}
+
+
 def test_pending_request_fails_when_server_exits(tmp_path: Path) -> None:
     client = _client(tmp_path, mode="exit_on_call")
     client.start()

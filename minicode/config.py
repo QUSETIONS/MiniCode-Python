@@ -259,6 +259,56 @@ def _known_openai_exposed_models(runtime: dict[str, Any] | None) -> list[str]:
     return list(list_openai_exposed_models(runtime))
 
 
+def _known_openai_agent_models(runtime: dict[str, Any] | None) -> list[str]:
+    from minicode.model_registry import model_id_supports_agent_tools
+
+    return [
+        model
+        for model in _known_openai_exposed_models(runtime)
+        if model_id_supports_agent_tools(model)
+    ]
+
+
+def discovered_openai_fallbacks(
+    runtime: dict[str, Any] | None,
+    current_model: str | None = None,
+    *,
+    probe_openai_models: bool = True,
+) -> list[str]:
+    """Return provider-exposed fallback models for a custom OpenAI host.
+
+    A custom OpenAI-compatible gateway is not guaranteed to expose the built-in
+    OpenAI defaults.  Prefer the gateway's own model catalog when it is
+    available.  Network probing is opt-in so local readiness surfaces stay
+    deterministic; the runtime switcher enables it when it needs recovery.
+    """
+    runtime = runtime or {}
+    if not _uses_custom_openai_compatible_host(runtime):
+        return []
+
+    from minicode.model_registry import (
+        list_openai_exposed_models,
+        model_id_supports_agent_tools,
+        probe_openai_exposed_models,
+    )
+
+    active_model = str(current_model or runtime.get("model", "")).strip()
+    exposed_models = (
+        probe_openai_exposed_models(runtime)
+        if probe_openai_models
+        else list_openai_exposed_models(runtime)
+    )
+    return [
+        model
+        for model in exposed_models
+        if (
+            model
+            and model != active_model
+            and model_id_supports_agent_tools(model)
+        )
+    ]
+
+
 def describe_fallback_guidance(
     runtime: dict[str, Any] | None,
     provider_name: str | None = None,
@@ -278,7 +328,7 @@ def describe_fallback_guidance(
     configured = configured_model_fallbacks(runtime, provider_key)
     defaults = default_model_fallbacks(runtime, provider_key, current_model=active_model)
     exposed_openai_models = (
-        _known_openai_exposed_models(runtime)
+        _known_openai_agent_models(runtime)
         if provider_key == "openai" and _uses_custom_openai_compatible_host(runtime)
         else []
     )
@@ -301,25 +351,23 @@ def describe_fallback_guidance(
         )
 
     if not configured:
-        if defaults:
+        if exposed_openai_models:
+            exposed_preview = ", ".join(exposed_openai_models[:3])
+            guidance.append(
+                "Default failover is already available for this runtime through "
+                "provider-exposed models. This OpenAI-compatible provider currently "
+                f"exposes: {exposed_preview}. Set fallbackModels or "
+                f"{provider_specific_key} to one of the exposed models."
+            )
+        elif defaults:
             preview = ", ".join(defaults[:3])
-            if exposed_openai_models:
-                exposed_preview = ", ".join(exposed_openai_models[:3])
-                guidance.append(
-                    "Default failover is already available for this runtime"
-                    f"{': ' + preview if preview else '.'}"
-                    f" This OpenAI-compatible provider currently exposes: {exposed_preview}. "
-                    f"Set fallbackModels or {provider_specific_key} to one of the exposed models "
-                    "if the defaults are unavailable on the current provider."
-                )
-            else:
-                guidance.append(
-                    "Default failover is already available for this runtime"
-                    f"{': ' + preview if preview else '.'}"
-                    " If those models are still unavailable on the current provider, "
-                    f"set fallbackModels or {provider_specific_key} to models that the provider actually exposes, "
-                    "or switch provider credentials."
-                )
+            guidance.append(
+                "Default failover is already available for this runtime"
+                f"{': ' + preview if preview else '.'}"
+                " If those models are still unavailable on the current provider, "
+                f"set fallbackModels or {provider_specific_key} to models that the provider actually exposes, "
+                "or switch provider credentials."
+            )
         else:
             guidance.append(
                 f"Add fallbackModels or {provider_specific_key} to enable model failover."
@@ -669,7 +717,11 @@ def _is_valid_http_url(value: str | None) -> bool:
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
 
-def validate_provider_runtime(runtime: dict[str, Any]) -> list[str]:
+def validate_provider_runtime(
+    runtime: dict[str, Any],
+    *,
+    probe_openai_models: bool = True,
+) -> list[str]:
     """Validate the auth/base-url required by the detected provider.
 
     A generic API key is not enough: if the selected model routes to OpenAI,
@@ -679,7 +731,11 @@ def validate_provider_runtime(runtime: dict[str, Any]) -> list[str]:
     from minicode.model_registry import Provider, detect_provider
 
     model = str(runtime.get("model", "")).strip()
-    provider = detect_provider(model, runtime)
+    provider = detect_provider(
+        model,
+        runtime,
+        probe_openai_models=probe_openai_models,
+    )
     errors: list[str] = []
 
     if provider == Provider.OPENAI:
@@ -755,7 +811,12 @@ def validate_config(cwd: str | Path | None = None) -> tuple[bool, list[str]]:
     
     try:
         config = load_runtime_config(cwd)
-        errors.extend(validate_provider_runtime(config))
+        errors.extend(
+            validate_provider_runtime(
+                config,
+                probe_openai_models=False,
+            )
+        )
         
         # 检查模型名称拼写
         model = config.get("model", "")
@@ -847,7 +908,11 @@ def format_config_diagnostic(cwd: str | Path | None = None) -> str:
 
         # Show provider info
         from minicode.model_registry import detect_provider, Provider
-        provider = detect_provider(model_name, config)
+        provider = detect_provider(
+            model_name,
+            config,
+            probe_openai_models=False,
+        )
         lines.append(f"  Provider: {provider.value}")
         lines.append(f"  Channel: {describe_provider_channel(config, provider.value)}")
 

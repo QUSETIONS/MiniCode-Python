@@ -11,14 +11,27 @@ from minicode.tty_app import (
 )
 import minicode.tui.input_handler as input_handler_module
 from minicode.context_manager import ContextManager
+from minicode.memory import MemoryManager, MemoryScope
 from minicode.permissions import PermissionManager
-from minicode.session import FileCheckpoint, SessionData, SessionMetadata
+from minicode.prompt import build_system_prompt_bundle
+from minicode.session import (
+    FileCheckpoint,
+    SessionData,
+    SessionMetadata,
+    create_file_checkpoint,
+    create_new_session,
+    rewind_session,
+)
 from minicode.tooling import ToolRegistry
 from minicode.tui.runtime_control import _ThrottledRenderer as RuntimeThrottledRenderer
 from minicode.tui.event_flow import _handle_event
 from minicode.tui.input_parser import KeyEvent
 from minicode.tui.renderer import _decorate_session_feed_body
-from minicode.tui.session_flow import finalize_tty_session
+from minicode.tui.session_flow import (
+    build_tty_runtime_state,
+    finalize_tty_session,
+    load_or_create_session,
+)
 from minicode.tui.state import ScreenState, TtyAppArgs
 from minicode.tui.transcript import format_runtime_summary_line, format_transcript_text
 from minicode.tui.types import TranscriptEntry
@@ -311,6 +324,79 @@ def test_finalize_tty_session_persists_runtime_metadata() -> None:
     ]
 
 
+def test_tty_resume_rehydrates_session_checkpoint_and_memory(tmp_path, monkeypatch) -> None:
+    sessions_dir = tmp_path / "sessions"
+    sessions_dir.mkdir()
+    monkeypatch.setattr("minicode.session.SESSIONS_DIR", sessions_dir)
+    monkeypatch.setattr("minicode.session.MINI_CODE_DIR", tmp_path)
+    monkeypatch.setattr("minicode.memory.MINI_CODE_DIR", tmp_path)
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    target = workspace / "README.md"
+    target.write_text("before", encoding="utf-8")
+
+    memory_manager = MemoryManager(project_root=workspace)
+    memory_manager.add_entry(
+        MemoryScope.PROJECT,
+        "decision",
+        "Resume continuity marker: keep the public API stable.",
+    )
+
+    session = create_new_session(str(workspace))
+    session.messages = [
+        {"role": "system", "content": "system"},
+        {"role": "user", "content": "Continue the interrupted task."},
+    ]
+    session.transcript_entries = [
+        {"id": 1, "kind": "user", "body": "Continue the interrupted task."},
+    ]
+    checkpoint = create_file_checkpoint(
+        session,
+        file_path=str(target),
+        existed=True,
+        previous_content="before",
+    )
+    assert checkpoint is not None
+    target.write_text("after", encoding="utf-8")
+
+    rewound, restored_checkpoints = rewind_session(session.session_id)
+    assert rewound is not None
+    assert restored_checkpoints
+    assert target.read_text(encoding="utf-8") == "before"
+
+    resumed = load_or_create_session(str(workspace), session.session_id)
+    resumed_memory = MemoryManager(project_root=workspace)
+    permissions = PermissionManager(str(workspace))
+    args, state = build_tty_runtime_state(
+        runtime={"model": "mock"},
+        tools=ToolRegistry([]),
+        model=object(),
+        messages=[{"role": "system", "content": "fresh process"}],
+        cwd=str(workspace),
+        permissions=permissions,
+        session=resumed,
+        memory_manager=resumed_memory,
+    )
+
+    assert args.messages == resumed.messages
+    assert [entry.body for entry in state.transcript] == [
+        "Continue the interrupted task."
+    ]
+    memory_context = resumed_memory.get_relevant_context(query="continuity")
+    bundle = build_system_prompt_bundle(
+        str(workspace),
+        permissions.get_summary(),
+        {
+            "skills": [],
+            "mcpServers": [],
+            "memory_context": memory_context,
+            "runtime": {"model": "mock"},
+        },
+    )
+    assert "Resume continuity marker" in bundle.prompt
+
+
 def test_summarize_tool_input_formats_patch_file() -> None:
     summary = summarize_tool_input(
         "patch_file",
@@ -398,6 +484,10 @@ def test_tty_input_passes_and_persists_context_manager(tmp_path, monkeypatch) ->
     captured: dict = {}
     saved: list[ContextManager] = []
     context_manager = ContextManager(model="default", context_window=1000)
+    memory_manager = SimpleNamespace(
+        handle_user_memory_input=lambda _input: None,
+        get_relevant_context=lambda **_kwargs: "",
+    )
 
     def fake_run_agent_turn(**kwargs):
         captured.update(kwargs)
@@ -416,6 +506,7 @@ def test_tty_input_passes_and_persists_context_manager(tmp_path, monkeypatch) ->
         messages=[{"role": "system", "content": "sys"}],
         cwd=str(tmp_path),
         permissions=PermissionManager(str(tmp_path)),
+        memory_manager=memory_manager,
         context_manager=context_manager,
     )
 
@@ -423,6 +514,7 @@ def test_tty_input_passes_and_persists_context_manager(tmp_path, monkeypatch) ->
     state.agent_thread.join(timeout=5)
 
     assert captured["context_manager"] is context_manager
+    assert captured["memory_manager"] is memory_manager
     assert saved == [context_manager]
     assert state.agent_result["messages"][-1] == {"role": "assistant", "content": "done"}
 

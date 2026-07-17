@@ -621,6 +621,7 @@ def main() -> None:
                     permissions=permissions,
                     store=app_store,
                     context_manager=context_mgr,
+                    memory_manager=memory_mgr,
                     runtime=runtime,
                 )
                 permissions.end_turn()

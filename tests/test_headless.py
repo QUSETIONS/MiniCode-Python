@@ -72,6 +72,7 @@ def test_run_headless_forwards_runtime_to_agent_turn(monkeypatch, tmp_path: Path
 
     def _fake_run_agent_turn(**kwargs):
         captured["runtime"] = kwargs["runtime"]
+        captured["memory_manager"] = kwargs["memory_manager"]
         return [{"role": "assistant", "content": "ok"}]
 
     monkeypatch.setattr("minicode.agent_loop.run_agent_turn", _fake_run_agent_turn)
@@ -80,6 +81,8 @@ def test_run_headless_forwards_runtime_to_agent_turn(monkeypatch, tmp_path: Path
 
     assert response == "ok"
     assert captured["runtime"] is runtime
+    assert isinstance(captured["memory_manager"], _DummyMemoryManager)
+    assert captured["memory_manager"].project_root == tmp_path
 
 
 def test_run_headless_provider_failure_uses_runtime_channel_details(

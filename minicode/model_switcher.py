@@ -22,6 +22,7 @@ from minicode.model_registry import (
     detect_provider,
     list_available_models,
     list_openai_exposed_models,
+    model_id_supports_agent_tools,
     probe_openai_exposed_models,
     resolve_model_info,
 )
@@ -232,7 +233,11 @@ class ModelSwitcher:
             )
         )
         if current_provider == "openai" and self._uses_custom_openai_compatible_host():
-            candidates.extend(probe_openai_exposed_models(self._runtime))
+            candidates.extend(
+                model
+                for model in probe_openai_exposed_models(self._runtime)
+                if model_id_supports_agent_tools(model)
+            )
 
         for env_var in ("MINI_CODE_MODEL_FALLBACKS", provider_env):
             parsed = _parse_model_list(os.environ.get(env_var, ""))
@@ -342,6 +347,8 @@ class ModelSwitcher:
             self._runtime_family_defaults[key] = model_name
 
     def _can_attempt_model(self, model_name: str) -> bool:
+        if not model_id_supports_agent_tools(model_name):
+            return False
         try:
             provider_config = build_provider_config(model_name, self._runtime)
         except Exception:

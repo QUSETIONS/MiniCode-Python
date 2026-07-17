@@ -717,6 +717,7 @@ def _handle_input(
                 on_thinking_chunk=on_thinking_chunk,
                 store=state.app_state,
                 context_manager=args.context_manager,
+                memory_manager=memory_mgr,
                 runtime=args.runtime,
             )
             if args.context_manager is not None:

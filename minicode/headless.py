@@ -233,6 +233,7 @@ def run_headless(prompt: str | None = None, allow_edits: bool = False) -> str:
             messages=messages,
             cwd=cwd,
             permissions=permissions,
+            memory_manager=memory_mgr,
             runtime=runtime,
         )
 

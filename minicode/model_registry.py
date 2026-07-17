@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -356,12 +357,14 @@ def probe_openai_exposed_models(
 def model_is_exposed_via_openai_runtime(
     model: str,
     runtime: dict[str, Any] | None = None,
+    *,
+    probe_openai_models: bool = True,
 ) -> bool:
     model_id = str(model or "").strip()
     if not model_id:
         return False
     exposed = list_openai_exposed_models(runtime)
-    if not exposed:
+    if not exposed and probe_openai_models:
         exposed = probe_openai_exposed_models(runtime)
     if not exposed:
         return False
@@ -452,7 +455,12 @@ _register(ModelInfo("minimax/minimax-m1", Provider.OPENROUTER,
 # Provider detection
 # ---------------------------------------------------------------------------
 
-def detect_provider(model: str, runtime: dict[str, Any] | None = None) -> Provider:
+def detect_provider(
+    model: str,
+    runtime: dict[str, Any] | None = None,
+    *,
+    probe_openai_models: bool = True,
+) -> Provider:
     """Auto-detect which provider to use based on model name and config.
 
     Priority:
@@ -478,8 +486,31 @@ def detect_provider(model: str, runtime: dict[str, Any] | None = None) -> Provid
             # Default to OpenRouter for vendor-prefixed models
             return Provider.OPENROUTER
 
-    if runtime and model_is_exposed_via_openai_runtime(model, runtime):
+    if runtime and model_is_exposed_via_openai_runtime(
+        model,
+        runtime,
+        probe_openai_models=probe_openai_models,
+    ):
         return Provider.OPENAI
+
+    if runtime and not probe_openai_models:
+        # Readiness and diagnostics must remain local-only.  When the model is
+        # known, its catalog provider is authoritative; for an unknown model,
+        # use an explicitly configured OpenAI-compatible channel only when no
+        # Anthropic credentials indicate a competing primary channel.
+        normalized_model = model.casefold()
+        for model_name, model_info in BUILTIN_MODELS.items():
+            if model_name.casefold() == normalized_model:
+                return model_info.provider
+        has_openai_channel = bool(
+            runtime.get("openaiApiKey")
+            and runtime.get("openaiBaseUrl")
+        )
+        has_anthropic_channel = bool(
+            runtime.get("apiKey") or runtime.get("authToken")
+        )
+        if has_openai_channel and not has_anthropic_channel:
+            return Provider.OPENAI
 
     # 2. DeepSeek direct API detection
     if model_lower.startswith("deepseek") or "deepseek" in model_lower:
@@ -529,6 +560,39 @@ def resolve_model_info(model: str, provider: Provider | None = None) -> ModelInf
         pricing_input=3.0,
         pricing_output=15.0,
     )
+
+
+_NON_AGENT_MODEL_MARKERS = (
+    "audio",
+    "embedding",
+    "image",
+    "moderation",
+    "realtime",
+    "rerank",
+    "transcrib",
+    "tts",
+    "whisper",
+)
+
+
+def model_id_supports_agent_tools(model: str) -> bool:
+    """Conservatively identify model IDs suitable for MiniCode tool calls.
+
+    OpenAI-compatible ``/v1/models`` responses generally expose IDs without
+    capability metadata.  Known catalog entries still use their declared
+    ``supports_tools`` value; unknown IDs are filtered only when their name
+    clearly identifies a non-chat modality.
+    """
+    normalized = str(model or "").strip().casefold()
+    if not normalized:
+        return False
+
+    for model_name, info in BUILTIN_MODELS.items():
+        if model_name.casefold() == normalized:
+            return info.supports_tools
+
+    compact = re.sub(r"[^a-z0-9]+", "-", normalized)
+    return not any(marker in compact for marker in _NON_AGENT_MODEL_MARKERS)
 
 
 # ---------------------------------------------------------------------------

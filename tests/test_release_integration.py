@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from minicode.agent_loop import run_agent_turn
@@ -972,6 +973,190 @@ def test_release_agent_loop_executes_real_tool_chain(tmp_path: Path) -> None:
     )
     assert messages[-1]["role"] == "assistant"
     assert "Release Fixtur" in messages[-1]["content"]
+
+
+def test_release_openai_protocol_fallback_completes_tool_turn(tmp_path: Path, monkeypatch) -> None:
+    """Exercise provider failure, automatic fallback, and tool continuation locally."""
+    primary_model = "qwen3.7-max"
+    fallback_model = "kimi-k2.7-code"
+    requests: list[dict] = []
+
+    class FallbackProtocolHandler(BaseHTTPRequestHandler):
+        server_version = "MiniCodeFallbackFixture/1.0"
+
+        def log_message(self, _format: str, *_args) -> None:
+            return
+
+        def _send_json(self, status: int, payload: dict) -> None:
+            body = json.dumps(payload).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self) -> None:
+            if self.path.rstrip("/") == "/v1/models":
+                self._send_json(
+                    200,
+                    {
+                        "object": "list",
+                        "data": [
+                            {"id": primary_model, "object": "model"},
+                            {"id": fallback_model, "object": "model"},
+                        ],
+                    },
+                )
+                return
+            self._send_json(404, {"error": {"message": "not found"}})
+
+        def do_POST(self) -> None:
+            length = int(self.headers.get("Content-Length", "0"))
+            payload = json.loads(self.rfile.read(length).decode("utf-8"))
+            requests.append(payload)
+            model = payload.get("model")
+            messages = payload.get("messages", [])
+
+            if model == primary_model:
+                self._send_json(
+                    503,
+                    {
+                        "error": {
+                            "message": f"No available channel for model {primary_model}",
+                            "type": "server_error",
+                        }
+                    },
+                )
+                return
+
+            if model != fallback_model:
+                self._send_json(
+                    400,
+                    {"error": {"message": f"unexpected model: {model}"}},
+                )
+                return
+
+            if any(message.get("role") == "tool" for message in messages):
+                response = "fallback succeeded after tool execution"
+                self._send_json(
+                    200,
+                    {
+                        "id": "chatcmpl-fallback-final",
+                        "object": "chat.completion",
+                        "choices": [
+                            {
+                                "index": 0,
+                                "message": {"role": "assistant", "content": response},
+                                "finish_reason": "stop",
+                            }
+                        ],
+                        "usage": {"prompt_tokens": 10, "completion_tokens": 5},
+                    },
+                )
+                return
+
+            self._send_json(
+                200,
+                {
+                    "id": "chatcmpl-fallback-tool",
+                    "object": "chat.completion",
+                    "choices": [
+                        {
+                            "index": 0,
+                            "message": {
+                                "role": "assistant",
+                                "content": None,
+                                "tool_calls": [
+                                    {
+                                        "id": "call-read-marker",
+                                        "type": "function",
+                                        "function": {
+                                            "name": "read_marker",
+                                            "arguments": json.dumps({"path": "README.md"}),
+                                        },
+                                    }
+                                ],
+                            },
+                            "finish_reason": "tool_calls",
+                        }
+                    ],
+                    "usage": {"prompt_tokens": 10, "completion_tokens": 5},
+                },
+            )
+
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "README.md").write_text("# fallback fixture\n", encoding="utf-8")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), FallbackProtocolHandler)
+    server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    server_thread.start()
+
+    try:
+        from minicode.model_registry import create_model_adapter
+        from minicode.tooling import ToolDefinition, ToolResult
+
+        def run_read_marker(input_data: dict, _context) -> ToolResult:
+            return ToolResult(ok=True, output=f"marker:{input_data['path']}")
+
+        tools = ToolRegistry(
+            [
+                ToolDefinition(
+                    name="read_marker",
+                    description="Read the deterministic release marker.",
+                    input_schema={
+                        "type": "object",
+                        "properties": {"path": {"type": "string"}},
+                        "required": ["path"],
+                    },
+                    validator=lambda value: value,
+                    run=run_read_marker,
+                )
+            ]
+        )
+        runtime = {
+            "model": primary_model,
+            "configuredModel": primary_model,
+            "openaiApiKey": "local-test-key",
+            "openaiBaseUrl": f"http://127.0.0.1:{server.server_port}",
+            "openaiFallbackModels": [fallback_model],
+            "_openaiExposedModels": [primary_model, fallback_model],
+            "maxOutputTokens": 128,
+        }
+        model = create_model_adapter(primary_model, tools, runtime=runtime)
+        monkeypatch.setenv("MINICODE_MODEL_TIMEOUT", "5")
+
+        messages = run_agent_turn(
+            model=model,
+            tools=tools,
+            messages=[
+                {"role": "system", "content": "Use the available tool, then report the result."},
+                {"role": "user", "content": "Read the marker and finish the task."},
+            ],
+            cwd=str(workspace),
+            permissions=PermissionManager(
+                str(workspace),
+                prompt=lambda _request: {"decision": "allow_once"},
+            ),
+            runtime=runtime,
+            max_steps=5,
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        server_thread.join(timeout=5)
+
+    assert [request.get("model") for request in requests] == [primary_model, fallback_model, fallback_model]
+    assert any(
+        message["role"] == "assistant_tool_call" and message["toolName"] == "read_marker"
+        for message in messages
+    )
+    assert any(
+        message["role"] == "tool_result" and "marker:README.md" in message["content"]
+        for message in messages
+    )
+    assert messages[-1]["role"] == "assistant"
+    assert "fallback succeeded" in messages[-1]["content"]
+    assert runtime["model"] == fallback_model
 
 
 class PromptCapturingModel:
