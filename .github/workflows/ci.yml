@@ -109,10 +109,6 @@ jobs:
       - name: Run packaging smoke tests
         run: python -m pytest tests/test_packaging.py -q
 
-      - name: Build and install package artifacts
-        run: |
-          python -m pip install build
-          python benchmarks/package_smoke.py
       - name: Run AGENTS mirror tests
         run: >
           python -m pytest -q --import-mode=importlib
@@ -127,3 +123,8 @@ jobs:
 
       - name: Run test suite
         run: python -m pytest -q --tb=short
+
+      - name: Build and install package artifacts
+        run: |
+          python -m pip install build
+          python benchmarks/package_smoke.py
