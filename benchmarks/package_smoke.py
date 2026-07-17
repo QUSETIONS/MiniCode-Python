@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -11,10 +14,41 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+_BUILD_OUTPUT_NAMES = ("build", "minicode_py.egg-info")
 
 
 def _run(command: list[str], *, cwd: Path) -> None:
     subprocess.run(command, cwd=cwd, check=True)
+
+
+def _remove_path(path: Path) -> None:
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.is_dir():
+        shutil.rmtree(path)
+
+
+@contextmanager
+def _preserve_build_outputs(work: Path) -> Iterator[None]:
+    """Keep PEP 517's source-tree build outputs out of the checkout."""
+    backup_dir = work / "source-build-output-backups"
+    paths = [ROOT / name for name in _BUILD_OUTPUT_NAMES]
+    backups: dict[Path, Path] = {}
+
+    for path in paths:
+        if path.exists() or path.is_symlink():
+            backup = backup_dir / path.name
+            backup.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(path), str(backup))
+            backups[path] = backup
+
+    try:
+        yield
+    finally:
+        for path in paths:
+            _remove_path(path)
+        for path, backup in backups.items():
+            shutil.move(str(backup), str(path))
 
 
 def _venv_python(venv_dir: Path) -> Path:
@@ -37,18 +71,19 @@ def main() -> int:
         dist = work / "dist"
         dist.mkdir()
 
-        _run(
-            [
-                sys.executable,
-                "-m",
-                "build",
-                "--wheel",
-                "--sdist",
-                "--outdir",
-                str(dist),
-            ],
-            cwd=ROOT,
-        )
+        with _preserve_build_outputs(work):
+            _run(
+                [
+                    sys.executable,
+                    "-m",
+                    "build",
+                    "--wheel",
+                    "--sdist",
+                    "--outdir",
+                    str(dist),
+                ],
+                cwd=ROOT,
+            )
 
         wheels = sorted(dist.glob("*.whl"))
         sdists = sorted(dist.glob("*.tar.gz"))
