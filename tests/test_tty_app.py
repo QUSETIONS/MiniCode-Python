@@ -23,6 +23,7 @@ from minicode.session import (
     rewind_session,
 )
 from minicode.tooling import ToolRegistry
+from minicode.turn_events import TurnEvent
 from minicode.tui.runtime_control import _ThrottledRenderer as RuntimeThrottledRenderer
 from minicode.tui.event_flow import _handle_event
 from minicode.tui.input_parser import KeyEvent
@@ -517,6 +518,87 @@ def test_tty_input_passes_and_persists_context_manager(tmp_path, monkeypatch) ->
     assert captured["memory_manager"] is memory_manager
     assert saved == [context_manager]
     assert state.agent_result["messages"][-1] == {"role": "assistant", "content": "done"}
+
+
+def test_tty_input_reduces_agent_events_on_the_ui_side(tmp_path, monkeypatch) -> None:
+    captured: dict = {}
+
+    def fake_run_agent_turn(**kwargs):
+        captured.update(kwargs)
+        sink = kwargs["callbacks"]
+        sink.on_event(
+            TurnEvent.tool_started(
+                step=1,
+                tool_name="read_marker",
+                tool_input={"path": "README.md"},
+            )
+        )
+        sink.on_event(
+            TurnEvent.tool_finished(
+                step=1,
+                tool_name="read_marker",
+                output="marker:ok",
+                is_error=False,
+            )
+        )
+        sink.on_event(TurnEvent.assistant_message(step=1, content="done"))
+        return [*kwargs["messages"], {"role": "assistant", "content": "done"}]
+
+    monkeypatch.setattr(input_handler_module, "run_agent_turn", fake_run_agent_turn)
+
+    state = ScreenState(input="inspect marker", cursor_offset=14)
+    args = TtyAppArgs(
+        runtime={"model": "default"},
+        tools=ToolRegistry([]),
+        model=object(),
+        messages=[{"role": "system", "content": "sys"}],
+        cwd=str(tmp_path),
+        permissions=PermissionManager(str(tmp_path)),
+    )
+
+    assert input_handler_module._handle_input(args, state, lambda: None) is False
+    state.agent_thread.join(timeout=5)
+    assert "callbacks" in captured
+    assert "on_tool_start" not in captured
+
+    state.agent_event_queue.drain(state.agent_event_handler)
+
+    assert any(entry.kind == "tool" for entry in state.transcript)
+    assert state.transcript[-1].kind == "assistant"
+    assert state.transcript[-1].body == "done"
+
+
+def test_tty_input_surfaces_agent_failure_without_rendering_exception_text(
+    tmp_path, monkeypatch
+) -> None:
+    def fake_run_agent_turn(**kwargs):
+        del kwargs
+        raise RuntimeError("provider rejected sk-secret-token")
+
+    monkeypatch.setattr(input_handler_module, "run_agent_turn", fake_run_agent_turn)
+
+    state = ScreenState(input="trigger failure", cursor_offset=15)
+    args = TtyAppArgs(
+        runtime={"model": "default"},
+        tools=ToolRegistry([]),
+        model=object(),
+        messages=[{"role": "system", "content": "sys"}],
+        cwd=str(tmp_path),
+        permissions=PermissionManager(str(tmp_path)),
+    )
+
+    assert input_handler_module._handle_input(args, state, lambda: None) is False
+    state.agent_thread.join(timeout=5)
+    state.agent_event_queue.drain(state.agent_event_handler)
+
+    failure = next(
+        entry
+        for entry in state.transcript
+        if entry.category == "runtime" and entry.runtimeStopReason == "error"
+    )
+    assert failure.body.startswith("Agent turn failed (RuntimeError)")
+    assert "sk-secret-token" not in failure.body
+    assert state.is_busy is False
 
 
 def test_tty_session_command_uses_live_session_snapshot(tmp_path) -> None:

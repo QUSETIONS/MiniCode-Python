@@ -72,4 +72,6 @@ class ScreenState:
     agent_thread: Any = None
     agent_result: dict | None = None
     agent_lock: Any = None
+    agent_event_queue: Any = None
+    agent_event_handler: Callable[[Any], None] | None = None
     tool_start_time: float | None = None

@@ -82,6 +82,7 @@ from minicode.turn_kernel import (
     finalize_work_chain_task,
     render_turn_policy_message,
 )
+from minicode.turn_events import AgentTurnCallbacks, AgentTurnEventSink, TurnEvent
 
 logger = get_logger("agent_loop")
 
@@ -757,6 +758,7 @@ def run_agent_turn(
     system_prompt: str = "",
     project_context: str = "",
     enable_work_chain: bool = True,
+    callbacks: AgentTurnCallbacks | AgentTurnEventSink | None = None,
 ) -> list[ChatMessage]:
     # Prelude: prepare per-turn state before we enter the recurrent think/act loop.
     current_messages = list(messages)
@@ -781,6 +783,159 @@ def run_agent_turn(
         ),
     )
     max_steps = runtime_profile.max_steps
+
+    # Keep the historical callback parameters as the source of truth for
+    # existing callers, while exposing one Rust-shaped structured event sink.
+    # The structured sink is deliberately isolated from the legacy callbacks:
+    # a UI/telemetry consumer must not be able to break the agent turn merely
+    # because its event handler failed.
+    legacy_on_tool_start = on_tool_start
+    legacy_on_tool_result = on_tool_result
+    legacy_on_assistant_message = on_assistant_message
+    legacy_on_progress_message = on_progress_message
+    legacy_on_runtime_event = on_runtime_event
+    legacy_on_assistant_stream_chunk = on_assistant_stream_chunk
+    legacy_on_thinking_chunk = on_thinking_chunk
+
+    def publish_turn_event(event: TurnEvent) -> None:
+        if callbacks is None:
+            return
+        try:
+            on_event = getattr(callbacks, "on_event", None)
+            if callable(on_event):
+                on_event(event)
+                return
+
+            # Also accept a Rust-style object that implements the four named
+            # methods but has no aggregate ``on_event`` method.
+            callback_name = {
+                "tool_start": "on_tool_start",
+                "tool_result": "on_tool_result",
+                "assistant": "on_assistant_message",
+                "progress": "on_progress_message",
+                "runtime": "on_runtime_event",
+                "assistant_stream": "on_assistant_stream_chunk",
+                "thinking": "on_thinking_chunk",
+            }.get(event.kind)
+            handler = getattr(callbacks, callback_name, None) if callback_name else None
+            if not callable(handler):
+                return
+            if event.kind == "tool_start":
+                handler(event.tool_name, event.tool_input)
+            elif event.kind == "tool_result":
+                handler(event.tool_name, event.output, event.is_error)
+            elif event.kind == "runtime" and event.runtime_event is not None:
+                handler(event.runtime_event)
+            else:
+                handler(event.content)
+        except Exception:  # noqa: BLE001
+            logger.debug(
+                "Structured agent-turn callback failed for event=%s",
+                event.kind,
+                exc_info=True,
+            )
+
+    def on_tool_start(tool_name: str, tool_input: dict) -> None:
+        publish_turn_event(
+            TurnEvent.tool_started(
+                step=turn_state.step or None,
+                tool_name=tool_name,
+                tool_input=tool_input,
+            )
+        )
+        if legacy_on_tool_start:
+            legacy_on_tool_start(tool_name, tool_input)
+
+    def on_tool_result(tool_name: str, output: str, is_error: bool) -> None:
+        publish_turn_event(
+            TurnEvent.tool_finished(
+                step=turn_state.step or None,
+                tool_name=tool_name,
+                output=output,
+                is_error=is_error,
+            )
+        )
+        if legacy_on_tool_result:
+            legacy_on_tool_result(tool_name, output, is_error)
+
+    def on_assistant_message(content: str) -> None:
+        publish_turn_event(
+            TurnEvent.assistant_message(
+                step=turn_state.step or None,
+                content=content,
+            )
+        )
+        if legacy_on_assistant_message:
+            legacy_on_assistant_message(content)
+
+    def on_progress_message(content: str) -> None:
+        publish_turn_event(
+            TurnEvent.progress_message(
+                step=turn_state.step or None,
+                content=content,
+            )
+        )
+        if legacy_on_progress_message:
+            legacy_on_progress_message(content)
+
+    def on_runtime_event(event: RuntimeEvent) -> None:
+        publish_turn_event(
+            TurnEvent.runtime_message(
+                step=turn_state.step or event.step,
+                event=event,
+            )
+        )
+        if legacy_on_runtime_event:
+            legacy_on_runtime_event(event)
+
+    def on_assistant_stream_chunk(content: str) -> None:
+        publish_turn_event(
+            TurnEvent.assistant_stream_chunk(
+                step=turn_state.step or None,
+                content=content,
+            )
+        )
+        if legacy_on_assistant_stream_chunk:
+            legacy_on_assistant_stream_chunk(content)
+
+    def on_thinking_chunk(content: str) -> None:
+        publish_turn_event(
+            TurnEvent.thinking_chunk(
+                step=turn_state.step or None,
+                content=content,
+            )
+        )
+        if legacy_on_thinking_chunk:
+            legacy_on_thinking_chunk(content)
+
+    # Provider adapters use ``None`` to select their non-streaming protocol.
+    # Do not turn an absent callback into a truthy no-op wrapper: that changes
+    # the wire format for callers that never asked for streaming.
+    if callbacks is None:
+        if legacy_on_tool_start is None:
+            on_tool_start = None
+        if legacy_on_tool_result is None:
+            on_tool_result = None
+        if legacy_on_assistant_message is None:
+            on_assistant_message = None
+        if legacy_on_progress_message is None:
+            on_progress_message = None
+        if legacy_on_runtime_event is None:
+            on_runtime_event = None
+    # Structured callbacks observe stream/thinking chunks when a caller has
+    # already enabled those legacy channels; merely subscribing to turn
+    # events must not silently change a provider from non-streaming to
+    # streaming mode.
+    if (
+        legacy_on_assistant_stream_chunk is None
+        and not bool(getattr(callbacks, "include_stream_chunks", False))
+    ):
+        on_assistant_stream_chunk = None
+    if (
+        legacy_on_thinking_chunk is None
+        and not bool(getattr(callbacks, "include_thinking_chunks", False))
+    ):
+        on_thinking_chunk = None
 
     def emit_runtime_event(
         *,
@@ -833,6 +988,17 @@ def run_agent_turn(
     reflection_engine: Any = None
     model_switcher: Any = None
     memory_injector: Any = None
+
+    # These objects are created by the work-chain/context branches below but
+    # are also consulted by the common prelude/coda paths.  Keep the disabled
+    # mode a valid lightweight execution path instead of relying on branch
+    # local assignment side effects.
+    context_compactor: ContextCompactor | None = None
+    context_cybernetics: ContextCyberneticsOrchestrator | None = None
+    memory_mgr: MemoryManager | None = None
+    micro_compactor: MicroCompactor | None = MicroCompactor()
+    compaction_breaker: CompactionCircuitBreaker | None = CompactionCircuitBreaker()
+    cost_control: CostControlLoop | None = None
 
     if enable_work_chain:
         prelude.task, prelude.task_metadata = _build_work_chain_task(current_messages)
@@ -947,9 +1113,6 @@ def run_agent_turn(
 
         # 初始化上下文管理器 (Claude Code-style + Engineering Cybernetics)
         # 必须在 SelfHealingEngine 之前初始化，因为自愈引擎需要委托压缩操作
-        context_compactor: ContextCompactor | None = None
-        context_cybernetics: ContextCyberneticsOrchestrator | None = None
-        memory_mgr: MemoryManager | None = None
         if context_manager:
             compact_config = AutoCompactConfig(
                 threshold_ratio=0.85,
@@ -1070,8 +1233,6 @@ def run_agent_turn(
         logger.info("Self-healing engine initialized: automated recovery + compaction delegation")
 
         # ── Micro-compaction + circuit breaker (CC-style layered defense) ─────
-        micro_compactor = MicroCompactor()
-        compaction_breaker = CompactionCircuitBreaker()
         logger.info("Micro-compactor + circuit breaker initialized for layered context defense")
 
         # 初始化成本控制闭环 (CostTracker → PID → ToolResultBudgetManager)
@@ -2001,6 +2162,16 @@ def run_agent_turn(
         current_messages.append({"role": "assistant", "content": fallback})
         return current_messages
     finally:
+        # Emit the terminal snapshot before coda bookkeeping so every return
+        # path (including an exception) produces exactly one structured Done
+        # event with the messages accumulated by the loop.
+        publish_turn_event(
+            TurnEvent.completed(
+                step=turn_state.step or None,
+                messages=current_messages,
+                stop_reason=str(turn_state.stop_reason or ""),
+            )
+        )
         # Coda: finalize metrics, work-chain bookkeeping, and control summaries.
         fire_hook_sync(
             HookEvent.AGENT_STOP,

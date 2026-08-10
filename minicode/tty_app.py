@@ -102,6 +102,12 @@ def run_tty_app(
     def rerender() -> None:
         throttled.request()
 
+    def drain_agent_events() -> None:
+        queue = getattr(state, "agent_event_queue", None)
+        handler = getattr(state, "agent_event_handler", None)
+        if queue is not None and handler is not None:
+            queue.drain(handler)
+
     approval_event, approval_result, _ = install_permission_prompt(args, state, rerender)
 
     input_remainder = ""
@@ -127,15 +133,24 @@ def run_tty_app(
                 if state.autosave and _autosave_counter >= _AUTOSAVE_CHECK_INTERVAL:
                     _autosave_counter = 0
                     state.autosave.save_if_needed()
+
+                # Reduce worker-thread turn events on the TUI thread, matching
+                # the Rust channel-driven event loop.
+                drain_agent_events()
                 
                 # Check if background agent thread completed
                 agent_result_data = state.agent_result
                 lock = getattr(state, "agent_lock", None)
                 if agent_result_data is not None and lock is not None and agent_result_data.get("done"):
+                    # The worker enqueues Done before publishing its shared
+                    # completion flag; drain once more to close that race.
+                    drain_agent_events()
                     with lock:
                         if agent_result_data.get("messages"):
                             args.messages = agent_result_data["messages"]
                         agent_result_data["done"] = False  # Reset flag
+                    state.agent_event_queue = None
+                    state.agent_event_handler = None
 
                 # Read raw input
                 if sys.platform == "win32":
