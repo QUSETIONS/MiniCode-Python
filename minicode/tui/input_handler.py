@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 import threading
+import time
 from typing import Any, Callable
 from minicode.tui.state import AggregatedEditProgress, ScreenState, TtyAppArgs
 from minicode.cli_commands import try_handle_local_command, find_matching_slash_commands
@@ -14,6 +15,7 @@ from minicode.local_tool_shortcuts import parse_local_tool_shortcut
 from minicode.prompt import build_system_prompt_bundle
 from minicode.tooling import ToolContext
 from minicode.types import RuntimeEvent
+from minicode.turn_events import TurnEvent, TurnEventQueue
 from minicode.tui.session_flow import refresh_tty_session_snapshot
 from minicode.tui.tool_helpers import _summarize_tool_input, _is_file_edit_tool, _extract_path_from_tool_input, _summarize_collapsed_tool_body
 from minicode.tui.tool_lifecycle import _push_transcript_entry, _update_tool_entry, _update_transcript_entry, _append_to_transcript_entry, _collapse_tool_entry, _finalize_dangling_running_tools, _get_running_tool_entries, _schedule_tool_auto_collapse
@@ -287,7 +289,6 @@ def _handle_input(
     """Returns True if /exit was typed."""
     if state.is_busy:
         # Animated spinner during tool execution
-        import time
         spinners = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
         tick = int(time.monotonic() * 8) % len(spinners)
         spin = spinners[tick]
@@ -693,10 +694,42 @@ def _handle_input(
         state.transcript_scroll_offset = 0
         rerender()
 
+    # Rust's TUI keeps the agent core on a worker and sends turn events over
+    # an unbounded channel.  The queue opts into stream/thinking events so the
+    # provider request shape remains unchanged for other event consumers.
+    agent_event_queue = TurnEventQueue(
+        include_stream_chunks=True,
+        include_thinking_chunks=True,
+    )
+
     # Run agent turn in background thread to keep UI responsive
     agent_error = None
     agent_result: dict = {"messages": None}
     agent_thread_lock = threading.Lock()
+
+    def on_turn_event(event: TurnEvent) -> None:
+        """Reduce one queued event into the existing TTY transcript state."""
+
+        if event.kind == "tool_start":
+            on_tool_start(event.tool_name, event.tool_input)
+        elif event.kind == "tool_result":
+            on_tool_result(event.tool_name, event.output, event.is_error)
+        elif event.kind == "assistant":
+            on_assistant_message(event.content)
+        elif event.kind == "progress":
+            on_progress_message(event.content)
+        elif event.kind == "runtime" and event.runtime_event is not None:
+            on_runtime_event(event.runtime_event)
+        elif event.kind == "assistant_stream":
+            on_assistant_stream_chunk(event.content)
+        elif event.kind == "thinking":
+            on_thinking_chunk(event.content)
+        elif event.kind == "done" and event.messages:
+            # The shared result remains the authoritative completion handoff,
+            # but the Done snapshot is useful if a worker exits during coda.
+            with agent_thread_lock:
+                if not agent_result.get("messages"):
+                    agent_result["messages"] = list(event.messages)
     
     def _run_agent_background():
         nonlocal agent_error, agent_result
@@ -708,13 +741,7 @@ def _handle_input(
                 cwd=args.cwd,
                 permissions=args.permissions,
                 session=state.session,
-                on_tool_start=on_tool_start,
-                on_tool_result=on_tool_result,
-                on_assistant_message=on_assistant_message,
-                on_progress_message=on_progress_message,
-                on_runtime_event=on_runtime_event,
-                on_assistant_stream_chunk=on_assistant_stream_chunk,
-                on_thinking_chunk=on_thinking_chunk,
+                callbacks=agent_event_queue,
                 store=state.app_state,
                 context_manager=args.context_manager,
                 memory_manager=memory_mgr,
@@ -727,6 +754,22 @@ def _handle_input(
                 agent_result["messages"] = next_messages
         except Exception as e:
             agent_error = e
+            # Do not let a worker failure disappear into the background
+            # thread.  Publish a safe runtime event so the UI can surface the
+            # failure without rendering exception text that may contain
+            # provider credentials or request payloads.
+            error_name = type(e).__name__ or "UnknownError"
+            logger.error("Agent turn failed (%s)", error_name)
+            agent_event_queue.on_event(
+                TurnEvent.runtime_message(
+                    step=None,
+                    event=RuntimeEvent(
+                        category="stop",
+                        message=f"Agent turn failed ({error_name}). Check the runtime log for details.",
+                        stop_reason="error",
+                    ),
+                )
+            )
         finally:
             args.permissions.end_turn()
             with agent_thread_lock:
@@ -737,13 +780,13 @@ def _handle_input(
             rerender()
     
     agent_thread = threading.Thread(target=_run_agent_background, daemon=True)
-    agent_thread.start()
     state.agent_thread = agent_thread
-    # Assign lock BEFORE result — the main loop checks agent_result first,
-    # so the lock must already be available to avoid AttributeError.
     state.agent_lock = agent_thread_lock
     state.agent_result = agent_result
-    
+    state.agent_event_queue = agent_event_queue
+    state.agent_event_handler = on_turn_event
+    agent_thread.start()
+
     # Return immediately - agent runs in background
     return False
 
