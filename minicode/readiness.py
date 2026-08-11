@@ -480,9 +480,6 @@ def main(argv: list[str] | None = None) -> int:
     examples_payload = redact_sensitive_payload(_examples_payload(report))
     repair_plan_payload = redact_sensitive_payload(_repair_plan_payload(report))
     patch_preview_payload = redact_sensitive_payload(_patch_preview_payload(report))
-    fallback_simulations_payload = redact_sensitive_payload(
-        _fallback_simulations_payload(cwd, patch_preview_payload)
-    )
     doctor_report = redact_sensitive_text(_format_doctor_report(report, cwd=cwd))
     if args.examples_out:
         _write_json(args.examples_out, examples_payload)
@@ -494,6 +491,9 @@ def main(argv: list[str] | None = None) -> int:
         _write_json(args.patch_preview_out, patch_preview_payload)
     bundle_paths = None
     if args.bundle_out:
+        fallback_simulations_payload = redact_sensitive_payload(
+            _fallback_simulations_payload(cwd, patch_preview_payload)
+        )
         bundle_paths = _write_bundle(
             args.bundle_out,
             examples_payload=examples_payload,

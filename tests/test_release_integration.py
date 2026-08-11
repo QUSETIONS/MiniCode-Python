@@ -713,6 +713,35 @@ def test_release_readiness_script_exports_bundle_as_black_box(tmp_path: Path) ->
     assert all(item["exists"] and item["size_bytes"] > 0 and len(item["sha256"]) == 64 for item in manifest)
 
 
+def test_readiness_non_bundle_outputs_skip_fallback_simulation(monkeypatch, tmp_path: Path, capsys) -> None:
+    import minicode.readiness
+
+    report = ReadinessReport(
+        status="ready",
+        provider="openai",
+        provider_ready=True,
+        provider_channel="openai via OPENAI_API_KEY",
+        risk_scope="none",
+        summary="readiness: ready (openai)",
+    )
+    monkeypatch.setattr(minicode.readiness, "build_readiness_report", lambda cwd: report)
+
+    def fail_if_called(cwd: str, patch_preview_payload: dict) -> dict:
+        raise AssertionError("fallback simulations should only run for --bundle-out")
+
+    monkeypatch.setattr(minicode.readiness, "_fallback_simulations_payload", fail_if_called)
+
+    for output_args in (
+        ["--doctor"],
+        ["--repair-plan"],
+        ["--patch-preview"],
+        ["--examples"],
+        ["--json"],
+    ):
+        assert minicode.readiness.main(["--cwd", str(tmp_path), *output_args]) == 0
+        capsys.readouterr()
+
+
 def test_readiness_outputs_redact_real_secrets(monkeypatch, tmp_path: Path, capsys) -> None:
     import minicode.readiness
 

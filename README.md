@@ -151,6 +151,7 @@ python -m minicode.release_readiness --check-fallback-patch-preview .temp/readin
 python -m minicode.release_readiness --check-fallback-simulation .temp/readiness-bundle/readiness-fallback-simulations.json
 python -m minicode.release_readiness --check-fallback-switch-smoke
 python benchmarks/release_readiness.py
+minicode-provider-smoke --help
 python -m minicode.release_readiness --check-fallback-evidence benchmarks/release_readiness_results.json
 python -m minicode.release_readiness --check-release-report benchmarks/release_readiness_results.json
 python -m minicode.release_readiness --check-release-markdown benchmarks/release_readiness_results.md --release-json benchmarks/release_readiness_results.json
@@ -177,17 +178,32 @@ notes, merge patch shape, and redaction. `--check-readiness-bundle` validates
 that bundle as one unit, including schema, manifest, and redaction.
 `--check-fallback-simulation` validates every offline fallback simulation and
 rejects any live-provider claim; it does not call a provider.
-`benchmarks/release_readiness.py` is report-only by default; use
-`python benchmarks/release_readiness.py --fail-on at-risk` when a release
-candidate must fail on live-provider risk. It also validates the generated
-headless provider trace so live-smoke failures keep a machine-readable
-readiness snapshot and repair plan. `--check-release-report` validates the full
+`benchmarks/release_readiness.py` is an offline report-only gate; use
+`minicode-provider-smoke` separately when a release candidate needs a real
+provider request. The benchmark still validates the generated headless trace
+so offline/provider-configuration failures keep a machine-readable readiness
+snapshot and repair plan. `--check-release-report` validates the full
 release JSON schema and evidence links while still allowing provider `at-risk`
 when the diagnostic evidence is present. `--check-release-markdown` validates
 that the human-readable report contains the same status, smoke, provider,
 fallback, and artifact evidence as the release JSON. `--check-fallback-evidence` validates
 that provider risk is paired with fallback coverage or an auditable fallback
-repair path.
+repair path. Use `--fail-on at-risk` on the offline report when local release
+policy should reject any unresolved provider risk.
+
+The ordinary readiness APIs are local-only, and release benchmark child checks
+run with an isolated HOME, so credentials in the current shell or
+`~/.mini-code` cannot silently trigger a provider request there. For one
+bounded real-provider check, use both explicit gates:
+
+```bash
+MINICODE_LIVE_PROVIDER_SMOKE=1 minicode-provider-smoke --run-live --timeout 45
+```
+
+The command emits only redacted structured evidence and returns a non-zero
+status for blocked configuration, provider failure, or timeout. The runtime
+profile benchmark has the same two-gate behavior with
+`--live-provider-smoke` when live diagnostics are needed.
 
 ## Typical Workflow
 

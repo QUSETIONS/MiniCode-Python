@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-from contextlib import contextmanager
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import venv
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parents[1]
 _BUILD_OUTPUT_NAMES = ("build", "minicode_py.egg-info")
@@ -105,7 +104,12 @@ def main() -> int:
                 cwd=work,
             )
 
-            for entrypoint in ("minicode-py", "minicode-headless", "minicode-readiness"):
+            for entrypoint in (
+                "minicode-py",
+                "minicode-headless",
+                "minicode-readiness",
+                "minicode-provider-smoke",
+            ):
                 command = _venv_entrypoint(env_dir, entrypoint)
                 completed = subprocess.run(
                     [str(command), "--help"],
@@ -120,7 +124,7 @@ def main() -> int:
                         f"{completed.stdout}\n{completed.stderr}"
                     )
 
-    print("package smoke passed: wheel, sdist, and three CLI entrypoints")
+    print("package smoke passed: wheel, sdist, and four CLI entrypoints")
     return 0
 
 

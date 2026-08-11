@@ -93,7 +93,22 @@ def _headless_readiness_snapshot(cwd: str, runtime: dict | None) -> dict:
         return {
             "status": "unknown",
             "summary": f"readiness unavailable: {exc}",
-            "repair_plan": [],
+            "repair_plan": [
+                {
+                    "step": "diagnose-local-readiness",
+                    "status": "blocked",
+                    "action": "Inspect local provider configuration without calling the model provider.",
+                    "command": "minicode-readiness --json --fail-on blocked",
+                    "safety": "read-only",
+                },
+                {
+                    "step": "verify-release-readiness",
+                    "status": "verify",
+                    "action": "Run the explicit provider smoke after local configuration is ready.",
+                    "command": "MINICODE_LIVE_PROVIDER_SMOKE=1 minicode-provider-smoke --run-live",
+                    "safety": "explicit opt-in; may call the live provider",
+                },
+            ],
         }
     return {
         "status": "unknown",

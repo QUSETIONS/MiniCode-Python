@@ -553,8 +553,8 @@ def _readiness_repair_plan(
                 "step": "verify-release-readiness",
                 "status": "verify",
                 "action": "Run the release smoke after local readiness is configured.",
-                "command": "python benchmarks/release_readiness.py --fail-on at-risk",
-                "safety": "may call the live provider",
+                "command": "MINICODE_LIVE_PROVIDER_SMOKE=1 minicode-provider-smoke --run-live",
+                "safety": "may call the live provider; explicit opt-in required",
             },
         ]
     )
@@ -618,7 +618,7 @@ def _readiness_preflight_checks(
             "label": "live-smoke-readiness",
             "status": "not-run",
             "summary": "Readiness preflight is local-only and does not call the model provider.",
-            "action": "Run benchmarks/release_readiness.py for the live provider smoke.",
+            "action": "Run the explicit provider smoke with --run-live and MINICODE_LIVE_PROVIDER_SMOKE=1.",
         },
     ]
     if not provider_ready and fallback_ready:
