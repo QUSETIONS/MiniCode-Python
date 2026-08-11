@@ -451,6 +451,7 @@ class MemoryGraphStore:
         self._search_cache.clear()
 
     def _trim(self) -> None:
+        trimmed = False
         if len(self.facts) > self.max_facts:
             keep = sorted(
                 self.facts.values(),
@@ -466,6 +467,7 @@ class MemoryGraphStore:
             }
             self._rebuild_indexes()
             self._pending_fact_ids.intersection_update(keep_ids)
+            trimmed = True
         if len(self.edges) > self.max_edges:
             keep_edges = sorted(
                 self.edges.values(),
@@ -473,6 +475,13 @@ class MemoryGraphStore:
                 reverse=True,
             )[: self.max_edges]
             self.edges = {edge.id: edge for edge in keep_edges}
+            trimmed = True
+        if trimmed:
+            # Trimming can happen during save after a search has populated the
+            # cache.  Any cached result may reference a fact or edge that was
+            # just evicted, so it must not survive the capacity bound.
+            self._dirty = True
+            self._invalidate_search_cache()
 
     def save(self) -> bool:
         """Persist the sidecar atomically; return whether the write succeeded."""

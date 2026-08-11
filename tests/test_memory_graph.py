@@ -214,6 +214,50 @@ def test_graph_search_cache_hits_and_invalidates_on_graph_mutation():
     assert store.stats()["search_cache_misses"] >= 2
 
 
+def test_graph_save_trim_invalidates_cached_evicted_facts(tmp_path: Path):
+    store = MemoryGraphStore(
+        storage_path=tmp_path / "memory-graph.json",
+        max_facts=2,
+    )
+    evicted = store.add_fact(
+        memory_id="evicted",
+        scope="project",
+        subject="obsolete",
+        predicate="choice",
+        value="evict this fact",
+        confidence=0.1,
+        observed_at=1,
+    )
+    store.add_fact(
+        memory_id="kept-1",
+        scope="project",
+        subject="current",
+        predicate="choice",
+        value="keep this fact",
+        confidence=0.9,
+        observed_at=2,
+    )
+    store.add_fact(
+        memory_id="kept-2",
+        scope="project",
+        subject="current",
+        predicate="choice",
+        value="keep another fact",
+        confidence=0.9,
+        observed_at=3,
+    )
+
+    assert [result.memory_id for result in store.search("obsolete evict")] == [
+        evicted.memory_id
+    ]
+    assert store.stats()["search_cache_size"] == 1
+
+    assert store.save()
+    assert evicted.id not in store.facts
+    assert store.search("obsolete evict") == []
+    assert store.stats()["search_cache_hits"] == 0
+
+
 def test_graph_relation_prioritises_support_over_similarity():
     store = MemoryGraphStore()
     source = store.add_fact(
