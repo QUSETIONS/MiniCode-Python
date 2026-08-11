@@ -1976,10 +1976,18 @@ def classify_provider_outcome(*, exit_code: int, stdout: str, stderr: str) -> tu
 
     if exit_code == 0 and stripped_stdout == "OK":
         return "answered", summary or "Headless provider smoke returned OK."
+    if any(
+        marker in combined
+        for marker in (
+            "no available channel",
+            "no model configured",
+            "no auth configured",
+        )
+    ):
+        return "provider_channel_unavailable", summary or "Provider channel unavailable."
     if (
         "provider availability failure" in combined
         or "all viable fallback models were unavailable" in combined
-        or "no available channel" in combined
     ):
         return "provider_outage", summary or "Provider availability failure."
     if "model api error" in combined:

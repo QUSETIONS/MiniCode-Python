@@ -101,6 +101,22 @@ def test_classify_provider_outcome_detects_answered_and_provider_outage() -> Non
     assert api_error == ("provider_api_error", "Model API error (RuntimeError): error code: 1010")
 
 
+def test_classify_provider_outcome_keeps_local_channel_failures_local() -> None:
+    for message in (
+        "No available channel for model.",
+        "No model configured.",
+        "No auth configured.",
+    ):
+        outcome, summary = classify_provider_outcome(
+            exit_code=1,
+            stdout="",
+            stderr=message,
+        )
+
+        assert outcome == "provider_channel_unavailable"
+        assert summary == message
+
+
 def test_summarize_release_status_treats_provider_outage_as_warning() -> None:
     status = summarize_release_status(
         compile_check=_check("compileall"),
