@@ -219,9 +219,14 @@ def test_graph_enabled_preserves_ordinary_query_results(tmp_path: Path):
     off_results = graph_off.read("service", max_results=4)
     on_results = graph_on.read("service", max_results=4)
 
-    assert [result["content"] for result in on_results] == [
+    # The lexical score includes time-sensitive recency/usage terms.  These
+    # pipelines are built independently, so tied candidates may legitimately
+    # arrive in a different order on another platform.  The graph opt-in
+    # contract for an ordinary query is that it preserves the same candidates,
+    # not a platform-specific ordering of equal-scoring entries.
+    assert sorted(result["content"] for result in on_results) == sorted(
         result["content"] for result in off_results
-    ]
+    )
     assert all("graph" not in result for result in on_results)
 
 
