@@ -61,6 +61,29 @@ class TestCuratorWithMemory:
             report = curator.run_cycle(force=True)
             assert report.memories_archived >= 1
 
+    def test_missing_referenced_file_archives_with_valid_tier(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            mgr = MemoryManager(project_root=tmp)
+            entry = mgr.add_entry(
+                MemoryScope.PROJECT,
+                category="decision",
+                content="Keep the migration notes in docs/removed-plan.md",
+            )
+
+            curator = MemoryCuratorAgent(memory_manager=mgr, workspace_path=tmp)
+            report = curator.run_cycle(force=True)
+
+            assert report.stale_count == 1
+            assert entry.tier == MemoryTier.ARCHIVAL
+            assert entry.content.startswith("[DEPRECATED: referenced files no longer exist]")
+            assert entry.tier.value == "archival"
+
+            # Re-running maintenance must not corrupt the enum or duplicate
+            # the deprecation marker.
+            curator.run_cycle(force=True)
+            assert entry.tier == MemoryTier.ARCHIVAL
+            assert entry.content.count("[DEPRECATED:") == 1
+
     def test_insight_from_related_cluster(self):
         with tempfile.TemporaryDirectory() as tmp:
             mgr = MemoryManager(project_root=tmp)
