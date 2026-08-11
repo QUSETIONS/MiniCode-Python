@@ -243,7 +243,7 @@ class MemoryCuratorAgent:
             return 0, 0
 
         import os
-        from minicode.memory import MemoryScope
+        from minicode.memory import MemoryScope, MemoryTier
 
         stale = 0
         validated = 0
@@ -267,33 +267,21 @@ class MemoryCuratorAgent:
                         all_missing = False
                         break
                 if all_missing and paths:
-                    entry.tier = MemoryScope.__class__.__name__  # will be fixed
                     stale += 1
-
-        # Fix: actual stale marking (safe approach)
-        from minicode.memory import MemoryTier
-        actual_stale = 0
-        for scope in MemoryScope:
-            if scope not in self._memory.memories:
-                continue
-            for entry in self._memory.memories[scope].entries:
-                words = entry.content.split()
-                paths = [w.strip(".,;:()[]{}'\"") for w in words
-                        if ("/" in w or "\\" in w) and "." in w and len(w) > 3]
-                if paths:
-                    all_missing = True
-                    for p in paths[:3]:
-                        full = os.path.join(self._workspace, p.lstrip("/\\"))
-                        if os.path.exists(full):
-                            all_missing = False
-                            break
-                    if all_missing and entry.tier not in (MemoryTier.ARCHIVAL,):
+                    if entry.tier != MemoryTier.ARCHIVAL:
                         entry.tier = MemoryTier.ARCHIVAL
-                        # Add deprecation marker
-                        entry.content = "[DEPRECATED: referenced files no longer exist] " + entry.content[:100]
-                        actual_stale += 1
+                        # Keep the marker idempotent so repeated maintenance
+                        # cycles do not grow the content indefinitely.
+                        marker = "[DEPRECATED: referenced files no longer exist] "
+                        if not entry.content.startswith(marker):
+                            entry.content = marker + entry.content[:100]
+                            entry.invalidate_tokens()
 
-        return actual_stale, validated
+                # Curator validation can mutate content, so refresh the
+                # MemoryFile indexes before later maintenance stages use them.
+            self._memory.memories[scope]._rebuild_indices()
+
+        return stale, validated
 
     # ── Insight consolidation ──────────────────────────────────
 

@@ -137,6 +137,112 @@ def test_delete_session(temp_session_dir):
     assert result is False
 
 
+def test_session_path_operations_reject_unsafe_ids(temp_session_dir, tmp_path):
+    """Legacy JSON and delta paths must not escape the sessions directory."""
+    outside_session = temp_session_dir.parent / "outside.json"
+    outside_session.write_text('{"session_id": "outside"}', encoding="utf-8")
+
+    assert load_session("../outside") is None
+    assert delete_session("../outside") is False
+
+    session = create_new_session(workspace="/tmp/test")
+    session.session_id = "../escape"
+    with pytest.raises(ValueError, match="invalid session id"):
+        save_session(session)
+
+    assert outside_session.exists()
+    assert not (temp_session_dir.parent / "escape.json").exists()
+
+
+@pytest.mark.parametrize("mismatch_field", ["payload", "metadata"])
+def test_load_session_rejects_legacy_payload_id_mismatch(
+    temp_session_dir, mismatch_field
+):
+    """A file name must not make a different serialized session resumable."""
+    source = create_new_session(workspace="/tmp/source")
+    source.messages = [{"role": "user", "content": "source"}]
+    save_session(source, force_full=True)
+    payload = json.loads(
+        (temp_session_dir / f"{source.session_id}.json").read_text(encoding="utf-8")
+    )
+
+    requested_id = "requested"
+    payload["session_id"] = (
+        source.session_id if mismatch_field == "payload" else requested_id
+    )
+    payload["metadata"]["session_id"] = (
+        source.session_id if mismatch_field == "metadata" else requested_id
+    )
+    (temp_session_dir / f"{requested_id}.json").write_text(
+        json.dumps(payload), encoding="utf-8"
+    )
+
+    assert load_session(requested_id) is None
+
+
+def test_update_metadata_keeps_session_ids_aligned(temp_session_dir):
+    session = create_new_session(workspace="/tmp/test")
+    session.metadata.session_id = "stale-id"
+
+    session.update_metadata()
+
+    assert session.metadata.session_id == session.session_id
+
+
+def test_load_session_does_not_follow_legacy_symlinks(temp_session_dir, tmp_path):
+    """Legacy session and delta readers must stay inside the session store."""
+    source = create_new_session(workspace="/tmp/source")
+    source.messages = [{"role": "user", "content": "base"}]
+    save_session(source, force_full=True)
+
+    linked_path = temp_session_dir / "linked.json"
+    linked_path.symlink_to(temp_session_dir / f"{source.session_id}.json")
+    assert load_session("linked") is None
+
+    outside_delta_dir = tmp_path / "outside-deltas"
+    outside_delta_dir.mkdir()
+    (outside_delta_dir / "delta_9999.json").write_text(
+        json.dumps(
+            {
+                "msg_offset": 1,
+                "messages": [{"role": "user", "content": "outside"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (temp_session_dir / "deltas").mkdir()
+    delta_dir = temp_session_dir / "deltas" / source.session_id
+    delta_dir.symlink_to(outside_delta_dir, target_is_directory=True)
+
+    loaded = load_session(source.session_id)
+
+    assert loaded is not None
+    assert loaded.messages == source.messages
+
+
+def test_corrupt_legacy_session_is_rejected_without_raising(temp_session_dir):
+    session = create_new_session(workspace="/tmp/test")
+    session_path = temp_session_dir / f"{session.session_id}.json"
+    session_path.write_text("[]", encoding="utf-8")
+
+    assert load_session(session.session_id) is None
+
+
+def test_corrupt_session_index_entries_are_skipped(temp_session_dir):
+    index_path = temp_session_dir.parent / "sessions_index.json"
+    index_path.write_text(
+        json.dumps(
+            {
+                "../escape": {"session_id": "../escape"},
+                "valid": "not-a-metadata-object",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert list_sessions() == []
+
+
 def test_list_sessions(temp_session_dir):
     """Test listing all sessions."""
     # Create multiple sessions

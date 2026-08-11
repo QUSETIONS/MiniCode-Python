@@ -20,6 +20,7 @@ import math
 import os
 import re
 import time
+import uuid
 from collections import Counter
 from dataclasses import dataclass, field
 from enum import Enum
@@ -189,6 +190,116 @@ def _recover_entries(data: dict, memory_json_path: Path) -> list[dict]:
 _WORD_RE = re.compile(r'[a-zA-Z0-9]+|[\u4e00-\u9fff]')
 _CJK_BIGRAM_RE = re.compile(r'[\u4e00-\u9fff]{2}')
 
+# Query-only stopwords keep natural-language questions from matching every
+# memory through terms such as "what", "is", and "the".  They are removed
+# from retrieval scoring, while stored memory text remains untouched.
+_SEARCH_STOPWORDS = frozenset(
+    {
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "by",
+        "can",
+        "could",
+        "did",
+        "do",
+        "does",
+        "for",
+        "from",
+        "how",
+        "in",
+        "is",
+        "it",
+        "of",
+        "on",
+        "or",
+        "should",
+        "that",
+        "the",
+        "this",
+        "to",
+        "use",
+        "using",
+        "we",
+        "what",
+        "when",
+        "where",
+        "which",
+        "who",
+        "why",
+        "would",
+    }
+)
+
+# Very large conversational indexes contain many filler turns with generic
+# request language.  At that scale, pronouns and polite scaffolding dominate
+# document frequency more easily than they do in the normal project-memory
+# file, so the search path becomes stricter without changing stored content.
+_LARGE_CORPUS_SEARCH_STOPWORDS = frozenset(
+    {
+        "also",
+        "any",
+        "around",
+        "find",
+        "get",
+        "give",
+        "i",
+        "just",
+        "like",
+        "many",
+        "me",
+        "might",
+        "mine",
+        "more",
+        "much",
+        "my",
+        "one",
+        "please",
+        "really",
+        "some",
+        "still",
+        "tell",
+        "thing",
+        "things",
+        "think",
+        "thinking",
+        "we",
+        "would",
+        "you",
+        "your",
+        "yours",
+    }
+)
+_LARGE_CORPUS_THRESHOLD = 1000
+_LARGE_CORPUS_QUERY_MARKERS = (
+    "recommend",
+    "suggest",
+    "advice",
+    "tips",
+    "ideas",
+    "what should",
+    "what do you think",
+    "choose",
+    "choice",
+    "prefer",
+    "preference",
+    "推荐",
+    "建议",
+    "偏好",
+    "选择",
+)
+
+
+def _uses_large_corpus_stopwords(query: str) -> bool:
+    """Return whether a query is broad enough to need stricter filtering."""
+
+    lowered = query.lower()
+    return any(marker in lowered for marker in _LARGE_CORPUS_QUERY_MARKERS)
+
 # Common code terminology expansions (bidirectional)
 _CODE_TERM_EXPANSIONS: dict[str, list[str]] = {
     "函数": ["function", "func", "method"],
@@ -296,6 +407,43 @@ _CODE_TERM_EXPANSIONS: dict[str, list[str]] = {
     "response": ["响应"],
 }
 
+# Lightweight conversational expansions for natural-language memory queries.
+#
+# Long-term memory questions often paraphrase the wording used when a memory
+# was written ("recommend" vs. "suggest", "publication" vs. "paper", or
+# "prefer" vs. "favorite").  These aliases stay query-side only: they do not
+# mutate stored memories and they do not replace the exact lexical signal.
+# This is the deterministic counterpart of an index-expansion pass, so it is
+# safe to use when no LLM reranker or embedding model is available.
+_CONVERSATIONAL_TERM_EXPANSIONS: dict[str, list[str]] = {
+    "recommend": ["suggest", "recommendation", "advice", "advise"],
+    "suggest": ["recommend", "recommendation", "advice"],
+    "recommendation": ["recommend", "suggest", "advice"],
+    "publication": ["paper", "article", "research"],
+    "publications": ["publication", "paper", "article", "research"],
+    "conference": ["symposium", "event", "meeting"],
+    "movie": ["film", "show", "series"],
+    "film": ["movie", "show", "series"],
+    "show": ["movie", "film", "series", "program"],
+    "activity": ["activities", "things", "entertainment", "recreation"],
+    "activities": ["activity", "things", "entertainment", "recreation"],
+    "dinner": ["meal", "dish", "recipe", "food"],
+    "meal": ["dinner", "dish", "recipe", "food"],
+    "hotel": ["lodging", "accommodation", "room", "stay"],
+    "trip": ["travel", "vacation", "journey"],
+    "preference": ["prefer", "favorite", "like", "choice"],
+    "preferences": ["preference", "prefer", "favorite", "like", "choice"],
+    "prefer": ["preference", "favorite", "like", "choose", "choice"],
+    "preferred": ["preference", "prefer", "favorite", "choice"],
+    "favorite": ["preference", "prefer", "like"],
+    "choose": ["choice", "select", "pick", "prefer"],
+    "choice": ["choose", "select", "pick", "prefer"],
+    "said": ["say", "mention", "tell", "explain"],
+    "say": ["said", "mention", "tell", "explain"],
+    "previously": ["before", "earlier", "prior"],
+    "remember": ["recall", "previously", "before"],
+}
+
 
 def _expand_query_terms(terms: list[str], active_domains: list[str] | None = None) -> list[str]:
     """Expand query terms using code terminology + domain-specific dictionaries."""
@@ -303,6 +451,8 @@ def _expand_query_terms(terms: list[str], active_domains: list[str] | None = Non
     for term in terms:
         if term in _CODE_TERM_EXPANSIONS:
             expanded.extend(_CODE_TERM_EXPANSIONS[term])
+        if term in _CONVERSATIONAL_TERM_EXPANSIONS:
+            expanded.extend(_CONVERSATIONAL_TERM_EXPANSIONS[term])
     # Domain-specific expansions
     if active_domains:
         for domain in active_domains:
@@ -433,6 +583,17 @@ def _tokenize(text: str) -> list[str]:
     return tokens + cjk_bigrams
 
 
+def _search_tokens(
+    text: str,
+    *,
+    stopwords: set[str] | frozenset[str] | None = None,
+) -> list[str]:
+    """Tokenize a query and remove generic question/function words."""
+
+    blocked = _SEARCH_STOPWORDS if stopwords is None else stopwords
+    return [token for token in _tokenize(text) if token not in blocked]
+
+
 # BM25 parameters
 _BM25_K1 = 1.5  # Term frequency scaling
 _BM25_B = 0.75  # Document length normalization
@@ -492,14 +653,17 @@ def _bm25_score(
         return 0.0
 
     doc_len = len(doc_tokens)
-    tf_doc = _compute_tf(doc_tokens)
+    # Okapi BM25 uses the raw document term frequency.  Normalising by the
+    # document length here double-counts length normalisation and heavily
+    # suppresses relevant terms in long-session memories.
+    tf_doc = Counter(doc_tokens)
     total_tokens = doc_len
 
     score = 0.0
     for term in set(query_tokens):
         if term not in idf:
             continue
-        tf = tf_doc.get(term, 0.0)
+        tf = float(tf_doc.get(term, 0))
         if tf == 0:
             continue
         numerator = tf * (k1 + 1)
@@ -723,12 +887,29 @@ class MemoryFile:
     _idf_cache: dict[str, float] | None = field(default=None, repr=False)
     _avgdl_cache: float | None = field(default=None, repr=False)
     _cache_dirty: bool = field(default=True, repr=False)
+    _index_signature: tuple[tuple[str, str, tuple[str, ...], str], ...] = field(
+        default_factory=tuple, repr=False
+    )
+
+    def _current_index_signature(self) -> tuple[tuple[str, str, tuple[str, ...], str], ...]:
+        """Return the fields used by the secondary indexes.
+
+        ``entries`` is intentionally a public list for backwards compatibility,
+        so callers can mutate it directly.  The signature lets the manager
+        detect those mutations before serving an indexed lookup.
+        """
+        return tuple(
+            (entry.id, entry.category, tuple(entry.tags), entry.content)
+            for entry in self.entries
+        )
 
     def _rebuild_indices(self) -> None:
         self._id_index.clear()
         self._tag_index.clear()
         self._category_index.clear()
         self._tokens_cache.clear()
+        self._idf_cache = None
+        self._avgdl_cache = None
         for entry in self.entries:
             self._id_index[entry.id] = entry
             for tag in entry.tags:
@@ -746,15 +927,49 @@ class MemoryFile:
             self._idf_cache = _compute_idf(all_tokens)
             self._avgdl_cache = _compute_avgdl(all_tokens)
         self._cache_dirty = False
+        self._index_signature = self._current_index_signature()
 
     def _ensure_cache_valid(self) -> None:
-        if self._cache_dirty:
+        if self._cache_dirty or self._index_signature != self._current_index_signature():
             self._rebuild_indices()
 
     def _invalidate_cache(self) -> None:
         self._cache_dirty = True
         self._idf_cache = None
         self._avgdl_cache = None
+
+    def _invalidate_search_cache(self) -> None:
+        """Invalidate ranking caches without discarding maintained indexes."""
+        self._idf_cache = None
+        self._avgdl_cache = None
+
+    def _remove_from_indices(self, entry: MemoryEntry) -> None:
+        """Remove one entry from every maintained index.
+
+        The identity check on ``_id_index`` matters for legacy files that may
+        contain duplicate IDs: removing an older duplicate must not delete the
+        newer entry that currently owns the ID lookup slot.
+        """
+        indexed = self._id_index.get(entry.id)
+        if indexed is entry:
+            self._id_index.pop(entry.id, None)
+            self._tokens_cache.pop(entry.id, None)
+
+        for tag in entry.tags:
+            tagged = self._tag_index.get(tag)
+            if tagged is None:
+                continue
+            tagged.discard(entry)
+            if not tagged:
+                self._tag_index.pop(tag, None)
+
+        category_entries = self._category_index.get(entry.category)
+        if category_entries is not None:
+            self._category_index[entry.category] = [
+                candidate for candidate in category_entries if candidate is not entry
+            ]
+            if not self._category_index[entry.category]:
+                self._category_index.pop(entry.category, None)
 
     @property
     def size_bytes(self) -> int:
@@ -776,6 +991,8 @@ class MemoryFile:
         self._category_index[cat].append(entry)
         self._tokens_cache[entry.id] = entry.get_tokens()
         self._enforce_limits()
+        self._invalidate_search_cache()
+        self._index_signature = self._current_index_signature()
     
     def update_entry(self, entry_id: str, content: str) -> bool:
         """Update existing entry using index."""
@@ -787,6 +1004,8 @@ class MemoryFile:
         entry.updated_at = time.time()
         entry.invalidate_tokens()
         self._tokens_cache[entry.id] = entry.get_tokens()
+        self._invalidate_search_cache()
+        self._index_signature = self._current_index_signature()
         return True
     
     def delete_entry(self, entry_id: str) -> bool:
@@ -795,15 +1014,54 @@ class MemoryFile:
         entry = self._id_index.get(entry_id)
         if entry is None:
             return False
-        self.entries.remove(entry)
-        del self._id_index[entry_id]
-        for tag in entry.tags:
-            if tag in self._tag_index:
-                self._tag_index[tag].discard(entry)
-        cat = entry.category
-        if cat in self._category_index and entry in self._category_index[cat]:
-            self._category_index[cat].remove(entry)
-        self._tokens_cache.pop(entry_id, None)
+        if not any(candidate is entry for candidate in self.entries):
+            # Be defensive when loading a legacy file or after a caller has
+            # mutated the public entries list directly.
+            self._rebuild_indices()
+            entry = self._id_index.get(entry_id)
+            if entry is None or not any(candidate is entry for candidate in self.entries):
+                return False
+        for index, candidate in enumerate(self.entries):
+            if candidate is entry:
+                del self.entries[index]
+                break
+        else:
+            return False
+        self._remove_from_indices(entry)
+        self._invalidate_search_cache()
+        self._index_signature = self._current_index_signature()
+        return True
+
+    def add_tag(self, entry_id: str, tag: str) -> bool:
+        """Add a tag while keeping tag and token indexes synchronized."""
+        self._ensure_cache_valid()
+        entry = self._id_index.get(entry_id)
+        if entry is None or not tag or tag in entry.tags:
+            return entry is not None
+        entry.tags.append(tag)
+        self._tag_index.setdefault(tag, set()).add(entry)
+        entry.invalidate_tokens()
+        self._tokens_cache[entry.id] = entry.get_tokens()
+        self._invalidate_search_cache()
+        self._index_signature = self._current_index_signature()
+        return True
+
+    def remove_tag(self, entry_id: str, tag: str) -> bool:
+        """Remove a tag while keeping tag and token indexes synchronized."""
+        self._ensure_cache_valid()
+        entry = self._id_index.get(entry_id)
+        if entry is None or tag not in entry.tags:
+            return entry is not None
+        entry.tags.remove(tag)
+        tagged = self._tag_index.get(tag)
+        if tagged is not None:
+            tagged.discard(entry)
+            if not tagged:
+                self._tag_index.pop(tag, None)
+        entry.invalidate_tokens()
+        self._tokens_cache[entry.id] = entry.get_tokens()
+        self._invalidate_search_cache()
+        self._index_signature = self._current_index_signature()
         return True
     
     def get_entries_by_category(self, category: str) -> list[MemoryEntry]:
@@ -811,7 +1069,13 @@ class MemoryFile:
         self._ensure_cache_valid()
         return list(self._category_index.get(category, []))
     
-    def search(self, query: str, active_domains: list[str] | None = None) -> list[MemoryEntry]:
+    def search(
+        self,
+        query: str,
+        active_domains: list[str] | None = None,
+        *,
+        record_usage: bool = True,
+    ) -> list[MemoryEntry]:
         """Search entries by keyword with BM25 + domain relevance scoring.
 
         Combines BM25 semantic relevance with usage frequency and optional
@@ -821,27 +1085,39 @@ class MemoryFile:
         if not self.entries:
             return []
 
+        self._ensure_cache_valid()
+
         # Snapshot entries so concurrent add_entry/_enforce_limits can't shift
         # indices between the two loops below (was: "list index out of range"
         # when another thread appended between building entry_tokens and the
         # scoring loop).
         entries = list(self.entries)
 
-        query_tokens = _tokenize(query)
+        search_stopwords = _SEARCH_STOPWORDS
+        if (
+            len(entries) >= _LARGE_CORPUS_THRESHOLD
+            and _uses_large_corpus_stopwords(query)
+        ):
+            search_stopwords = _SEARCH_STOPWORDS | _LARGE_CORPUS_SEARCH_STOPWORDS
+
+        query_tokens = _search_tokens(query, stopwords=search_stopwords)
         query_tokens = _expand_query_terms(query_tokens, active_domains=active_domains)
         if not query_tokens:
             return []
 
         query_lower = query.lower()
-        query_terms = query_lower.split()
+        query_terms = _search_tokens(query, stopwords=search_stopwords)
 
-        entry_tokens = []
-        for entry in entries:
-            text = f"{entry.content} {entry.category} {' '.join(entry.tags)}"
-            entry_tokens.append(_tokenize(text))
-
-        idf = _compute_idf(entry_tokens)
-        avgdl = _compute_avgdl(entry_tokens)
+        # _rebuild_indices() already prepares the stable token/IDF snapshot;
+        # reuse it across repeated reads instead of re-tokenising the whole
+        # memory file for every query.  MemoryEntry.get_tokens() also keeps the
+        # per-entry fallback cache for legacy callers that mutate entries
+        # directly.
+        if self._idf_cache is None or self._avgdl_cache is None:
+            self._rebuild_indices()
+        entry_tokens = [entry.get_tokens() for entry in entries]
+        idf = self._idf_cache or {}
+        avgdl = self._avgdl_cache or 0.0
 
         scored: list[tuple[float, MemoryEntry]] = []
         for i, entry in enumerate(entries):
@@ -892,20 +1168,30 @@ class MemoryFile:
             scored.append((total_score, entry))
 
         scored.sort(key=lambda x: x[0], reverse=True)
-        # Increment usage_count for top results to feed back into future scoring
-        for _, entry in scored[:10]:
-            entry.usage_count += 1
+        # Retrieval callers that compare rankings or run previews need a
+        # stable, read-only view.  Production remains feedback-enabled by
+        # default, while benchmarks can opt out explicitly.
+        if record_usage:
+            for _, entry in scored[:10]:
+                entry.usage_count += 1
         return [entry for _, entry in scored]
     
     def _enforce_limits(self) -> None:
         """Remove oldest entries if exceeding limits."""
+        removed = False
         # Check entry count
         while len(self.entries) > self.max_entries:
-            self.entries.pop(0)  # Remove oldest
+            removed_entry = self.entries.pop(0)
+            self._remove_from_indices(removed_entry)
+            removed = True
         
         # Check size
         while self.size_bytes > self.max_size_bytes and self.entries:
-            self.entries.pop(0)
+            removed_entry = self.entries.pop(0)
+            self._remove_from_indices(removed_entry)
+            removed = True
+        if removed:
+            self._invalidate_search_cache()
     
     def format_as_markdown(self, include_header: bool = True) -> str:
         """Format as MEMORY.md content."""
@@ -1057,6 +1343,7 @@ class MemoryManager:
             recovered.append(entry)
 
         self.memories[scope].entries = recovered
+        self.memories[scope]._rebuild_indices()
         self._save_scope(scope)
 
         logger.info(
@@ -1204,7 +1491,11 @@ class MemoryManager:
             final_category = auto_category
             final_tags = list(dict.fromkeys(final_tags + auto_tags))
 
-        entry_id = f"{scope.value}-{int(time.time())}-{len(self.memories[scope].entries)}"
+        # ``time.time() + len(entries)`` reused IDs once a scope reached its
+        # capacity: every new entry had the same list length after eviction.
+        # UUIDs keep references stable even during burst writes and across
+        # process restarts.
+        entry_id = f"{scope.value}-{uuid.uuid4().hex}"
         entry = MemoryEntry(
             id=entry_id,
             scope=scope,
@@ -1233,23 +1524,21 @@ class MemoryManager:
 
     def add_tag(self, scope: MemoryScope, entry_id: str, tag: str) -> bool:
         """Add a tag to an entry."""
-        for entry in self.memories[scope].entries:
-            if entry.id == entry_id:
-                if tag not in entry.tags:
-                    entry.tags.append(tag)
-                    self._save_scope(scope)
-                return True
-        return False
+        memory = self.memories[scope]
+        had_tag = any(entry.id == entry_id and tag in entry.tags for entry in memory.entries)
+        changed = memory.add_tag(entry_id, tag)
+        if changed and not had_tag:
+            self._save_scope(scope)
+        return changed
 
     def remove_tag(self, scope: MemoryScope, entry_id: str, tag: str) -> bool:
         """Remove a tag from an entry."""
-        for entry in self.memories[scope].entries:
-            if entry.id == entry_id:
-                if tag in entry.tags:
-                    entry.tags.remove(tag)
-                    self._save_scope(scope)
-                return True
-        return False
+        memory = self.memories[scope]
+        had_tag = any(entry.id == entry_id and tag in entry.tags for entry in memory.entries)
+        changed = memory.remove_tag(entry_id, tag)
+        if changed and had_tag:
+            self._save_scope(scope)
+        return changed
 
     def search_by_tag(self, scope: MemoryScope, tag: str) -> list[MemoryEntry]:
         """Search entries by tag."""
@@ -1281,6 +1570,8 @@ class MemoryManager:
         limit: int = 20,
         min_relevance: float = 0.1,
         active_domains: list[str] | None = None,
+        *,
+        record_usage: bool = True,
     ) -> list[MemoryEntry]:
         """Search across memory scopes with TF-IDF + domain relevance.
 
@@ -1298,8 +1589,35 @@ class MemoryManager:
 
         scopes_to_search = [scope] if scope else list(MemoryScope)
 
-        for s in scopes_to_search:
-            results.extend(self.memories[s].search(query, active_domains=active_domains))
+        if scope is None:
+            # A per-scope search computes IDF independently and concatenating
+            # those ranked lists lets a weak user-memory hit hide a stronger
+            # project/local hit merely because USER is visited first.  Build a
+            # read-only aggregate view so BM25 compares all scopes in one
+            # corpus; the original scope order remains the stable tie-breaker.
+            aggregate_entries = [
+                entry
+                for current_scope in scopes_to_search
+                for entry in self.memories[current_scope].entries
+            ]
+            if aggregate_entries:
+                aggregate_memory = MemoryFile(
+                    scope=MemoryScope.PROJECT,
+                    entries=aggregate_entries,
+                )
+                results = aggregate_memory.search(
+                    query,
+                    active_domains=active_domains,
+                    record_usage=record_usage,
+                )
+        else:
+            results.extend(
+                self.memories[scope].search(
+                    query,
+                    active_domains=active_domains,
+                    record_usage=record_usage,
+                )
+            )
 
         # Apply minimum relevance threshold
         # (entries are already scored by MemoryFile.search)
@@ -1713,6 +2031,7 @@ class MemoryManager:
             final_entries.append(entry_a)
 
         self.memories[scope].entries = final_entries
+        self.memories[scope]._rebuild_indices()
         self._save_scope(scope)
 
         return {
@@ -1831,6 +2150,7 @@ class MemoryManager:
         """
         now = time.time()
         stats = {"promoted_to_long": 0, "demoted_to_archival": 0, "reactivated": 0}
+        changed_scopes: set[MemoryScope] = set()
         for scope in MemoryScope:
             if scope not in self.memories:
                 continue
@@ -1843,12 +2163,28 @@ class MemoryManager:
                 if entry.tier == MemoryTier.LONG_TERM and accessed_days > 30:
                     entry.tier = MemoryTier.ARCHIVAL
                     entry.content = self._summarize_content(entry.content)
+                    entry.invalidate_tokens()
+                    changed_scopes.add(scope)
                     stats["demoted_to_archival"] += 1
-                if entry.tier in (MemoryTier.LONG_TERM, MemoryTier.ARCHIVAL) and accessed_days < 7:
+                # A newly archived entry has a recent ``last_accessed`` value
+                # because that field defaults to creation time.  Reactivating
+                # every such entry immediately made archival and stale-memory
+                # cleanup ineffective.  Require actual prior use and keep
+                # curator-marked deprecated memories archived.
+                is_deprecated = entry.content.startswith("[DEPRECATED:")
+                if (
+                    entry.tier in (MemoryTier.LONG_TERM, MemoryTier.ARCHIVAL)
+                    and accessed_days < 7
+                    and entry.usage_count > 0
+                    and not is_deprecated
+                ):
                     entry.tier = MemoryTier.SHORT_TERM
+                    changed_scopes.add(scope)
                     stats["reactivated"] += 1
         if any(stats.values()):
             for scope in MemoryScope:
+                if scope in changed_scopes:
+                    self.memories[scope]._rebuild_indices()
                 self._save_scope(scope)
         return stats
 
@@ -1880,6 +2216,7 @@ class MemoryManager:
         found_scope = None
         for s in MemoryScope:
             if s in self.memories:
+                self.memories[s]._ensure_cache_valid()
                 entry = self.memories[s]._id_index.get(entry_id)
                 if entry:
                     found_scope = s

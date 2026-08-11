@@ -25,6 +25,7 @@ from minicode.memory import (
     _tokenize,
     _CODE_TERM_EXPANSIONS,
 )
+from minicode.memory_pipeline import MemoryPipeline
 from minicode.context_manager import ContextManager, estimate_tokens
 from minicode.session import (
     save_session,
@@ -232,6 +233,28 @@ class TestMemoryContextManagerIntegration:
         tokens_after = ctx2.get_stats().total_tokens
 
         assert tokens_after > tokens_before
+
+    def test_memory_pipeline_feedback_persists_across_manager_reload(
+        self, tmp_workspace
+    ):
+        memory_manager = MemoryManager(project_root=tmp_workspace)
+        entry = memory_manager.add_entry(
+            MemoryScope.PROJECT,
+            "convention",
+            "Use pytest fixtures for integration tests",
+        )
+        pipeline = MemoryPipeline(memory_manager)
+
+        pipeline.feedback(task_success=True, injected_memory_ids=[entry.id])
+
+        reloaded = MemoryManager(project_root=tmp_workspace)
+        persisted = next(
+            item
+            for item in reloaded.memories[MemoryScope.PROJECT].entries
+            if item.id == entry.id
+        )
+        assert persisted.usage_count == 2
+        assert persisted.last_accessed >= entry.last_accessed
 
 
 # ---------------------------------------------------------------------------
@@ -482,6 +505,21 @@ class TestMemoryAgentLoopIntegration:
 
         results = memory_manager.search("test entry")
         assert len(results) >= 1
+
+    def test_memory_search_can_be_read_only_for_stable_ranking(
+        self, memory_manager: MemoryManager
+    ):
+        entry = memory_manager.add_entry(
+            MemoryScope.PROJECT,
+            "test",
+            "This is a test entry for read-only retrieval",
+            ["read-only"],
+        )
+
+        results = memory_manager.search("test entry", record_usage=False)
+
+        assert results
+        assert entry.usage_count == 0
 
     def test_memory_search_used_in_agent_turn(
         self, mock_model, tools, tmp_workspace, auto_allow_permissions
@@ -1123,6 +1161,26 @@ class TestCrossCuttingMemoryIntegration:
         total = len(project_results) + len(user_results) + len(local_results)
         assert total >= len(results)
 
+    def test_memory_search_across_scopes_ranks_by_global_relevance(
+        self, tmp_workspace
+    ):
+        mm = MemoryManager(project_root=tmp_workspace)
+        weak_user = mm.add_entry(
+            MemoryScope.USER,
+            "preference",
+            "FastAPI",
+        )
+        strong_project = mm.add_entry(
+            MemoryScope.PROJECT,
+            "architecture",
+            "FastAPI FastAPI FastAPI routing architecture integration",
+        )
+
+        results = mm.search("FastAPI", limit=1, record_usage=False)
+
+        assert weak_user.id != strong_project.id
+        assert results[0].id == strong_project.id
+
     def test_memory_format_stats_display(self, memory_with_entries):
         stats_str = memory_with_entries.format_stats()
         assert "Memory System Status" in stats_str
@@ -1235,3 +1293,77 @@ def test_search_survives_none_content_entry(tmp_path):
     # Must not raise; the good entry is still searchable.
     results = mgr.search("run the test suite")
     assert any("test suite" in e.content for e in results)
+
+
+def test_memory_file_eviction_keeps_indexes_and_crud_consistent():
+    """Evicted entries must disappear from every indexed lookup."""
+    memory = MemoryFile(
+        scope=MemoryScope.PROJECT,
+        max_entries=2,
+        max_size_bytes=10_000,
+    )
+    for index in range(3):
+        memory.add_entry(
+            MemoryEntry(
+                id=f"evict-{index}",
+                scope=MemoryScope.PROJECT,
+                category="pattern",
+                content=f"entry {index}",
+                tags=["shared"],
+            )
+        )
+
+    assert [entry.id for entry in memory.entries] == ["evict-1", "evict-2"]
+    assert sorted(memory._id_index) == ["evict-1", "evict-2"]
+    assert [entry.id for entry in memory.get_entries_by_category("pattern")] == [
+        "evict-1",
+        "evict-2",
+    ]
+    assert not memory.delete_entry("evict-0")
+    assert not memory.update_entry("evict-0", "must not resurrect")
+
+
+def test_memory_manager_burst_ids_are_unique_at_capacity(tmp_path):
+    """Capacity eviction must not make generated IDs collide."""
+    manager = MemoryManager(project_root=tmp_path)
+    for scope in MemoryScope:
+        manager.memories[scope].entries.clear()
+        manager.memories[scope]._rebuild_indices()
+
+    capacity = manager.memories[MemoryScope.PROJECT].max_entries
+    for index in range(capacity + 20):
+        manager.add_entry(
+            MemoryScope.PROJECT,
+            "test",
+            f"burst entry {index}",
+        )
+
+    entries = manager.memories[MemoryScope.PROJECT].entries
+    ids = [entry.id for entry in entries]
+    assert len(entries) == capacity
+    assert len(ids) == len(set(ids))
+
+
+def test_memory_indexes_survive_persistence_after_eviction(tmp_path):
+    """A reloaded manager must expose only the retained entries by ID/tag."""
+    manager = MemoryManager(project_root=tmp_path)
+    memory = manager.memories[MemoryScope.PROJECT]
+    memory.max_entries = 2
+    for index in range(3):
+        manager.add_entry(
+            MemoryScope.PROJECT,
+            "pattern",
+            f"persisted entry {index}",
+            tags=["persisted"],
+        )
+
+    reloaded = MemoryManager(project_root=tmp_path)
+    retained = reloaded.memories[MemoryScope.PROJECT].entries
+    assert [entry.content for entry in retained] == [
+        "persisted entry 1",
+        "persisted entry 2",
+    ]
+    assert [entry.id for entry in reloaded.memories[MemoryScope.PROJECT].get_entries_by_category("pattern")] == [
+        entry.id for entry in retained
+    ]
+    assert len(reloaded.search_by_tag(MemoryScope.PROJECT, "persisted")) == 2

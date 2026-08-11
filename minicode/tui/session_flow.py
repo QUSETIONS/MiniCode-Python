@@ -18,6 +18,7 @@ from minicode.session import (
     load_session,
     save_session,
 )
+from minicode.session_contract import build_memory_continuity_snapshot
 from minicode.state import create_app_store
 from minicode.tui.state import PendingApproval, ScreenState, TtyAppArgs
 from minicode.tui.tool_lifecycle import _bump_transcript_revision
@@ -91,13 +92,19 @@ def build_tty_runtime_state(
     )
 
     state = ScreenState(
-        history=load_history_entries(),
+        # Rust stores input history inside the session directory.  Prefer the
+        # resumed session's history and keep the old global history as a
+        # fallback for brand-new/legacy sessions.
+        history=list(session.history) if session.history else load_history_entries(),
         session=session,
         autosave=AutosaveManager(session),
         app_state=create_app_store({
             "session_id": session.session_id,
             "workspace": cwd,
             "model": runtime.get("model", "unknown") if runtime else "unknown",
+            "metadata": {
+                "memory_continuity": dict(session.memory_continuity),
+            },
         }),
         cost_tracker=CostTracker(),
     )
@@ -168,6 +175,12 @@ def refresh_tty_session_snapshot(args: TtyAppArgs, state: ScreenState) -> None:
     state.session.permissions_summary = args.permissions.get_summary()
     state.session.skills = args.tools.get_skills()
     state.session.mcp_servers = args.tools.get_mcp_servers()
+    memory_manager = getattr(args, "memory_manager", None)
+    if memory_manager is not None:
+        state.session.memory_continuity = build_memory_continuity_snapshot(
+            memory_manager,
+            workspace=str(Path(args.cwd).resolve()),
+        )
     product_snapshot = getattr(args, "product_snapshot", None)
     if product_snapshot:
         state.session.instruction_layers = list(

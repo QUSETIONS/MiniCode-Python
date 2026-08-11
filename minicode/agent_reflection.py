@@ -119,6 +119,7 @@ class ReflectionEngine:
         task_description: str,
         execution_trace: list[dict[str, Any]],
         metrics: Any | None = None,
+        persist: bool = True,
     ) -> ReflectionResult:
         """Generate reflection from execution trace.
 
@@ -126,6 +127,8 @@ class ReflectionEngine:
             task_description: Original task
             execution_trace: List of step records (tool calls, responses, errors)
             metrics: Optional metrics collector for performance data
+            persist: Whether this engine should persist the reflection directly.
+                Pipeline callers can disable this and own structured storage.
 
         Returns:
             Reflection result
@@ -156,7 +159,7 @@ class ReflectionEngine:
             task_context=task_context,
         )
 
-        if self.memory and confidence >= self.min_confidence:
+        if persist and self.memory and confidence >= self.min_confidence:
             self._persist_reflection(reflection)
 
         return reflection

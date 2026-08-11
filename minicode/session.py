@@ -22,6 +22,14 @@ from typing import Any
 
 from minicode.config import MINI_CODE_DIR
 from minicode.logging_config import log_session_event
+from minicode.session_contract import (
+    atomic_write_json,
+    build_session_record,
+    delete_session_bundle,
+    read_session_bundle,
+    _valid_session_id,
+    write_session_bundle,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -58,6 +66,16 @@ class SessionMetadata:
     delegation_summary: str = ""
     extension_summary: str = ""
     readiness_summary: str = ""
+    # Rust-compatible session/history fields.  They remain optional so old
+    # Python session indexes continue to load without a migration step.
+    ended_at: str | None = None
+    duration_seconds: int = 0
+    model: str | None = None
+    turn_count: int = 0
+    user_input_count: int = 0
+    tool_call_count: int = 0
+    status: str = "active"
+    memory_summary: str = ""
 
 
 @dataclass
@@ -82,6 +100,7 @@ class SessionData:
     workspace: str
     messages: list[dict[str, Any]] = field(default_factory=list)
     transcript_entries: list[dict[str, Any]] = field(default_factory=list)
+    turns: list[dict[str, Any]] = field(default_factory=list)
     history: list[str] = field(default_factory=list)
     permissions_summary: dict[str, Any] = field(default_factory=dict)
     skills: list[dict[str, Any]] = field(default_factory=list)
@@ -92,6 +111,7 @@ class SessionData:
     delegation_status: dict[str, Any] = field(default_factory=dict)
     extension_manifests: list[dict[str, Any]] = field(default_factory=list)
     readiness_report: dict[str, Any] = field(default_factory=dict)
+    memory_continuity: dict[str, Any] = field(default_factory=dict)
     checkpoints: list[FileCheckpoint] = field(default_factory=list)
     metadata: SessionMetadata = field(default=None)
     
@@ -116,11 +136,30 @@ class SessionData:
                 delegation_summary=_summarize_delegation_status(self.delegation_status),
                 extension_summary=_summarize_extension_manifests(self.extension_manifests),
                 readiness_summary=_summarize_readiness_report(self.readiness_report),
+                turn_count=len(self.turns)
+                or sum(
+                    1 for message in self.messages
+                    if isinstance(message, dict) and message.get("role") == "user"
+                ),
+                user_input_count=sum(
+                    1 for message in self.messages
+                    if isinstance(message, dict) and message.get("role") == "user"
+                ),
+                tool_call_count=sum(
+                    1 for message in self.messages
+                    if isinstance(message, dict)
+                    and message.get("role") in {"assistant_tool_call", "tool_result", "tool"}
+                ),
+                memory_summary=_summarize_memory_continuity(self.memory_continuity),
             )
 
     def update_metadata(self) -> None:
         """Refresh metadata from current state."""
         self.updated_at = time.time()
+        # The legacy payload and Rust-compatible bundle both identify the
+        # session from this field.  Keep it aligned even when callers reuse a
+        # deserialized SessionMetadata object or mutate session_id in tests.
+        self.metadata.session_id = self.session_id
         self.metadata.updated_at = self.updated_at
         self.metadata.message_count = len(self.messages)
         self.metadata.runtime_summary = _runtime_summary_from_transcript_entries(
@@ -139,6 +178,24 @@ class SessionData:
         )
         self.metadata.readiness_summary = _summarize_readiness_report(
             self.readiness_report
+        )
+        user_input_count = sum(
+            1 for message in self.messages
+            if isinstance(message, dict) and message.get("role") == "user"
+        )
+        tool_call_count = sum(
+            1 for message in self.messages
+            if isinstance(message, dict)
+            and message.get("role") in {"assistant_tool_call", "tool_result", "tool"}
+        )
+        self.metadata.turn_count = len(self.turns) or user_input_count
+        self.metadata.user_input_count = user_input_count
+        self.metadata.tool_call_count = tool_call_count
+        self.metadata.memory_summary = _summarize_memory_continuity(
+            self.memory_continuity
+        )
+        self.metadata.duration_seconds = max(
+            0, int(self.updated_at - self.created_at)
         )
 
         # Extract first user message (truncated)
@@ -298,6 +355,18 @@ def _summarize_readiness_report(report: dict[str, Any]) -> str:
     return status or provider
 
 
+def _summarize_memory_continuity(snapshot: dict[str, Any]) -> str:
+    """Return a compact, content-free summary for session listings."""
+
+    if not isinstance(snapshot, dict) or not snapshot:
+        return ""
+    counts = snapshot.get("scope_counts")
+    if isinstance(counts, dict):
+        total = sum(value for value in counts.values() if isinstance(value, int))
+        return f"{total} memory entr{'y' if total == 1 else 'ies'} tracked"
+    return str(snapshot.get("schema") or "memory continuity")
+
+
 def _format_named_collection(items: list[Any], *, fallback: str = "(none)") -> str:
     names = _named_list(items)
     return ", ".join(names) if names else fallback
@@ -333,11 +402,15 @@ def _deserialize_checkpoint(data: dict[str, Any]) -> FileCheckpoint:
 
 def _session_file(session_id: str) -> Path:
     """Return path to a session JSON file."""
+    if not _valid_session_id(session_id):
+        raise ValueError("invalid session id for session path")
     return SESSIONS_DIR / f"{session_id}.json"
 
 
 def _session_delta_dir(session_id: str) -> Path:
     """Return path to a session's delta directory."""
+    if not _valid_session_id(session_id):
+        raise ValueError("invalid session id for session path")
     return SESSIONS_DIR / DELTA_DIR_NAME / session_id
 
 
@@ -349,16 +422,28 @@ def _session_index_file() -> Path:
 def _load_session_index() -> dict[str, SessionMetadata]:
     """Load the session index (lightweight metadata for all sessions)."""
     index_path = _session_index_file()
-    if not index_path.exists():
+    if index_path.is_symlink() or not index_path.is_file():
         return {}
     try:
         raw = index_path.read_text(encoding="utf-8")
         data = json.loads(raw)
-        return {
-            sid: SessionMetadata(**meta)
-            for sid, meta in data.items()
-        }
-    except (json.JSONDecodeError, TypeError, KeyError):
+        if not isinstance(data, dict):
+            return {}
+        valid: dict[str, SessionMetadata] = {}
+        for sid, meta in data.items():
+            if not _valid_session_id(sid) or not isinstance(meta, dict):
+                continue
+            metadata_sid = meta.get("session_id")
+            if metadata_sid not in {None, sid}:
+                continue
+            if metadata_sid is None:
+                meta = {**meta, "session_id": sid}
+            try:
+                valid[sid] = SessionMetadata(**meta)
+            except (TypeError, ValueError, OverflowError):
+                continue
+        return valid
+    except (json.JSONDecodeError, OSError, TypeError, KeyError, AttributeError):
         return {}
 
 
@@ -382,13 +467,18 @@ def _save_session_index(index: dict[str, SessionMetadata]) -> None:
             "delegation_summary": meta.delegation_summary,
             "extension_summary": meta.extension_summary,
             "readiness_summary": meta.readiness_summary,
+            "ended_at": meta.ended_at,
+            "duration_seconds": meta.duration_seconds,
+            "model": meta.model,
+            "turn_count": meta.turn_count,
+            "user_input_count": meta.user_input_count,
+            "tool_call_count": meta.tool_call_count,
+            "status": meta.status,
+            "memory_summary": meta.memory_summary,
         }
         for sid, meta in index.items()
     }
-    _session_index_file().write_text(
-        json.dumps(serializable, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    atomic_write_json(_session_index_file(), serializable)
 
 
 def _save_delta(session: SessionData) -> None:
@@ -399,6 +489,10 @@ def _save_delta(session: SessionData) -> None:
     the entire session on every autosave.
     """
     delta_dir = _session_delta_dir(session.session_id)
+    if delta_dir.is_symlink() or (
+        delta_dir.exists() and not delta_dir.is_dir()
+    ):
+        raise OSError("invalid session delta directory")
     delta_dir.mkdir(parents=True, exist_ok=True)
     
     # Collect new messages since last save
@@ -426,10 +520,7 @@ def _save_delta(session: SessionData) -> None:
     # Write delta file with sequential numbering
     delta_num = session._delta_save_count
     delta_path = delta_dir / f"delta_{delta_num:04d}.json"
-    delta_path.write_text(
-        json.dumps(delta_data, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
+    atomic_write_json(delta_path, delta_data)
     
     # Update tracking
     session._last_saved_msg_count = len(session.messages)
@@ -445,11 +536,13 @@ def _consolidate_deltas(session: SessionData) -> None:
     and to ensure the full session file stays consistent.
     """
     delta_dir = _session_delta_dir(session.session_id)
-    if not delta_dir.exists():
+    if delta_dir.is_symlink() or not delta_dir.is_dir():
         return
     
     # Deltas are already applied during load_session, so just clean up
     for delta_file in sorted(delta_dir.glob("delta_*.json")):
+        if delta_file.is_symlink() or not delta_file.is_file():
+            continue
         try:
             delta_file.unlink()
         except OSError:
@@ -468,6 +561,122 @@ def _consolidate_deltas(session: SessionData) -> None:
     session._delta_save_count = 0
 
 
+def _sync_session_contract(session: SessionData) -> Any:
+    """Refresh Rust-compatible turn/metadata fields before persistence."""
+
+    record = build_session_record(session)
+    session.turns = [turn.to_dict() for turn in record.turns]
+    session.metadata.message_count = len(session.messages)
+    session.metadata.updated_at = session.updated_at
+    session.metadata.ended_at = record.metadata.ended_at
+    session.metadata.duration_seconds = record.metadata.duration_seconds
+    session.metadata.model = record.metadata.model
+    session.metadata.turn_count = record.metadata.turn_count
+    session.metadata.user_input_count = record.metadata.user_input_count
+    session.metadata.tool_call_count = record.metadata.tool_call_count
+    session.metadata.status = record.metadata.status
+    session.metadata.memory_summary = _summarize_memory_continuity(
+        session.memory_continuity
+    )
+    return record
+
+
+def _transcript_entries_from_messages(
+    messages: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Create a minimal Python transcript when loading a Rust-only bundle."""
+
+    entries: list[dict[str, Any]] = []
+    for index, message in enumerate(messages, 1):
+        if not isinstance(message, dict):
+            continue
+        role = str(message.get("role") or "").lower()
+        if role == "system":
+            continue
+        if role == "user":
+            kind = "user"
+        elif role in {"tool_result", "tool", "assistant_tool_call"}:
+            kind = "tool:error" if message.get("isError") or message.get("is_error") else "tool"
+        else:
+            kind = "assistant"
+        content = message.get("content", "")
+        if not isinstance(content, str):
+            try:
+                content = json.dumps(content, ensure_ascii=False)
+            except (TypeError, ValueError):
+                content = str(content)
+        entries.append({"id": index, "kind": kind, "body": content})
+    return entries
+
+
+def _contract_timestamp(value: str | None, fallback: float) -> float:
+    if value:
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            pass
+    return fallback
+
+
+def _load_session_from_bundle(session_id: str) -> SessionData | None:
+    """Load the Rust-compatible bundle when the legacy file is unavailable."""
+
+    record = read_session_bundle(session_id, SESSIONS_DIR)
+    if record is None:
+        return None
+
+    created_at = _contract_timestamp(record.metadata.created_at, time.time())
+    updated_at = _contract_timestamp(record.metadata.updated_at, created_at)
+    extensions = record.extensions
+    transcript_entries = extensions.get("transcript_entries", [])
+    if not isinstance(transcript_entries, list):
+        transcript_entries = _transcript_entries_from_messages(record.messages)
+    raw_checkpoints = extensions.get("checkpoints", [])
+    checkpoints: list[FileCheckpoint] = []
+    if isinstance(raw_checkpoints, list):
+        for item in raw_checkpoints:
+            if not isinstance(item, dict) or not item.get("checkpoint_id"):
+                continue
+            try:
+                checkpoints.append(_deserialize_checkpoint(item))
+            except (KeyError, TypeError, ValueError):
+                continue
+    metadata = SessionMetadata(
+        session_id=record.metadata.session_id,
+        created_at=created_at,
+        updated_at=updated_at,
+        message_count=len(record.messages),
+        workspace=record.metadata.cwd,
+        ended_at=record.metadata.ended_at,
+        duration_seconds=record.metadata.duration_seconds,
+        model=record.metadata.model,
+        turn_count=record.metadata.turn_count,
+        user_input_count=record.metadata.user_input_count,
+        tool_call_count=record.metadata.tool_call_count,
+        status=record.metadata.status,
+        memory_summary=_summarize_memory_continuity(record.memory_continuity),
+        checkpoint_count=len(checkpoints),
+    )
+    session = SessionData(
+        session_id=record.session_id,
+        created_at=created_at,
+        updated_at=updated_at,
+        workspace=record.metadata.cwd,
+        messages=record.messages,
+        transcript_entries=transcript_entries,
+        turns=[turn.to_dict() for turn in record.turns],
+        history=record.input_history,
+        memory_continuity=record.memory_continuity,
+        checkpoints=checkpoints,
+        metadata=metadata,
+    )
+    session._last_saved_msg_count = len(session.messages)
+    session._last_saved_transcript_count = len(session.transcript_entries)
+    session._last_saved_checkpoint_count = len(session.checkpoints)
+    session._last_full_save_hash = session._compute_content_hash()
+    return session
+
+
 def save_session(session: SessionData, force_full: bool = False) -> None:
     """Persist session to disk with incremental delta support.
 
@@ -480,8 +689,11 @@ def save_session(session: SessionData, force_full: bool = False) -> None:
         session: The session to save
         force_full: Force a full save (e.g., on explicit save command)
     """
+    if not _valid_session_id(session.session_id):
+        raise ValueError("invalid session id for session path")
     log_session_event("save", details=f"id={session.session_id} force_full={force_full}")
     session.update_metadata()
+    _sync_session_contract(session)
     SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
     
     # Decide whether to do a full save or delta save
@@ -502,6 +714,7 @@ def save_session(session: SessionData, force_full: bool = False) -> None:
             "workspace": session.workspace,
             "messages": session.messages,
             "transcript_entries": session.transcript_entries,
+            "turns": session.turns,
             "history": session.history,
             "permissions_summary": session.permissions_summary,
             "skills": session.skills,
@@ -512,6 +725,7 @@ def save_session(session: SessionData, force_full: bool = False) -> None:
             "delegation_status": session.delegation_status,
             "extension_manifests": session.extension_manifests,
             "readiness_report": session.readiness_report,
+            "memory_continuity": session.memory_continuity,
             "checkpoints": [_serialize_checkpoint(cp) for cp in session.checkpoints],
             "metadata": {
                 "session_id": session.metadata.session_id,
@@ -528,12 +742,17 @@ def save_session(session: SessionData, force_full: bool = False) -> None:
                 "delegation_summary": session.metadata.delegation_summary,
                 "extension_summary": session.metadata.extension_summary,
                 "readiness_summary": session.metadata.readiness_summary,
+                "ended_at": session.metadata.ended_at,
+                "duration_seconds": session.metadata.duration_seconds,
+                "model": session.metadata.model,
+                "turn_count": session.metadata.turn_count,
+                "user_input_count": session.metadata.user_input_count,
+                "tool_call_count": session.metadata.tool_call_count,
+                "status": session.metadata.status,
+                "memory_summary": session.metadata.memory_summary,
             },
         }
-        session_path.write_text(
-            json.dumps(serializable, indent=2, ensure_ascii=False) + "\n",
-            encoding="utf-8",
-        )
+        atomic_write_json(session_path, serializable)
         
         # Reset delta tracking
         session._last_saved_msg_count = len(session.messages)
@@ -552,6 +771,17 @@ def save_session(session: SessionData, force_full: bool = False) -> None:
     index[session.session_id] = session.metadata
     _save_session_index(index)
 
+    # Keep a Rust-readable bundle beside the legacy file during migration.
+    # The legacy path remains the recovery source when a crash leaves the
+    # bundle partially written, while a bundle-only session can be resumed.
+    try:
+        write_session_bundle(session, SESSIONS_DIR)
+    except (OSError, TypeError, ValueError) as exc:
+        log_session_event(
+            "bundle_write_error",
+            details=f"id={session.session_id} error={type(exc).__name__}",
+        )
+
 
 def load_session(session_id: str) -> SessionData | None:
     """Load a session from disk, applying any pending deltas.
@@ -562,15 +792,27 @@ def load_session(session_id: str) -> SessionData | None:
     3. Apply deltas in order (append new messages/transcripts)
     4. Update tracking counters
     """
+    if not _valid_session_id(session_id):
+        return None
     log_session_event("load", details=f"id={session_id}")
     session_path = _session_file(session_id)
-    if not session_path.exists():
-        return None
+    if session_path.is_symlink() or not session_path.is_file():
+        return _load_session_from_bundle(session_id)
 
     try:
         raw = session_path.read_text(encoding="utf-8")
         data = json.loads(raw)
-        metadata = SessionMetadata(**data.get("metadata", {}))
+        if not isinstance(data, dict):
+            return _load_session_from_bundle(session_id)
+        if data.get("session_id") != session_id:
+            return _load_session_from_bundle(session_id)
+        metadata_payload = data.get("metadata", {})
+        if (
+            isinstance(metadata_payload, dict)
+            and metadata_payload.get("session_id") not in {None, session_id}
+        ):
+            return _load_session_from_bundle(session_id)
+        metadata = SessionMetadata(**metadata_payload)
         session = SessionData(
             session_id=data["session_id"],
             created_at=data["created_at"],
@@ -578,6 +820,7 @@ def load_session(session_id: str) -> SessionData | None:
             workspace=data["workspace"],
             messages=data.get("messages", []),
             transcript_entries=data.get("transcript_entries", []),
+            turns=data.get("turns", []),
             history=data.get("history", []),
             permissions_summary=data.get("permissions_summary", {}),
             skills=data.get("skills", []),
@@ -588,6 +831,7 @@ def load_session(session_id: str) -> SessionData | None:
             delegation_status=data.get("delegation_status", {}),
             extension_manifests=data.get("extension_manifests", []),
             readiness_report=data.get("readiness_report", {}),
+            memory_continuity=data.get("memory_continuity", {}),
             checkpoints=[
                 _deserialize_checkpoint(item)
                 for item in data.get("checkpoints", [])
@@ -598,9 +842,11 @@ def load_session(session_id: str) -> SessionData | None:
         
         # Apply any pending deltas
         delta_dir = _session_delta_dir(session_id)
-        if delta_dir.exists():
+        if not delta_dir.is_symlink() and delta_dir.is_dir():
             delta_files = sorted(delta_dir.glob("delta_*.json"))
             for delta_path in delta_files:
+                if delta_path.is_symlink() or not delta_path.is_file():
+                    continue
                 try:
                     delta_raw = delta_path.read_text(encoding="utf-8")
                     delta = json.loads(delta_raw)
@@ -648,10 +894,22 @@ def load_session(session_id: str) -> SessionData | None:
         session._last_saved_transcript_count = len(session.transcript_entries)
         session._last_saved_checkpoint_count = len(session.checkpoints)
         session._last_full_save_hash = session._compute_content_hash()
+        # Deltas can append messages after the base turn list was written.
+        # Re-derive the compact turn view so Rust readers and Python resume
+        # both observe the same current conversation boundary.
+        _sync_session_contract(session)
         
         return session
-    except (json.JSONDecodeError, KeyError, TypeError):
-        return None
+    except (
+        json.JSONDecodeError,
+        OSError,
+        KeyError,
+        TypeError,
+        ValueError,
+        OverflowError,
+        AttributeError,
+    ):
+        return _load_session_from_bundle(session_id)
 
 
 def list_sessions(workspace: str | None = None) -> list[SessionMetadata]:
@@ -673,17 +931,23 @@ def list_sessions(workspace: str | None = None) -> list[SessionMetadata]:
 
 def delete_session(session_id: str) -> bool:
     """Delete a session from disk. Returns True if deleted."""
+    if not _valid_session_id(session_id):
+        return False
     session_path = _session_file(session_id)
-    if not session_path.exists():
+    bundle_path = SESSIONS_DIR / session_id
+    bundle_exists = bundle_path.is_dir() and not bundle_path.is_symlink()
+    if not session_path.exists() and not bundle_exists:
         return False
 
     try:
-        session_path.unlink()
+        if session_path.exists():
+            session_path.unlink()
         # Clean up orphaned delta files
         delta_dir = _session_delta_dir(session_id)
         if delta_dir.exists():
             import shutil
             shutil.rmtree(delta_dir, ignore_errors=True)
+        delete_session_bundle(session_id, SESSIONS_DIR)
         index = _load_session_index()
         index.pop(session_id, None)
         _save_session_index(index)
