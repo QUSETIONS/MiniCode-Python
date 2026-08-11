@@ -16,7 +16,6 @@ why a memory was surfaced.
 from __future__ import annotations
 
 import json
-import math
 import re
 import time
 import uuid
@@ -654,7 +653,7 @@ class MemoryGraphStore:
         changed = False
         for entry in entry_list:
             fact_id = f"memory:{entry.id}"
-            fact = self.add_fact(
+            self.add_fact(
                 fact_id=fact_id,
                 memory_id=entry.id,
                 scope=getattr(entry, "scope", "project"),
