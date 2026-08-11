@@ -46,7 +46,23 @@ def test_runtime_profile_provider_diagnostic_includes_headless_trace_context(tmp
     assert diagnostic.readiness_status == "warning"
     assert diagnostic.repair_step_count == 2
     assert diagnostic.trace_artifact == str(trace_path)
-    assert any(str(trace_path) in item for item in diagnostic.guidance)
+    trace_guidance = [item for item in diagnostic.guidance if str(trace_path) in item]
+    assert trace_guidance == [f"Inspect headless trace artifact: {trace_path}"]
+
+
+def test_runtime_profile_provider_diagnostic_shares_local_channel_classification() -> None:
+    diagnostic = _classify_provider_diagnostic(
+        label="headless-smoke",
+        command="python -m minicode.headless Reply with exactly OK.",
+        exit_code=1,
+        stdout="",
+        stderr="No available channel for model.",
+    )
+
+    assert diagnostic.outcome == "provider_channel_unavailable"
+    assert diagnostic.risk_scope == "provider-config"
+    assert diagnostic.failure_category == "configuration"
+    assert diagnostic.ownership == "local-configuration"
 
 
 def test_runtime_profile_provider_diagnostic_classifies_local_config_failure() -> None:

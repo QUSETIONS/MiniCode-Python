@@ -13,6 +13,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from minicode.release_readiness import (
+    classify_provider_outcome,
     normalize_evidence_paths,
     redact_sensitive_payload,
     redact_sensitive_text,
@@ -149,10 +150,11 @@ def _classify_provider_diagnostic(
     trace_artifact: Path | None = None,
     trace_payload: dict | None = None,
 ) -> ProviderDiagnostic:
-    combined = " ".join(f"{stdout}\n{stderr}".lower().split())
-    stripped_stdout = stdout.strip()
-    summary_source = stripped_stdout or stderr.strip()
-    summary_line = summary_source.splitlines()[0].strip() if summary_source else ""
+    outcome, summary_line = classify_provider_outcome(
+        exit_code=exit_code,
+        stdout=stdout,
+        stderr=stderr,
+    )
     provider_context = extract_provider_error_context(
         summary_line,
         stdout,
@@ -160,42 +162,27 @@ def _classify_provider_diagnostic(
     )
     risk_scope = "unknown"
     guidance: list[str] = []
-    if exit_code == 0 and stripped_stdout == "OK":
-        outcome = "answered"
+    if outcome == "answered":
         risk_scope = "none"
-    elif (
-        "provider availability failure" in combined
-        or "all viable fallback models were unavailable" in combined
-    ):
-        outcome = "provider_outage"
+    elif outcome == "provider_outage":
         risk_scope = "external-provider"
         guidance = [
             "Check upstream provider availability and retry the headless provider smoke.",
             "Configure fallbackModels or provider-specific fallback models before relying on live-provider release evidence.",
         ]
-    elif any(
-        marker in combined
-        for marker in (
-            "no available channel",
-            "no model configured",
-            "no auth configured",
-        )
-    ):
-        outcome = "provider_channel_unavailable"
+    elif outcome == "provider_channel_unavailable":
         risk_scope = "provider-config"
         guidance = [
             "Verify the selected model group and provider channel configuration.",
             "Add a viable fallback provider/model or credentials for the configured channel.",
         ]
-    elif "model api error" in combined:
-        outcome = "provider_api_error"
+    elif outcome == "provider_api_error":
         risk_scope = "external-provider"
         guidance = [
             "Inspect the provider error code and request id in stderr/stdout.",
             "Retry with a known available fallback model before marking live-provider readiness as stable.",
         ]
-    elif "empty response" in combined:
-        outcome = "empty_output"
+    elif outcome == "empty_output":
         risk_scope = "provider-response"
         guidance = [
             "Retry the headless provider smoke and inspect provider response logs.",
