@@ -1,15 +1,22 @@
 from __future__ import annotations
 
+import argparse
 import json
 import os
-from dataclasses import asdict
-from pathlib import Path
 import subprocess
 import sys
+import tempfile
+from dataclasses import asdict
+from pathlib import Path
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from minicode.release_readiness import (
+    normalize_evidence_paths,
+    redact_sensitive_payload,
+    redact_sensitive_text,
+)
 from minicode.runtime_profile_eval import (
     ProviderDiagnostic,
     RuntimeEvalCondition,
@@ -20,16 +27,30 @@ from minicode.runtime_profile_eval import (
     runtime_profile_eval_as_dict,
     runtime_profile_eval_as_markdown,
 )
-from minicode.release_readiness import (
-    normalize_evidence_paths,
-    redact_sensitive_payload,
-    redact_sensitive_text,
-)
 from minicode.tooling import ToolRegistry
 from minicode.types import AgentStep, ChatMessage, ModelAdapter
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
+LIVE_PROVIDER_SMOKE_ENV = "MINICODE_LIVE_PROVIDER_SMOKE"
+
+
+def _truthy(value: str | None) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _clear_provider_environment(env: dict[str, str]) -> None:
+    """Make the non-live runtime profile subprocess unable to use credentials."""
+    for key in list(env):
+        if key.startswith((
+            "MINI_CODE_",
+            "OPENAI_",
+            "ANTHROPIC_",
+            "OPENROUTER_",
+            "CUSTOM_",
+            "DEEPSEEK_",
+        )):
+            env.pop(key, None)
+    env.pop(LIVE_PROVIDER_SMOKE_ENV, None)
 
 
 def _portable_provider_diagnostic(
@@ -225,7 +246,7 @@ def _classify_provider_diagnostic(
     )
 
 
-def collect_provider_diagnostics() -> list[ProviderDiagnostic]:
+def collect_provider_diagnostics(*, allow_live: bool = False) -> list[ProviderDiagnostic]:
     command = [sys.executable, "-m", "minicode.headless", "Reply with exactly OK."]
     trace_artifact = REPO_ROOT / ".temp" / "headless-provider-smoke-trace.json"
     trace_artifact.parent.mkdir(parents=True, exist_ok=True)
@@ -234,6 +255,13 @@ def collect_provider_diagnostics() -> list[ProviderDiagnostic]:
     except FileNotFoundError:
         pass
     env = dict(os.environ)
+    live_enabled = allow_live and _truthy(env.get(LIVE_PROVIDER_SMOKE_ENV))
+    isolated_home: tempfile.TemporaryDirectory[str] | None = None
+    if not live_enabled:
+        _clear_provider_environment(env)
+        isolated_home = tempfile.TemporaryDirectory(prefix="minicode-runtime-profile-home-")
+        env["HOME"] = isolated_home.name
+        env["USERPROFILE"] = isolated_home.name
     env["MINI_CODE_HEADLESS_MESSAGES_OUT"] = str(trace_artifact)
     try:
         completed = subprocess.run(
@@ -287,16 +315,30 @@ def collect_provider_diagnostics() -> list[ProviderDiagnostic]:
                 recovery_action=failure.recovery_action,
             )
         ]
+    finally:
+        if isolated_home is not None:
+            isolated_home.cleanup()
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description="Evaluate runtime profiles and optionally run an explicit live provider smoke."
+    )
+    parser.add_argument(
+        "--live-provider-smoke",
+        action="store_true",
+        help=f"Allow a live smoke only when {LIVE_PROVIDER_SMOKE_ENV}=1 is also set.",
+    )
+    args = parser.parse_args(argv)
     rows = evaluate_runtime_profiles(
         scenarios=build_demo_scenarios(),
         conditions=build_demo_conditions(),
     )
     provider_diagnostics = [
         _portable_provider_diagnostic(diagnostic)
-        for diagnostic in collect_provider_diagnostics()
+        for diagnostic in collect_provider_diagnostics(
+            allow_live=args.live_provider_smoke,
+        )
     ]
     payload = redact_sensitive_payload(
         runtime_profile_eval_as_dict(rows, provider_diagnostics)

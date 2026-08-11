@@ -50,6 +50,7 @@ def test_console_script_entry_points_match_main_lifecycle_contract() -> None:
     assert pyproject["project"]["scripts"] == {
         **lifecycle_script_targets(),
         "minicode-structure-check": "minicode.structure_check:main",
+        "minicode-provider-smoke": "minicode.provider_smoke:main",
     }
 
 

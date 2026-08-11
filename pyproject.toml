@@ -18,6 +18,7 @@ minicode-py = "minicode.main:main"
 minicode-headless = "minicode.headless:main"
 minicode-readiness = "minicode.readiness:main"
 minicode-structure-check = "minicode.structure_check:main"
+minicode-provider-smoke = "minicode.provider_smoke:main"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

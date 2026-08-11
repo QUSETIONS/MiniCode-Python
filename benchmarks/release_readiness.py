@@ -4,18 +4,20 @@ import argparse
 import json
 import os
 import subprocess
-from datetime import datetime, timezone
-from pathlib import Path
 import sys
+import tempfile
+from datetime import UTC, datetime
+from pathlib import Path
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from minicode.product_surfaces import build_readiness_report
 from minicode.release_readiness import (
     ReleaseCheck,
     build_artifact_manifest,
-    check_artifact_redaction,
     check_artifact_manifest,
+    check_artifact_redaction,
     check_fallback_evidence_payload,
     check_fallback_patch_preview,
     check_fallback_simulation,
@@ -36,7 +38,6 @@ from minicode.runtime_profile_eval import (
     classify_provider_failure,
     extract_provider_error_context,
 )
-from minicode.product_surfaces import build_readiness_report
 from minicode.session import (
     create_file_checkpoint,
     create_new_session,
@@ -45,13 +46,12 @@ from minicode.session import (
     save_session,
 )
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BENCHMARKS_DIR = REPO_ROOT / "benchmarks"
 
 
 def _clear_test_provider_environment(env: dict[str, str]) -> None:
-    """Keep the release test suite hermetic while live smoke uses real config."""
+    """Remove provider credentials and live-smoke gates from child checks."""
     for key in list(env):
         if key.startswith((
             "MINI_CODE_",
@@ -62,6 +62,7 @@ def _clear_test_provider_environment(env: dict[str, str]) -> None:
             "DEEPSEEK_",
         )):
             env.pop(key, None)
+    env.pop("MINICODE_LIVE_PROVIDER_SMOKE", None)
 
 
 def _normalize_evidence_paths(
@@ -75,8 +76,7 @@ def _normalize_evidence_paths(
 
 def _run_command(label: str, command: list[str], *, cwd: Path, timeout: int = 1800) -> ReleaseCheck:
     env = dict(os.environ)
-    if label == "pytest-q":
-        _clear_test_provider_environment(env)
+    _clear_test_provider_environment(env)
     existing_pythonpath = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = (
         str(REPO_ROOT)
@@ -84,17 +84,23 @@ def _run_command(label: str, command: list[str], *, cwd: Path, timeout: int = 18
         else f"{REPO_ROOT}{os.pathsep}{existing_pythonpath}"
     )
     try:
-        completed = subprocess.run(
-            command,
-            cwd=cwd,
-            env=env,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout,
-            check=False,
-        )
+        # Config is read at import time from Path.home().  An empty temporary
+        # home keeps release checks offline even when ~/.mini-code/settings.json
+        # contains valid provider credentials.
+        with tempfile.TemporaryDirectory(prefix="minicode-release-home-") as isolated_home:
+            env["HOME"] = isolated_home
+            env["USERPROFILE"] = isolated_home
+            completed = subprocess.run(
+                command,
+                cwd=cwd,
+                env=env,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=timeout,
+                check=False,
+            )
         stdout = completed.stdout.strip()
         stderr = completed.stderr.strip()
         summary_source = stdout or stderr
@@ -444,7 +450,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    generated_at = datetime.now(timezone.utc).isoformat()
+    generated_at = datetime.now(UTC).isoformat()
     workspace = REPO_ROOT / "outputs" / "release_smoke_workspace"
     _prepare_saved_session(workspace)
     readiness_examples_path = REPO_ROOT / ".temp" / "readiness-fallback-examples.json"

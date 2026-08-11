@@ -114,6 +114,40 @@ def test_release_pytest_command_does_not_inherit_live_provider_environment(
     assert "OPENAI_MODEL_FALLBACKS" not in captured
 
 
+def test_release_runtime_profile_command_is_offline_even_with_global_provider_config(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "live-secret")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://provider.example/v1")
+    monkeypatch.setenv("MINICODE_LIVE_PROVIDER_SMOKE", "1")
+    captured: dict[str, str] = {}
+
+    def fake_run(*args, **kwargs):
+        captured.update(kwargs["env"])
+        return subprocess.CompletedProcess(
+            args=args[0],
+            returncode=0,
+            stdout="runtime profile ok\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr("benchmarks.release_readiness.subprocess.run", fake_run)
+
+    check = _run_command(
+        "runtime-profile-eval",
+        [sys.executable, "benchmarks/runtime_profile_eval.py"],
+        cwd=tmp_path,
+        timeout=30,
+    )
+
+    assert check.status == "passed"
+    assert "OPENAI_API_KEY" not in captured
+    assert "OPENAI_BASE_URL" not in captured
+    assert "MINICODE_LIVE_PROVIDER_SMOKE" not in captured
+    assert captured["HOME"] != str(Path.home())
+
+
 def test_release_readiness_snapshot_preserves_local_preflight() -> None:
     report = ReadinessReport(
         status="warning",

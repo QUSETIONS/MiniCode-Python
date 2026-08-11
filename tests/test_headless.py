@@ -260,7 +260,7 @@ def test_run_headless_writes_trace_when_runtime_config_is_invalid(
     assert payload["error"] == "No model configured."
     assert payload["messages"] == []
     assert payload["readiness_report"]["status"] in {"warning", "blocked", "unknown"}
-    assert isinstance(payload["repair_plan"], list)
+    assert payload["repair_plan"]
 
 
 def test_run_headless_failure_trace_includes_redacted_repair_context(monkeypatch, tmp_path: Path) -> None:
